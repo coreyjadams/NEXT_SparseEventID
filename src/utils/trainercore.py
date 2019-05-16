@@ -76,13 +76,7 @@ class trainercore(object):
                 data_keys[proc._name] = proc._name
 
         # Assign the keywords here:
-        if FLAGS.LABEL_MODE == 'all':
-            FLAGS.KEYWORD_LABEL = 'label'
-        else:
-            FLAGS.KEYWORD_LABEL = []
-            for key in data_keys.keys():
-                if key != 'image':
-                    FLAGS.KEYWORD_LABEL.append(key)
+        FLAGS.KEYWORD_LABEL = 'label'
 
         self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys)
 
@@ -144,10 +138,7 @@ class trainercore(object):
         dims = self._larcv_interface.fetch_minibatch_dims('primary')
 
         # This sets up the necessary output shape:
-        if FLAGS.LABEL_MODE == 'split':
-            output_shape = { key : dims[key] for key in FLAGS.KEYWORD_LABEL}
-        else:
-            output_shape = dims[FLAGS.KEYWORD_LABEL]
+        output_shape = dims[FLAGS.KEYWORD_LABEL]
 
 
         self._net = FLAGS._net(output_shape)
@@ -228,37 +219,17 @@ class trainercore(object):
         device = self.get_device()
 
         # here we store the loss weights:
-        if FLAGS.LABEL_MODE == 'all':
-            self._label_weights = torch.tensor([ 
-                4930., 247., 2311., 225., 11833., 1592., 3887., 378., 4966., 1169., 1944., 335., 
-                5430., 201., 1630., 67., 13426., 1314., 3111., 243., 5070., 788., 1464., 163.,
-                5851.,3267.,1685.,183.,7211.,3283.,2744.,302.,5804.,1440.,1302., 204.
-                ], device=device)
-            weights = torch.sum(self._label_weights) / self._label_weights
-            self._label_weights = weights / torch.sum(weights)
+        self._label_weights = torch.tensor([ 
+            4930., 247., 2311., 225., 11833., 1592., 3887., 378., 4966., 1169., 1944., 335., 
+            5430., 201., 1630., 67., 13426., 1314., 3111., 243., 5070., 788., 1464., 163.,
+            5851.,3267.,1685.,183.,7211.,3283.,2744.,302.,5804.,1440.,1302., 204.
+            ], device=device)
+        weights = torch.sum(self._label_weights) / self._label_weights
+        self._label_weights = weights / torch.sum(weights)
 
-            self._criterion = torch.nn.CrossEntropyLoss(weight=self._label_weights)
+        self._criterion = torch.nn.CrossEntropyLoss(weight=self._label_weights)
 
-
-        elif FLAGS.LABEL_MODE == 'split':
-            # These are the raw category occurences
-            self._label_weights = {
-                'label_cpi'  : torch.tensor([7784., 2216.], device=device),
-                'label_prot' : torch.tensor([2658., 4940., 2402.], device=device), 
-                'label_npi'  : torch.tensor([8448., 1552.], device=device),
-                'label_neut' : torch.tensor([3322., 3317., 3361.], device=device)
-            }
-
-            self._criterion = {}
-
-            for key in self._label_weights:
-                weights = torch.sum(self._label_weights[key]) / self._label_weights[key]
-                self._label_weights[key] = weights / torch.sum(weights)
-
-
-
-            for key in self._label_weights:
-                self._criterion[key] = torch.nn.CrossEntropyLoss(weight=self._label_weights[key])
+       
 
 
     def init_saver(self):
@@ -426,28 +397,14 @@ class trainercore(object):
         # And it is difficult to bust out of that.
 
 
-        if FLAGS.LABEL_MODE == 'all':
-            values, target = torch.max(inputs[FLAGS.KEYWORD_LABEL], dim = 1)
-            loss = self._criterion(logits, target=target)
-            return loss
-        elif FLAGS.LABEL_MODE == 'split':
-            loss = None
-            for key in logits:
-                values, target = torch.max(inputs[key], dim=1)
+        print(type(inputs))
+        print(FLAGS.KEYWORD_LABEL)
+        print(inputs.keys())
+        values, target = torch.max(inputs[FLAGS.KEYWORD_LABEL], dim = 1)
+        loss = self._criterion(logits, target=target)
+        return loss
 
-                temp_loss = self._criterion[key](logits[key], target= target)
-                # print(temp_loss.shape)
-                # temp_loss *= self._label_weights[key]
-                # print(temp_loss.shape)
-                # temp_loss = torch.sum(temp_loss)
-                # print(temp_loss.shape)
-
-                if loss is None:
-                    loss = temp_loss
-                else:
-                    loss += temp_loss
-
-            return loss
+        return loss
 
 
     def _calculate_accuracy(self, logits, minibatch_data):
