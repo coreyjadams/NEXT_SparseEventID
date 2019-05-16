@@ -41,7 +41,8 @@ print(next_new_meta.dump())
 
 for mode in ['train', 'test', 'val']:
 
-    if mode == 'train': continue
+    if mode == 'test': continue
+    if mode == 'val':  continue
 
     output = "next_new_classification_{}.h5".format(mode)
     io_manager = larcv.IOManager(larcv.IOManager.kWRITE)

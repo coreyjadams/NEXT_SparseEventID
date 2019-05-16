@@ -5,12 +5,9 @@ from . import larcv_io
 # Here, we set up a bunch of template IO formats in the form of callable functions:
 
 def train_io(input_file, image_dim, label_mode, prepend_names=""):
-    if image_dim == "2D":
-        max_voxels = 10000
-        data_proc = gen_sparse2d_data_filler(name=prepend_names + "data", producer="\"sbndwire\"", max_voxels=max_voxels)
-    else:
-        max_voxels = 18000
-        data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"sbndvoxels\"", max_voxels=max_voxels)
+
+    max_voxels = 18000
+    data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"voxels\"", max_voxels=max_voxels)
 
     label_proc = gen_label_filler(label_mode, prepend_names)
 
@@ -18,8 +15,7 @@ def train_io(input_file, image_dim, label_mode, prepend_names=""):
     config = larcv_io.ThreadIOConfig(name="TrainIO")
 
     config.add_process(data_proc)
-    for l in label_proc:
-        config.add_process(l)
+    config.add_process(label_proc)
 
     config.set_param("InputFiles", input_file)
 
@@ -27,12 +23,9 @@ def train_io(input_file, image_dim, label_mode, prepend_names=""):
 
 
 def test_io(input_file, image_dim, label_mode, prepend_names="aux_"):
-    if image_dim == "2D":
-        max_voxels = 10000
-        data_proc = gen_sparse2d_data_filler(name=prepend_names + "data", producer="\"sbndwire\"", max_voxels=max_voxels)
-    else:
-        max_voxels = 18000
-        data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"sbndvoxels\"", max_voxels=max_voxels)
+
+    max_voxels = 18000
+    data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"voxels\"", max_voxels=max_voxels)
 
     label_proc = gen_label_filler(label_mode, prepend_names)
 
@@ -40,8 +33,7 @@ def test_io(input_file, image_dim, label_mode, prepend_names="aux_"):
     config = larcv_io.ThreadIOConfig(name="TestIO")
 
     config.add_process(data_proc)
-    for l in label_proc:
-        config.add_process(l)
+    config.add_process(label_proc)
 
     config.set_param("InputFiles", input_file)
 
@@ -49,12 +41,9 @@ def test_io(input_file, image_dim, label_mode, prepend_names="aux_"):
 
 
 def ana_io(input_file, image_dim, label_mode, prepend_names=""):
-    if image_dim == "2D":
-        max_voxels = 10000
-        data_proc = gen_sparse2d_data_filler(name=prepend_names + "data", producer="\"sbndwire\"", max_voxels=max_voxels)
-    else:
-        max_voxels = 18000
-        data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"sbndvoxels\"", max_voxels=max_voxels)
+
+    max_voxels = 18000
+    data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"voxels\"", max_voxels=max_voxels)
 
 
     label_proc = gen_label_filler(label_mode, prepend_names)
@@ -65,8 +54,7 @@ def ana_io(input_file, image_dim, label_mode, prepend_names=""):
 
     config._params['RandomAccess'] = "0"
     config.add_process(data_proc)
-    for l in label_proc:
-        config.add_process(l)
+    config.add_process(label_proc)
 
     config.set_param("InputFiles", input_file)
 
@@ -125,29 +113,13 @@ def gen_sparse3d_data_filler(name, producer, max_voxels):
 
 def gen_label_filler(label_mode, prepend_names):
 
-    if label_mode == 'all':
+    proc = larcv_io.ProcessConfig(proc_name=prepend_names + "label", proc_type="BatchFillerPIDLabel")
 
-        proc = larcv_io.ProcessConfig(proc_name=prepend_names + "label", proc_type="BatchFillerPIDLabel")
+    proc.set_param("Verbosity",         "3")
+    proc.set_param("ParticleProducer",  "label")
+    proc.set_param("PdgClassList",      "[{}]".format(",".join([str(i) for i in range(2)])))
 
-        proc.set_param("Verbosity",         "3")
-        proc.set_param("ParticleProducer",  "all")
-        proc.set_param("PdgClassList",      "[{}]".format(",".join([str(i) for i in range(36)])))
-
-        return [proc]
-
-    else:
-        procs = []
-        for name, l in zip(['neut', 'prot', 'cpi', 'npi'], [3, 3, 2, 2]): 
-            proc  = larcv_io.ProcessConfig(proc_name=prepend_names + "label_" + name, proc_type="BatchFillerPIDLabel")
-
-            proc.set_param("Verbosity",         "3")
-            proc.set_param("ParticleProducer",  name+"ID")
-            proc.set_param("PdgClassList",      "[{}]".format(",".join([str(i) for i in range(l)])))
-
-            procs.append(proc)
-        return procs
-
-
+    return proc
 
 
 
