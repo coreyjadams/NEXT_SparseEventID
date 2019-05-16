@@ -235,8 +235,8 @@ class trainercore(object):
     def init_saver(self):
 
         # This sets up the summary saver:
-        if FLAGS.TRAINING:
-            self._saver = tensorboardX.SummaryWriter(FLAGS.LOG_DIRECTORY)
+        # if FLAGS.TRAINING:
+        #     self._saver = tensorboardX.SummaryWriter(FLAGS.LOG_DIRECTORY)
 
         if FLAGS.AUX_FILE is not None and FLAGS.TRAINING:
             self._aux_saver = tensorboardX.SummaryWriter(FLAGS.LOG_DIRECTORY + "/test/")
@@ -398,8 +398,6 @@ class trainercore(object):
 
         values, target = torch.max(inputs[FLAGS.KEYWORD_LABEL], dim = 1)
         loss = self._criterion(logits, target=target)
-        return loss
-
         return loss
 
 

@@ -141,6 +141,10 @@ class distributed_trainer(trainercore):
 
     def save_model(self):
 
+        # Don't save if on summit for now
+        if FLAGS.SUMMIT:
+            return True
+
         if hvd.rank() == 0:
             trainercore.save_model(self)
             
@@ -170,6 +174,7 @@ class distributed_trainer(trainercore):
 
 
     def init_saver(self):
+        self._saver = None
         if hvd.rank() == 0:
             trainercore.init_saver(self)
         else:
@@ -202,10 +207,7 @@ class distributed_trainer(trainercore):
         # print("Rank {}".format(hvd.rank()) + " Recieved Dimensions")
 
         # This sets up the necessary output shape:
-        if FLAGS.LABEL_MODE == 'split':
-            output_shape = { key : dims[key] for key in FLAGS.KEYWORD_LABEL}
-        else:
-            output_shape = dims[FLAGS.KEYWORD_LABEL]
+        output_shape = dims[FLAGS.KEYWORD_LABEL]
 
         self._net = FLAGS._net(output_shape)
         # print("Rank {}".format(hvd.rank()) + " Built network")
@@ -261,12 +263,12 @@ class distributed_trainer(trainercore):
 
         print("Rank ", hvd.rank(), next(self._net.parameters()).device)
 
-        if FLAGS.LABEL_MODE == 'all':
-            self._log_keys = ['loss', 'accuracy']
-        elif FLAGS.LABEL_MODE == 'split':
-            self._log_keys = ['loss']
-            for key in FLAGS.KEYWORD_LABEL: 
-                self._log_keys.append('acc/{}'.format(key))
+        # if FLAGS.LABEL_MODE == 'all':
+        self._log_keys = ['loss', 'accuracy']
+        # elif FLAGS.LABEL_MODE == 'split':
+        #     self._log_keys = ['loss']
+        #     for key in FLAGS.KEYWORD_LABEL: 
+        #         self._log_keys.append('acc/{}'.format(key))
 
 
 
