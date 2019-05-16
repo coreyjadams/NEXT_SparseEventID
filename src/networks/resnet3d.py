@@ -97,7 +97,7 @@ class ConvolutionDownsample(nn.Module):
     def __init__(self, inplanes, outplanes):
         nn.Module.__init__(self)
 
-        self.conv2 = torch.nn.Conv3d(
+        self.conv = torch.nn.Conv3d(
             in_channels  = inplanes, 
             out_channels = outplanes, 
             kernel_size  = [2, 2, 2], 
@@ -106,7 +106,7 @@ class ConvolutionDownsample(nn.Module):
             bias         = FLAGS.USE_BIAS)
 
         # if FLAGS.BATCH_NORM:
-        self.bn2 = torch.nn.BatchNorm3d(outplanes)
+        self.bn = torch.nn.BatchNorm3d(outplanes)
         self.relu = torch.nn.ReLU()
 
     def forward(self, x):
@@ -190,20 +190,19 @@ class ResNet(torch.nn.Module):
         # Here, take the final output and convert to a dense tensor:
 
 
-        if FLAGS.LABEL_MODE == 'all':
-            self.final_layer = BlockSeries(
-                        inplanes = n_filters, 
-                        n_blocks = FLAGS.RES_BLOCKS_PER_LAYER,
-                        residual = True)
-                    
-            self.bottleneck  = torch.nn.Conv3d(
-                in_channels  = n_filters, 
-                out_channels = 2, 
-                kernel_size  = [1, 1, 1],
-                stride       = [1, 1, 1],
-                padding      = [0, 0, 0],
-                bias         = FLAGS.USE_BIAS
-            )
+        self.final_layer = BlockSeries(
+                    inplanes = n_filters, 
+                    n_blocks = FLAGS.RES_BLOCKS_PER_LAYER,
+                    residual = True)
+                
+        self.bottleneck  = torch.nn.Conv3d(
+            in_channels  = n_filters, 
+            out_channels = 2, 
+            kernel_size  = [1, 1, 1],
+            stride       = [1, 1, 1],
+            padding      = [0, 0, 0],
+            bias         = FLAGS.USE_BIAS
+        )
 
 
         # # The rest of the final operations (reshape, softmax) are computed in the forward pass
@@ -221,12 +220,11 @@ class ResNet(torch.nn.Module):
 
     def forward(self, x):
         
-        batch_size = x[2]
+        batch_size = x.shape[0]
 
         FLAGS = utils.flags.FLAGS()
 
 
-        x = self.input_tensor(x) 
 
         x = self.initial_convolution(x)
 

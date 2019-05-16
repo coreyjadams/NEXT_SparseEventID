@@ -184,13 +184,7 @@ class trainercore(object):
         if FLAGS.COMPUTE_MODE == "GPU":
             self._net.cuda()
 
-        if FLAGS.LABEL_MODE == 'all':
-            self._log_keys = ['loss', 'accuracy']
-        elif FLAGS.LABEL_MODE == 'split':
-            self._log_keys = ['loss']
-            for key in FLAGS.KEYWORD_LABEL: 
-                self._log_keys.append('acc/{}'.format(key))
-
+        self._log_keys = ['loss', 'accuracy']
 
     def get_device(self):
         # Convert the input data to torch tensors
@@ -219,38 +213,23 @@ class trainercore(object):
 
         device = self.get_device()
 
-        # here we store the loss weights:
-        if FLAGS.LABEL_MODE == 'all':
-            self._label_weights = torch.tensor([ 
-                4930., 247., 2311., 225., 11833., 1592., 3887., 378., 4966., 1169., 1944., 335., 
-                5430., 201., 1630., 67., 13426., 1314., 3111., 243., 5070., 788., 1464., 163.,
-                5851.,3267.,1685.,183.,7211.,3283.,2744.,302.,5804.,1440.,1302., 204.
-                ], device=device)
-            weights = torch.sum(self._label_weights) / self._label_weights
-            self._label_weights = weights / torch.sum(weights)
+# This is doing loss balancing by class for the 36 class example.  We may want this 
+# for our two class network
+####################################################################################
+#        # here we store the loss weights:
+#        self._label_weights = torch.tensor([ 
+#            4930., 247., 2311., 225., 11833., 1592., 3887., 378., 4966., 1169., 1944., 335., 
+#            5430., 201., 1630., 67., 13426., 1314., 3111., 243., 5070., 788., 1464., 163.,
+#            5851.,3267.,1685.,183.,7211.,3283.,2744.,302.,5804.,1440.,1302., 204.
+#            ], device=device)
+#        weights = torch.sum(self._label_weights) / self._label_weights
+#        self._label_weights = weights / torch.sum(weights)
+#
+#        self._criterion = torch.nn.CrossEntropyLoss(weight=self._label_weights)
+####################################################################################
+        self._criterion = torch.nn.CrossEntropyLoss()
 
-            self._criterion = torch.nn.CrossEntropyLoss(weight=self._label_weights)
-
-
-        elif FLAGS.LABEL_MODE == 'split':
-            # These are the raw category occurences
-            self._label_weights = {
-                'label_cpi'  : torch.tensor([7784., 2216.], device=device),
-                'label_prot' : torch.tensor([2658., 4940., 2402.], device=device), 
-                'label_npi'  : torch.tensor([8448., 1552.], device=device),
-                'label_neut' : torch.tensor([3322., 3317., 3361.], device=device)
-            }
-
-            self._criterion = {}
-
-            for key in self._label_weights:
-                weights = torch.sum(self._label_weights[key]) / self._label_weights[key]
-                self._label_weights[key] = weights / torch.sum(weights)
-
-
-
-            for key in self._label_weights:
-                self._criterion[key] = torch.nn.CrossEntropyLoss(weight=self._label_weights[key])
+       
 
 
     def init_saver(self):
@@ -282,7 +261,6 @@ class trainercore(object):
 
         _, checkpoint_file_path = self.get_model_filepath()
 
-        print(checkpoint_file_path)
 
         if not os.path.isfile(checkpoint_file_path):
             print("Returning none!")
@@ -418,28 +396,11 @@ class trainercore(object):
         # And it is difficult to bust out of that.
 
 
-        if FLAGS.LABEL_MODE == 'all':
-            values, target = torch.max(inputs[FLAGS.KEYWORD_LABEL], dim = 1)
-            loss = self._criterion(logits, target=target)
-            return loss
-        elif FLAGS.LABEL_MODE == 'split':
-            loss = None
-            for key in logits:
-                values, target = torch.max(inputs[key], dim=1)
+        values, target = torch.max(inputs[FLAGS.KEYWORD_LABEL], dim = 1)
+        loss = self._criterion(logits, target=target)
+        return loss
 
-                temp_loss = self._criterion[key](logits[key], target= target)
-                # print(temp_loss.shape)
-                # temp_loss *= self._label_weights[key]
-                # print(temp_loss.shape)
-                # temp_loss = torch.sum(temp_loss)
-                # print(temp_loss.shape)
-
-                if loss is None:
-                    loss = temp_loss
-                else:
-                    loss += temp_loss
-
-            return loss
+        return loss
 
 
     def _calculate_accuracy(self, logits, minibatch_data):
@@ -449,21 +410,11 @@ class trainercore(object):
 
         # Compare how often the input label and the output prediction agree:
 
-        if FLAGS.LABEL_MODE == 'all':
 
-            values, indices = torch.max(minibatch_data[FLAGS.KEYWORD_LABEL], dim = 1)
-            values, predict = torch.max(logits, dim=1)
-            correct_prediction = torch.eq(predict,indices)
-            accuracy = torch.mean(correct_prediction.float())
-
-        elif FLAGS.LABEL_MODE == 'split':
-            accuracy = {}
-            for key in logits:
-
-                values, indices = torch.max(minibatch_data[key], dim = 1)
-                values, predict = torch.max(logits[key], dim=1)
-                correct_prediction = torch.eq(predict,indices)
-                accuracy[key] = torch.mean(correct_prediction.float())
+        values, indices = torch.max(minibatch_data[FLAGS.KEYWORD_LABEL], dim = 1)
+        values, predict = torch.max(logits, dim=1)
+        correct_prediction = torch.eq(predict,indices)
+        accuracy = torch.mean(correct_prediction.float())
 
         return accuracy
 
@@ -475,11 +426,7 @@ class trainercore(object):
 
         metrics['loss']     = loss.data
         accuracy = self._calculate_accuracy(logits, minibatch_data)
-        if FLAGS.LABEL_MODE == 'all':
-            metrics['accuracy'] = accuracy
-        elif FLAGS.LABEL_MODE == 'split':
-            for key in accuracy:
-                metrics['acc/{}'.format(key)] = accuracy[key]
+        metrics['accuracy'] = accuracy
 
         return metrics
 
@@ -636,6 +583,7 @@ class trainercore(object):
         return minibatch_data
 
     def train_step(self):
+
 
 
         # For a train step, we fetch data, run a forward and backward pass, and

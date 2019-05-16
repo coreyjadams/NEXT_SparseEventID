@@ -210,11 +210,11 @@ class ResNet(torch.nn.Module):
                 
         self.bottleneck  = scn.SubmanifoldConvolution(dimension=3, 
                     nIn=n_filters, 
-                    nOut=output_shape[key][-1], 
+                    nOut=2, 
                     filter_size=3, 
                     bias=FLAGS.USE_BIAS)
 
-        self.sparse_to_dense = scn.SparseToDense(dimension=3, nPlanes=output_shape[-1])
+        self.sparse_to_dense = scn.SparseToDense(dimension=3, nPlanes=2)
 
 
         # # The rest of the final operations (reshape, softmax) are computed in the forward pass

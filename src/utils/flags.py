@@ -90,7 +90,7 @@ class FLAGS(Borg):
         # is the training data, aux is testing data.
         # In inference mode, default is the validation data, 
         # aux is the outputdata
-        self.FILE                  = "/lus/theta-fs0/projects/datascience/cadams/wire_pixel_preprocessed_files_split/train_event_id.root"
+        self.FILE                  = "/ccs/home/deltutto/data/next_new_classification_train.h5"
         self.IO_VERBOSITY          = 3
         self.KEYWORD_DATA          = 'data'
         # For this classification task, the label can be split or all-in-one

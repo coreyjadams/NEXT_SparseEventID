@@ -60,26 +60,26 @@ def larcvsparse_to_dense_3d(input_array, dense_shape=512):
 
 
     batch_size = input_array.shape[0]
-    n_planes   = input_array.shape[1]
-    output_array = numpy.zeros((batch_size, n_planes, dense_shape, dense_shape), dtype=numpy.float32)
+    output_array = numpy.zeros((batch_size, 1, 45, 45, 275), dtype=numpy.float32)
 
-    x_coords = input_array[:,:,:,0]
-    y_coords = input_array[:,:,:,1]
-    z_coords = input_array[:,:,:,2]
-    val_coords = input_array[:,:,:,3]
+    x_coords   = input_array[:,:,0]
+    y_coords   = input_array[:,:,1]
+    z_coords   = input_array[:,:,2]
+    val_coords = input_array[:,:,3]
 
 
     # Find the non_zero indexes of the input:
-    batch_index, plane_index, voxel_index = numpy.where(val_coords != -999)
+    batch_index, voxel_index = numpy.where(val_coords != -999)
 
-    values  = val_coords[batch_index, plane_index, voxel_index]
-    x_index = numpy.int32(x_coords[batch_index, plane_index, voxel_index])
-    y_index = numpy.int32(y_coords[batch_index, plane_index, voxel_index])
+    values  = val_coords[batch_index, voxel_index]
+    x_index = numpy.int32(x_coords[batch_index, voxel_index])
+    y_index = numpy.int32(y_coords[batch_index, voxel_index])
+    z_index = numpy.int32(z_coords[batch_index, voxel_index])
 
 
     # Fill in the output tensor
 
-    output_array[batch_index, plane_index, x_index, y_index] = values    
+    output_array[batch_index, 0, x_index, y_index, z_index] = values    
 
     return output_array
 
