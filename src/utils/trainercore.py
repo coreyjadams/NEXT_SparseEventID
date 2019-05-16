@@ -76,13 +76,8 @@ class trainercore(object):
                 data_keys[proc._name] = proc._name
 
         # Assign the keywords here:
-        if FLAGS.LABEL_MODE == 'all':
-            FLAGS.KEYWORD_LABEL = 'label'
-        else:
-            FLAGS.KEYWORD_LABEL = []
-            for key in data_keys.keys():
-                if key != 'image':
-                    FLAGS.KEYWORD_LABEL.append(key)
+        FLAGS.KEYWORD_LABEL = 'label'
+
 
         self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys)
 
@@ -144,10 +139,7 @@ class trainercore(object):
         dims = self._larcv_interface.fetch_minibatch_dims('primary')
 
         # This sets up the necessary output shape:
-        if FLAGS.LABEL_MODE == 'split':
-            output_shape = { key : dims[key] for key in FLAGS.KEYWORD_LABEL}
-        else:
-            output_shape = dims[FLAGS.KEYWORD_LABEL]
+        output_shape = dims[FLAGS.KEYWORD_LABEL]
 
 
         self._net = FLAGS._net(output_shape)

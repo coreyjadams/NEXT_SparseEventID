@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import sparseconvnet as scn
 
 from src import utils
 
@@ -153,15 +152,15 @@ class ResNet(torch.nn.Module):
 
         # We apply an initial convolution, to each plane, to get n_inital_filters
 
+        n_filters = FLAGS.N_INITIAL_FILTERS
         self.initial_convolution = torch.nn.Conv3d(
             in_channels  = 1, 
-            out_channels = outplanes, 
+            out_channels = n_filters, 
             kernel_size  = [3, 3, 3], # Could be 5,5,5 with padding 2 or stride 2?
             stride       = [1, 1, 1],
             padding      = [1, 1, 1],
             bias         = FLAGS.USE_BIAS)
 
-        n_filters = FLAGS.N_INITIAL_FILTERS
         # Next, build out the convolution steps
 
 

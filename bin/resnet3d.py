@@ -12,7 +12,7 @@ sys.path.insert(0,network_dir)
 
 # import the necessary
 from src.utils import flags
-# from src.networks import resnet3d
+from src.networks import resnet3d
 try:
     from src.networks import sparseresnet3d
 except:
@@ -44,7 +44,7 @@ def main():
         if FLAGS.SPARSE:
             net = sparseresnet3d.ResNet
         else:
-            net = resnet.ResNet
+            net = resnet3d.ResNet
         FLAGS.set_net(net)
         trainer.initialize()
         trainer.batch_process()

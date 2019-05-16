@@ -65,7 +65,8 @@ def larcvsparse_to_dense_3d(input_array, dense_shape=512):
 
     x_coords = input_array[:,:,:,0]
     y_coords = input_array[:,:,:,1]
-    val_coords = input_array[:,:,:,2]
+    z_coords = input_array[:,:,:,2]
+    val_coords = input_array[:,:,:,3]
 
 
     # Find the non_zero indexes of the input:
