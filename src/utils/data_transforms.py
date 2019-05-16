@@ -56,58 +56,7 @@ def larcvsparse_to_scnsparse_3d(input_array):
     return output_array
 
 
-def larcvsparse_to_scnsparse_2d(input_array):
-    # This format converts the larcv sparse format to
-    # the tuple format required for sparseconvnet
-
-    # First, we can split off the features (which is the pixel value)
-    # and the indexes (which is everythin else)
-
-    # To handle the multiplane networks, we have to split this into
-    # n_planes and pass it out as a list
-
-    n_planes = input_array.shape[1]
-    batch_size = input_array.shape[0]
-
-    raw_planes = numpy.split(input_array,n_planes, axis=1)
-
-    output_list = []
-    output_features = []
-    output_dimension = []
-
-    for i, plane in enumerate(raw_planes):
-        # First, squeeze off the plane dimension from this image:
-        plane = numpy.squeeze(plane, axis=1)
-
-        # Next, figure out the x, y, value coordinates:
-        x,y,features = numpy.split(plane, 3, axis=-1)
-
-        non_zero_locs = numpy.where(features != -999)
-
-        # Pull together the different dimensions:
-        x = x[non_zero_locs]
-        y = y[non_zero_locs]
-        p = numpy.full(x.shape, fill_value=i)
-        features = features[non_zero_locs]
-        features = numpy.expand_dims(features,axis=-1)
-
-        batch = non_zero_locs[0]
-
-        # dimension = numpy.concatenate([x,y,batch], axis=0)
-        # dimension = numpy.stack([x,y,batch], axis=-1)
-        dimension = numpy.stack([p,x,y,batch], axis=-1)
-
-        output_features.append(features)
-        output_dimension.append(dimension)
-
-    output_features = numpy.concatenate(output_features)
-    output_dimension = numpy.concatenate(output_dimension)
-
-    output_list = [output_dimension, output_features, batch_size]
-
-    return output_list
-
-def larcvsparse_to_dense_2d(input_array, dense_shape=512):
+def larcvsparse_to_dense_3d(input_array, dense_shape=512):
 
 
     batch_size = input_array.shape[0]
@@ -133,25 +82,5 @@ def larcvsparse_to_dense_2d(input_array, dense_shape=512):
 
     return output_array
 
-def larcvdense_to_scnsparse_3d(input_array):
-    # Convert a full scale 3D tensor (actually 5D, batch + channel at the end)
-
-
-    n_dims = 4
-
-    # To map out the non_zero locations now is easy:
-    batch, x, y, z, val = numpy.where(input_array != -999)
-
-    features = input_array[batch,x,y,z,val]
-
-    # The batch dimension is just the first piece of the non-zero indexes:
-    batch_size  = input_array.shape[0]
-
-    # And stack this into one numpy array:
-    dimension = numpy.stack([x,y,z,batch], axis=-1)
-
-    output_array = (dimension, features, batch_size)
-
-    return output_array
 
 

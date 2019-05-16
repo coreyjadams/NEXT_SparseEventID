@@ -6,70 +6,74 @@ from src import utils
 
 FLAGS = utils.flags.FLAGS()
 
-class SparseBlock(nn.Module):
+
+class Block(nn.Module):
 
     def __init__(self, inplanes, outplanes):
 
         nn.Module.__init__(self)
         
-        self.conv1 = scn.SubmanifoldConvolution(
-            dimension   = 3, 
-            nIn         = inplanes, 
-            nOut        = outplanes, 
-            filter_size = 3, 
-            bias        = FLAGS.USE_BIAS)
+
+
+        self.conv1 = torch.nn.Conv3d(
+            in_channels  = inplanes, 
+            out_channels = outplanes, 
+            kernel_size  = [3, 3, 3], 
+            stride       = [1, 1, 1],
+            padding      = [1, 1, 1],
+            bias         = FLAGS.USE_BIAS)
         
         # if FLAGS.BATCH_NORM:
-        self.bn1 = scn.BatchNormReLU(outplanes)
-        # self.relu = scn.ReLU()
+        self.bn1  = torch.nn.BatchNorm3d(outplanes)
+        self.relu = torch.nn.ReLU()
 
     def forward(self, x):
 
         out = self.conv1(x)
         # if FLAGS.BATCH_NORM:
         out = self.bn1(out)
+        out = self.relu(out)
         # else:
             # out = self.relu(out)
 
         return out
 
 
-
-class SparseResidualBlock(nn.Module):
+class ResidualBlock(nn.Module):
 
     def __init__(self, inplanes, outplanes):
         nn.Module.__init__(self)
         
         
-        self.conv1 = scn.SubmanifoldConvolution(
-            dimension   = 3, 
-            nIn         = inplanes, 
-            nOut        = outplanes, 
-            filter_size = 3, 
-            bias        = FLAGS.USE_BIAS)
+        self.conv1 = torch.nn.Conv3d(
+            in_channels  = inplanes, 
+            out_channels = outplanes, 
+            kernel_size  = [3, 3, 3], 
+            stride       = [1, 1, 1],
+            padding      = [1, 1, 1],
+            bias         = FLAGS.USE_BIAS)
         
 
         # if FLAGS.BATCH_NORM:
-        self.bn1 = scn.BatchNormReLU(outplanes)
+        self.bn1 = torch.nn.BatchNorm3d(outplanes)
 
-        self.conv2 = scn.SubmanifoldConvolution(
-            dimension   = 3, 
-            nIn         = outplanes,
-            nOut        = outplanes,
-            filter_size = 3,
-            bias        = FLAGS.USE_BIAS)
+        self.conv2 = torch.nn.Conv3d(
+            in_channels  = inplanes, 
+            out_channels = outplanes, 
+            kernel_size  = [3, 3, 3], 
+            stride       = [1, 1, 1],
+            padding      = [1, 1, 1],
+            bias         = FLAGS.USE_BIAS)
 
         # if FLAGS.BATCH_NORM:
-        self.bn2 = scn.BatchNormalization(outplanes)
+        self.bn2 = torch.nn.BatchNorm3d(outplanes)
 
-        self.residual = scn.Identity()
-        self.relu = scn.ReLU()
+        self.relu = torch.nn.ReLU()
 
-        self.add = scn.AddTable()
 
     def forward(self, x):
 
-        residual = self.residual(x)
+        residual = x
 
         out = self.conv1(x)
         # if FLAGS.BATCH_NORM:
@@ -83,31 +87,28 @@ class SparseResidualBlock(nn.Module):
 
         # The addition of sparse tensors is not straightforward, since
 
-        out = self.add([out, residual])
+        out = out + residual
 
-        out = self.relu(out)
-
-        return out
+        return self.relu(out)
 
 
 
-
-class SparseConvolutionDownsample(nn.Module):
+class ConvolutionDownsample(nn.Module):
 
     def __init__(self, inplanes, outplanes):
         nn.Module.__init__(self)
 
-        self.conv = scn.Convolution(
-            dimension       = 3,
-            nIn             = inplanes,
-            nOut            = outplanes,
-            filter_size     = 2,
-            filter_stride   = 2,
-            bias            = FLAGS.USE_BIAS
-        )
+        self.conv2 = torch.nn.Conv3d(
+            in_channels  = inplanes, 
+            out_channels = outplanes, 
+            kernel_size  = [2, 2, 2], 
+            stride       = [2, 2, 2],
+            padding      = [1, 1, 1],
+            bias         = FLAGS.USE_BIAS)
+
         # if FLAGS.BATCH_NORM:
-        self.bn   = scn.BatchNormalization(outplanes)
-        self.relu = scn.ReLU()
+        self.bn2 = torch.nn.BatchNorm3d(outplanes)
+        self.relu = torch.nn.ReLU()
 
     def forward(self, x):
         out = self.conv(x)
@@ -119,16 +120,16 @@ class SparseConvolutionDownsample(nn.Module):
         return out
 
 
-class SparseBlockSeries(torch.nn.Module):
+class BlockSeries(torch.nn.Module):
 
 
     def __init__(self, inplanes, n_blocks, residual=False):
         torch.nn.Module.__init__(self)
 
         if residual:
-            self.blocks = [ SparseResidualBlock(inplanes, inplanes) for i in range(n_blocks) ]
+            self.blocks = [ ResidualBlock(inplanes, inplanes) for i in range(n_blocks) ]
         else:
-            self.blocks = [ SparseBlock(inplanes, inplanes) for i in range(n_blocks)]
+            self.blocks = [ Block(inplanes, inplanes) for i in range(n_blocks) ]
 
         for i, block in enumerate(self.blocks):
             self.add_module('block_{}'.format(i), block)
@@ -144,33 +145,21 @@ def filter_increase(input_filters):
     # return input_filters * 2
     return input_filters + FLAGS.N_INITIAL_FILTERS
 
-
 class ResNet(torch.nn.Module):
 
     def __init__(self, output_shape):
         torch.nn.Module.__init__(self)
-        # All of the parameters are controlled via the flags module
-
-
-        # Create the sparse input tensor:
-        self.input_tensor = scn.InputLayer(dimension=3, spatial_size=(512))
-
-        # Here, define the layers we will need in the forward path:
-
-
-        
-        # The convolutional layers, which can be shared or not across planes,
-        # are defined below
+        # All of the parameters are controlled via the FLAGS module
 
         # We apply an initial convolution, to each plane, to get n_inital_filters
 
-        self.initial_convolution = scn.SubmanifoldConvolution(
-                dimension   = 3, 
-                nIn         = 1, 
-                nOut        = FLAGS.N_INITIAL_FILTERS, 
-                filter_size = 5, 
-                bias        = FLAGS.USE_BIAS
-            )
+        self.initial_convolution = torch.nn.Conv3d(
+            in_channels  = 1, 
+            out_channels = outplanes, 
+            kernel_size  = [3, 3, 3], # Could be 5,5,5 with padding 2 or stride 2?
+            stride       = [1, 1, 1],
+            padding      = [1, 1, 1],
+            bias         = FLAGS.USE_BIAS)
 
         n_filters = FLAGS.N_INITIAL_FILTERS
         # Next, build out the convolution steps
@@ -181,17 +170,16 @@ class ResNet(torch.nn.Module):
         self.convolutional_layers = []
         for layer in range(FLAGS.NETWORK_DEPTH):
 
-            self.convolutional_layers.append(
-                SparseBlockSeries(
+            self.convolutional_layers.append( 
+                BlockSeries(
                     n_filters, 
                     FLAGS.RES_BLOCKS_PER_LAYER,
                     residual = True)
                 )
             out_filters = filter_increase(n_filters)
-
-            self.convolutional_layers.append(
-                SparseConvolutionDownsample(
-                    inplanes  = n_filters,
+            self.convolutional_layers.append( 
+                ConvolutionDownsample(
+                    inplanes = n_filters,
                     outplanes = out_filters)
                 )
                 # outplanes = n_filters + FLAGS.N_INITIAL_FILTERS))
@@ -203,18 +191,20 @@ class ResNet(torch.nn.Module):
         # Here, take the final output and convert to a dense tensor:
 
 
-        self.final_layer = SparseBlockSeries(
-                    inplanes = n_filters, 
-                    n_blocks = FLAGS.RES_BLOCKS_PER_LAYER,
-                    residual = True)
-                
-        self.bottleneck  = scn.SubmanifoldConvolution(dimension=3, 
-                    nIn=n_filters, 
-                    nOut=output_shape[key][-1], 
-                    filter_size=3, 
-                    bias=FLAGS.USE_BIAS)
-
-        self.sparse_to_dense = scn.SparseToDense(dimension=3, nPlanes=output_shape[-1])
+        if FLAGS.LABEL_MODE == 'all':
+            self.final_layer = BlockSeries(
+                        inplanes = n_filters, 
+                        n_blocks = FLAGS.RES_BLOCKS_PER_LAYER,
+                        residual = True)
+                    
+            self.bottleneck  = torch.nn.Conv3d(
+                in_channels  = n_filters, 
+                out_channels = 2, 
+                kernel_size  = [1, 1, 1],
+                stride       = [1, 1, 1],
+                padding      = [0, 0, 0],
+                bias         = FLAGS.USE_BIAS
+            )
 
 
         # # The rest of the final operations (reshape, softmax) are computed in the forward pass
@@ -248,21 +238,19 @@ class ResNet(torch.nn.Module):
 
         # Apply the final steps to get the right output shape
 
-         # Apply the final residual block:
+
+        # Apply the final residual block:
         output = self.final_layer(x)
         # print " 1 shape: ", output.shape)
 
         # Apply the bottle neck to make the right number of output filters:
         output = self.bottleneck(output)
 
-        output = self.sparse_to_dense(output)
 
         # Apply global average pooling 
         kernel_size = output.shape[2:]
         output = torch.squeeze(nn.AvgPool3d(kernel_size, ceil_mode=False)(output))
         output = output.view([batch_size, output.shape[-1]])
-
-
 
 
         return output

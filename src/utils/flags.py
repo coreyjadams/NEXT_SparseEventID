@@ -330,63 +330,6 @@ class FLAGS(Borg):
         raise NotImplementedError("Must use a derived class which overrides this function")
 
 
-class resnet(FLAGS):
-    ''' Sparse Resnet specific flags
-    '''
-
-    def __init__(self):
-        FLAGS.__init__(self)
-
-
-    def set_net(self, net):
-        # For the resnet object, we set the network as resnet:
-        self._net = net
-
-
-    def _set_defaults(self):
-
-        self.VERBOSITY                  = 0
-        self.N_INITIAL_FILTERS          = 2
-        self.RES_BLOCKS_PER_LAYER       = 2
-        self.NETWORK_DEPTH_PRE_MERGE    = 4
-        self.NETWORK_DEPTH_POST_MERGE   = 2
-        self.NPLANES                    = 3
-        self.SHARE_WEIGHTS              = True
-        self.WEIGHT_DECAY               = 1e-4
-
-        self.SPARSE                     = True
-
-        self.INPUT_DIMENSION            = '2D' 
-
-        FLAGS._set_defaults(self)
-
-    def _add_default_network_configuration(self, parser):
-
-
-
-        parser.add_argument('-v', '--verbosity', type=int,default=self.VERBOSITY,
-            help="Network verbosity at construction [default: {}]".format(self.VERBOSITY))
-
-        parser.add_argument('--weight-decay', type=float, default=self.WEIGHT_DECAY,
-            help="Weight decay strength [default: {}]".format(self.WEIGHT_DECAY))
-
-        parser.add_argument('--n-initial-filters', type=int, default=self.N_INITIAL_FILTERS,
-            help="Number of filters applied, per plane, for the initial convolution [default: {}]".format(self.N_INITIAL_FILTERS))
-        parser.add_argument('--res-blocks-per-layer', type=int, default=self.RES_BLOCKS_PER_LAYER,
-            help="Number of residual blocks per layer [default: {}]".format(self.RES_BLOCKS_PER_LAYER))
-        parser.add_argument('--network-depth-pre-merge', type=int, default=self.NETWORK_DEPTH_PRE_MERGE,
-            help="Total number of downsamples to apply before merging planes [default: {}]".format(self.NETWORK_DEPTH_PRE_MERGE))
-        parser.add_argument('--network-depth-post-merge', type=int, default=self.NETWORK_DEPTH_POST_MERGE,
-            help="Total number of downsamples to apply after merging planes [default: {}]".format(self.NETWORK_DEPTH_POST_MERGE))
-        parser.add_argument('--nplanes', type=int, default=self.NPLANES,
-            help="Number of planes to split the initial image into [default: {}]".format(self.NPLANES))
-        parser.add_argument('--share-weights', type=str2bool, default=self.SHARE_WEIGHTS,
-            help="Whether or not to share weights across planes [default: {}]".format(self.SHARE_WEIGHTS))
-
-        parser.add_argument('--sparse', type=str2bool, default=self.SPARSE,
-            help="Run using submanifold sparse convolutions [default: {}]".format(self.SPARSE))
-
-        return parser
 
 
 
@@ -411,7 +354,8 @@ class resnet3D(FLAGS):
         self.NETWORK_DEPTH         = 5
         self.WEIGHT_DECAY          = 1e-4
         self.SPARSE                = True
-        self.INPUT_DIMENSION       = '3D' 
+        self.INPUT_DIMENSION       = '3D'
+        self.USE_BIAS              = False 
 
         FLAGS._set_defaults(self)
 
@@ -427,6 +371,8 @@ class resnet3D(FLAGS):
             help="Number of residual blocks per layer [default: {}]".format(self.RES_BLOCKS_PER_LAYER))
         parser.add_argument('--network-depth', type=int, default=self.NETWORK_DEPTH,
             help="Total number of downsamples to apply [default: {}]".format(self.NETWORK_DEPTH))
+        parser.add_argument('--use-bias', type=int, default=self.USE_BIAS,
+            help="Use Bias in the convolutions [default: {}]".format(self.USE_BIAS))
 
         parser.add_argument('--weight-decay', type=float, default=self.WEIGHT_DECAY,
             help="Weight decay strength [default: {}]".format(self.WEIGHT_DECAY))
