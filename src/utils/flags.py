@@ -68,7 +68,7 @@ class FLAGS(Borg):
         # Parameters controlling training situations
         self.COMPUTE_MODE          = "GPU"
         self.TRAINING              = True
-        self.MINIBATCH_SIZE        = 2
+        self.MINIBATCH_SIZE        = 64
         self.CHECKPOINT_ITERATION  = 100
         self.SUMMARY_ITERATION     = 1
         self.LOGGING_ITERATION     = 1
@@ -77,6 +77,7 @@ class FLAGS(Borg):
         self.VERBOSITY             = 0
         self.LOG_DIRECTORY         = './log'
         self.CHECKPOINT_DIRECTORY  = None
+        self.SUMMIT                = False
 
         self.DISTRIBUTED           = False
 
@@ -240,6 +241,8 @@ class FLAGS(Borg):
             help='Prefix (directory) for logging information [default: {}]'.format(self.LOG_DIRECTORY))
         parser.add_argument('-cd','--checkpoint-directory', default=self.CHECKPOINT_DIRECTORY,
             help='Prefix (directory + file prefix) for snapshots of weights [default: {}]'.format(self.CHECKPOINT_DIRECTORY))
+        parser.add_argument('-s','--summit', action='store_true', default=self.SUMMIT,
+            help="Run on Summit supercomputer [default: {}]".format(self.SUMMIT))
 
         return parser
 
