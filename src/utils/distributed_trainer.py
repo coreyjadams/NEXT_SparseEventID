@@ -141,10 +141,6 @@ class distributed_trainer(trainercore):
 
     def save_model(self):
 
-        # Don't save if on summit for now
-        if FLAGS.SUMMIT:
-            return True
-
         if hvd.rank() == 0:
             trainercore.save_model(self)
             

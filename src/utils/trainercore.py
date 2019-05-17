@@ -235,8 +235,8 @@ class trainercore(object):
     def init_saver(self):
 
         # This sets up the summary saver:
-        # if FLAGS.TRAINING:
-        #     self._saver = tensorboardX.SummaryWriter(FLAGS.LOG_DIRECTORY)
+        if FLAGS.TRAINING:
+            self._saver = tensorboardX.SummaryWriter(FLAGS.LOG_DIRECTORY)
 
         if FLAGS.AUX_FILE is not None and FLAGS.TRAINING:
             self._aux_saver = tensorboardX.SummaryWriter(FLAGS.LOG_DIRECTORY + "/test/")

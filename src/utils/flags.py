@@ -75,9 +75,8 @@ class FLAGS(Borg):
         self.LEARNING_RATE         = 0.003
         self.ITERATIONS            = 5000
         self.VERBOSITY             = 0
-        self.LOG_DIRECTORY         = './log'
+        self.LOG_DIRECTORY         = '/gpfs/alpine/scratch/deltutto/nph133/next/log/'
         self.CHECKPOINT_DIRECTORY  = None
-        self.SUMMIT                = False
 
         self.DISTRIBUTED           = False
 
@@ -241,8 +240,6 @@ class FLAGS(Borg):
             help='Prefix (directory) for logging information [default: {}]'.format(self.LOG_DIRECTORY))
         parser.add_argument('-cd','--checkpoint-directory', default=self.CHECKPOINT_DIRECTORY,
             help='Prefix (directory + file prefix) for snapshots of weights [default: {}]'.format(self.CHECKPOINT_DIRECTORY))
-        parser.add_argument('-s','--summit', action='store_true', default=self.SUMMIT,
-            help="Run on Summit supercomputer [default: {}]".format(self.SUMMIT))
 
         return parser
 
