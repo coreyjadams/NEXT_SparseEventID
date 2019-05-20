@@ -227,7 +227,16 @@ class trainercore(object):
 #
 #        self._criterion = torch.nn.CrossEntropyLoss(weight=self._label_weights)
 ####################################################################################
-        self._criterion = torch.nn.CrossEntropyLoss()
+
+        if FLAGS.WEIGHT_SIG is not None and FLAGS.WEIGHT_BKG is not None:
+
+            weights = [FLAGS.WEIGHT_BKG, FLAGS.WEIGHT_SIG]
+            class_weights = torch.tensor(weights, device=device)
+            self._criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+
+        else:
+
+            self._criterion = torch.nn.CrossEntropyLoss()
 
        
 

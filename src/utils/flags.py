@@ -75,8 +75,10 @@ class FLAGS(Borg):
         self.LEARNING_RATE         = 0.003
         self.ITERATIONS            = 5000
         self.VERBOSITY             = 0
-        self.LOG_DIRECTORY         = '/gpfs/alpine/scratch/deltutto/nph133/next/log/'
+        self.LOG_DIRECTORY         = './log/'
         self.CHECKPOINT_DIRECTORY  = None
+        self.WEIGHT_SIG            = None
+        self.WEIGHT_BKG            = None
 
         self.DISTRIBUTED           = False
 
@@ -240,6 +242,11 @@ class FLAGS(Borg):
             help='Prefix (directory) for logging information [default: {}]'.format(self.LOG_DIRECTORY))
         parser.add_argument('-cd','--checkpoint-directory', default=self.CHECKPOINT_DIRECTORY,
             help='Prefix (directory + file prefix) for snapshots of weights [default: {}]'.format(self.CHECKPOINT_DIRECTORY))
+
+        parser.add_argument('--weight-sig',type=float, default=self.WEIGHT_SIG,
+            help="Weight applied to signal events during loss calculation [default: {}]".format(self.WEIGHT_SIG))
+        parser.add_argument('--weight-bkg',type=float, default=self.WEIGHT_BKG,
+            help="Weight applied to background events during loss calculation [default: {}]".format(self.WEIGHT_BKG))
 
         return parser
 
