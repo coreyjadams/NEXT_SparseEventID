@@ -77,8 +77,9 @@ class FLAGS(Borg):
         self.VERBOSITY             = 0
         self.LOG_DIRECTORY         = './log/'
         self.CHECKPOINT_DIRECTORY  = None
-        self.WEIGHT_SIG            = None
-        self.WEIGHT_BKG            = None
+        self.BALANCE_LOSS          = False
+        self.WEIGHT_SIG            = 1.60
+        self.WEIGHT_BKG            = 0.62
 
         self.DISTRIBUTED           = False
 
@@ -243,6 +244,8 @@ class FLAGS(Borg):
         parser.add_argument('-cd','--checkpoint-directory', default=self.CHECKPOINT_DIRECTORY,
             help='Prefix (directory + file prefix) for snapshots of weights [default: {}]'.format(self.CHECKPOINT_DIRECTORY))
 
+        parser.add_argument('-bl','--balance-loss', action='store_true', default=self.BALANCE_LOSS,
+            help="Use weights to balance loss. Weight can be set with --weight-sig and --weight-bkg [default: {}]".format(self.BALANCE_LOSS))
         parser.add_argument('--weight-sig',type=float, default=self.WEIGHT_SIG,
             help="Weight applied to signal events during loss calculation [default: {}]".format(self.WEIGHT_SIG))
         parser.add_argument('--weight-bkg',type=float, default=self.WEIGHT_BKG,

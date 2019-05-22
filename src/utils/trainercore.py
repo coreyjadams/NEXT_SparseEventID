@@ -228,7 +228,12 @@ class trainercore(object):
 #        self._criterion = torch.nn.CrossEntropyLoss(weight=self._label_weights)
 ####################################################################################
 
-        if FLAGS.WEIGHT_SIG is not None and FLAGS.WEIGHT_BKG is not None:
+        if FLAGS.WEIGHT_SIG is None or FLAGS.WEIGHT_BKG is None:
+            print ('You have requested to balance loss but have not set the weight for signal of background. I will ignore your request.')
+            FLAGS.BALANCE_LOSS = False
+
+
+        if FLAGS.BALANCE_LOSS:
 
             weights = [FLAGS.WEIGHT_BKG, FLAGS.WEIGHT_SIG]
             class_weights = torch.tensor(weights, device=device)
