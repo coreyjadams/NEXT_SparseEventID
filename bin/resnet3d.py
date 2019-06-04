@@ -52,9 +52,10 @@ def main():
     if FLAGS.MODE == 'iotest':
         trainer.initialize(io_only=True)
 
-        time.sleep(0.1)
+        total_start_time = time.time()
+        # time.sleep(0.1)
+        start = time.time()
         for i in range(FLAGS.ITERATIONS):
-            start = time.time()
             mb = trainer.fetch_next_batch()
             end = time.time()
             if not FLAGS.DISTRIBUTED:
@@ -63,6 +64,14 @@ def main():
                 if trainer._rank == 0:
                     print(i, ": Time to fetch a minibatch of data: {}".format(end - start))
             # time.sleep(0.5)
+            start = time.time()
+
+        total_time = time.time() - total_start_time
+        print("Time to read {} batches of {} images each: {}".format(
+            FLAGS.ITERATIONS, 
+            FLAGS.MINIBATCH_SIZE,
+            time.time() - total_start_time
+            ))
 
     trainer.stop()
 
