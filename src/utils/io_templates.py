@@ -52,7 +52,7 @@ def ana_io(input_file, image_dim, label_mode, prepend_names=""):
     config = larcv_io.ThreadIOConfig(name="AnaIO")
     # Force ana files to go in order:
 
-    config._params['RandomAccess'] = "0"
+    config._params['RandomAccess'] = "2"
     config.add_process(data_proc)
     config.add_process(label_proc)
 
