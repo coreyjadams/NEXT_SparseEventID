@@ -82,6 +82,9 @@ class FLAGS(Borg):
         self.WEIGHT_BKG            = 0.62
 
         self.DISTRIBUTED           = False
+        self.DIST_READFROMALLRANKS = True
+        self.DIST_TOTALSIZE        = -1
+        self.DIST_LOCALSIZE        = -1
 
         # To be clear, this is specifying the image mode from larcv ThreadIO,
         # Not the input to the network
@@ -104,7 +107,7 @@ class FLAGS(Borg):
         # self.KEYWORD_LABEL_ALL     = 'label'
         # self.KEYWORD_LABEL_SPLIT   = ['label_neut','label_cpi','label_npi','label_prot']
 
-        self.KEYWORD_LABEL         = None
+        self.KEYWORD_LABEL         = 'label'
 
         self.LR_SCHEDULE           = 'flat'
         self.OPTIMIZER             = "Adam"
@@ -235,6 +238,13 @@ class FLAGS(Borg):
 
         parser.add_argument('-d','--distributed', action='store_true', default=self.DISTRIBUTED,
             help="Run with the MPI compatible mode [default: {}]".format(self.DISTRIBUTED))
+        parser.add_argument('-ra','--read-all-ranks', action='store_true', default=self.DIST_READFROMALLRANKS,
+            help="Read data from all MPI ranks [default: {}]".format(self.DIST_READFROMALLRANKS))
+        parser.add_argument('-ts','--total-size', type=int, default=self.DIST_TOTALSIZE,
+            help="MPI total size [default: {}]".format(self.DIST_TOTALSIZE))
+        parser.add_argument('-ls','--local-size', type=int, default=self.DIST_LOCALSIZE,
+            help="MPI local size [default: {}]".format(self.DIST_LOCALSIZE))
+
         parser.add_argument('-m','--compute-mode', type=str, choices=['CPU','GPU'], default=self.COMPUTE_MODE,
             help="Selection of compute device, CPU or GPU  [default: {}]".format(self.COMPUTE_MODE))
         parser.add_argument('-im','--image-mode',type=str,choices=['dense', 'sparse'],default=self.IMAGE_MODE,

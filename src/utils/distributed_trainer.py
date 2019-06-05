@@ -112,7 +112,7 @@ class distributed_trainer(trainercore):
     a NotImplemented error.
 
     '''
-    def __init__(self):
+    def __init__(self, total_size=-1, local_size=-1):
         # Rely on the base class for most standard parameters, only
         # search for parameters relevant for distributed computing here
 
@@ -123,9 +123,12 @@ class distributed_trainer(trainercore):
             os.environ['CUDA_VISIBLE_DEVICES'] = str(hvd.local_rank())
             
 
-        self._larcv_interface = larcv_interface(root=root_rank)
+        self._larcv_interface = larcv_interface(root=root_rank, read_from_all_ranks=FLAGS.DIST_READFROMALLRANKS)
         self._iteration       = 0
         self._rank            = hvd.rank()
+        self._local_rank      = hvd.local_rank()
+        self._size            = hvd.size()
+        self._local_size      = hvd.local_size()
         self._cleanup         = []
         self._global_step     = torch.as_tensor(-1)
 
@@ -134,6 +137,13 @@ class distributed_trainer(trainercore):
         # Make sure that 'LEARNING_RATE' and 'TRAINING'
         # are in net network parameters:
 
+        if local_size is not -1 and self._local_size is not local_size:
+            print ('Provided local size (', str(local_size), ') if different than Horovod local size (', str(self._local_size()), '). Will override with your value of: ', str(local_size))
+            self._local_size = local_size
+
+        if total_size is not -1 and self._total_size is not total_size:
+            print ('Provided total size (', str(total_size), ') if different than Horovod total size (', str(self._total_size()), '). Will override with your value of: ', str(total_size))
+            self._total_size = total_size
 
     def __del__(self):
         if hvd.rank() == 0:
@@ -193,7 +203,13 @@ class distributed_trainer(trainercore):
 
         print("HVD rank: {}".format(hvd.rank()))
 
-        self._initialize_io()
+        filename = self.get_file_name(FLAGS.FILE)
+        auxfilename = self.get_file_name(FLAGS.AUX_FILE)
+
+        print ('filename', filename)
+        print ('auxfilename', auxfilename)
+
+        self._initialize_io(filename, auxfilename)
 
         # print("Rank {}".format(hvd.rank()) + " Initialized IO")
         if io_only:
@@ -267,7 +283,24 @@ class distributed_trainer(trainercore):
         #         self._log_keys.append('acc/{}'.format(key))
 
 
-
+    def get_file_name(self, f_name):
+        #return '/mnt/bb/deltutto/878ebfd0-87aa-11e9-9034-70e284149a4f'
+        #return '/mnt/bb/deltutto/fec4a524-87aa-11e9-af3b-70e284149a4f'
+        #return f_name
+        import uuid
+        unique_name = str(uuid.uuid1())
+        from shutil import copyfile
+        import os
+        path_to_file = os.path.dirname(os.path.abspath(f_name)) + '/'
+        new_file = path_to_file + unique_name
+        copyfile(f_name, new_file)
+        local_rank = self._local_rank % self._local_size
+        print ('Constructing file name for rank', self._rank, ',local_rank', self._local_rank, ',local_size', hvd.local_size(), 'name is:', f_name + '_' + str(local_rank))
+        #return f_name + '_' + str(local_rank)
+        import time
+        print ('Returning filename ', new_file)
+        time.sleep(3)
+        return new_file
 
 
     def summary(self, metrics, saver=""):
