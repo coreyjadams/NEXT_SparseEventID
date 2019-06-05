@@ -284,20 +284,18 @@ class distributed_trainer(trainercore):
 
 
     def get_file_name(self, f_name):
-        #return '/mnt/bb/deltutto/878ebfd0-87aa-11e9-9034-70e284149a4f'
-        #return '/mnt/bb/deltutto/fec4a524-87aa-11e9-af3b-70e284149a4f'
-        #return f_name
-        import uuid
-        unique_name = str(uuid.uuid1())
+        import uuid, os, time
         from shutil import copyfile
-        import os
+
+        unique_name = str(uuid.uuid1())
         path_to_file = os.path.dirname(os.path.abspath(f_name)) + '/'
         new_file = path_to_file + unique_name
         copyfile(f_name, new_file)
-        local_rank = self._local_rank % self._local_size
-        print ('Constructing file name for rank', self._rank, ',local_rank', self._local_rank, ',local_size', hvd.local_size(), 'name is:', f_name + '_' + str(local_rank))
+
+        #local_rank = self._local_rank % self._local_size
+        #print ('Constructing file name for rank', self._rank, ',local_rank', self._local_rank, ',local_size', hvd.local_size(), 'name is:', f_name + '_' + str(local_rank))
         #return f_name + '_' + str(local_rank)
-        import time
+        
         print ('Returning filename ', new_file)
         time.sleep(3)
         return new_file
