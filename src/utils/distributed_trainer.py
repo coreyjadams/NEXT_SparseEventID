@@ -2,6 +2,7 @@ import os
 import sys
 import time
 from collections import OrderedDict
+import uuid
 
 import numpy
 
@@ -112,18 +113,21 @@ class distributed_trainer(trainercore):
     a NotImplemented error.
 
     '''
-    def __init__(self, total_size=-1, local_size=-1):
+    def __init__(self):
         # Rely on the base class for most standard parameters, only
         # search for parameters relevant for distributed computing here
 
         # Put the IO rank as the last rank in the COMM, since rank 0 does tf saves
-        root_rank = hvd.size() - 1 
+        root_rank = hvd.size() - 1
+        # Unless we are reading from one rank in every node
+        if FLAGS.READ_OPTION is 'read_from_single_local_rank':
+            root_rank = hvd.local_size() - 1
 
         if FLAGS.COMPUTE_MODE == "GPU":
             os.environ['CUDA_VISIBLE_DEVICES'] = str(hvd.local_rank())
             
 
-        self._larcv_interface = larcv_interface(root=root_rank, read_from_all_ranks=FLAGS.DIST_READFROMALLRANKS)
+        self._larcv_interface = larcv_interface(root=root_rank, read_from_all_ranks=True, read_option=FLAGS.READ_OPTION, local_rank=hvd.local_rank(), local_size=hvd.local_size())
         self._iteration       = 0
         self._rank            = hvd.rank()
         self._local_rank      = hvd.local_rank()
@@ -131,23 +135,18 @@ class distributed_trainer(trainercore):
         self._local_size      = hvd.local_size()
         self._cleanup         = []
         self._global_step     = torch.as_tensor(-1)
+        self._files_to_delete = []
 
         if self._rank == 0:
             FLAGS.dump_config()
         # Make sure that 'LEARNING_RATE' and 'TRAINING'
         # are in net network parameters:
 
-        if local_size is not -1 and self._local_size is not local_size:
-            print ('Provided local size (', str(local_size), ') if different than Horovod local size (', str(self._local_size()), '). Will override with your value of: ', str(local_size))
-            self._local_size = local_size
-
-        if total_size is not -1 and self._total_size is not total_size:
-            print ('Provided total size (', str(total_size), ') if different than Horovod total size (', str(self._total_size()), '). Will override with your value of: ', str(total_size))
-            self._total_size = total_size
-
     def __del__(self):
         if hvd.rank() == 0:
             trainercore.__del__(self)
+        for f in self._files_to_delete:
+            os.system('rm ' + f)
 
     def save_model(self):
 
@@ -203,15 +202,20 @@ class distributed_trainer(trainercore):
 
         print("HVD rank: {}".format(hvd.rank()))
 
-        filename = self.get_file_name(FLAGS.FILE)
-        auxfilename = self.get_file_name(FLAGS.AUX_FILE)
 
-        print ('filename', filename)
-        print ('auxfilename', auxfilename)
+        if ((FLAGS.READ_OPTION is 'read_from_all_ranks')
+          or (FLAGS.READ_OPTION is 'read_from_single_local_rank')):
+            filename = self.get_file_name(FLAGS.FILE)
+            auxfilename = self.get_file_name(FLAGS.AUX_FILE)
+        else:
+            filename = FLAGS.FILE
+            auxfilename = FLAGS.AUX_FILE
+
+        #print ('filename', filename)
+        #print ('auxfilename', auxfilename)
 
         self._initialize_io(filename, auxfilename)
-
-        # print("Rank {}".format(hvd.rank()) + " Initialized IO")
+        #print("Rank {}".format(hvd.rank()) + " Initialized IO")
         if io_only:
             return
 
@@ -284,20 +288,32 @@ class distributed_trainer(trainercore):
 
 
     def get_file_name(self, f_name):
-        import uuid, os, time
-        from shutil import copyfile
+        #from shutil import copyfile
 
-        unique_name = str(uuid.uuid1())
-        path_to_file = os.path.dirname(os.path.abspath(f_name)) + '/'
-        new_file = path_to_file + unique_name
-        copyfile(f_name, new_file)
+        # Get the file size of original file
+        size = os.path.getsize(f_name)
 
-        #local_rank = self._local_rank % self._local_size
-        #print ('Constructing file name for rank', self._rank, ',local_rank', self._local_rank, ',local_size', hvd.local_size(), 'name is:', f_name + '_' + str(local_rank))
-        #return f_name + '_' + str(local_rank)
-        
-        print ('Returning filename ', new_file)
-        time.sleep(3)
+        unique_name = str(uuid.uuid4())
+
+        path_to_file = os.path.dirname(os.path.abspath(f_name)) + '/tmp/'
+        original_file_name = os.path.basename(f_name)
+
+        #path_to_file = '/tmp/'
+        new_file = path_to_file + unique_name + '_' + original_file_name
+        #copyfile(f_name, new_file)
+
+        self._files_to_delete.append(new_file)
+
+        os.system('mkdir -p ' + path_to_file)
+        os.system('cp ' + f_name + ' ' + new_file)
+
+        # Check that the file was fully copied before moving on
+        while size != os.path.getsize(new_file):
+            print (os.path.getsize(new_file), ' is not ', size)
+            time.sleep(0.2)
+
+        #print ('Returning filename ', new_file)
+        #time.sleep(5)
         return new_file
 
 

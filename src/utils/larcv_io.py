@@ -196,7 +196,7 @@ class ThreadIOConfig(CoreConfig):
         if self._params['NumThreads'] is None:
             self._params['NumThreads'] = "1"
         if self._params['NumBatchStorage'] is None:
-            self._params['NumBatchStorage'] = "4"
+            self._params['NumBatchStorage'] = "1"
         if self._params['RandomSeed'] is None:
             self._params['RandomSeed'] = "0"
         if self._params['RandomAccess'] is None:

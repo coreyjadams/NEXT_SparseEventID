@@ -88,6 +88,7 @@ class trainercore(object):
 
         self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys)
 
+        print ('done prepare_manager')
         if not FLAGS.TRAINING:
             self._larcv_interface._dataloaders['primary'].set_next_index(0)
 
@@ -508,38 +509,24 @@ class trainercore(object):
 
     def fetch_next_batch(self, mode='primary', metadata=False):
 
-        start = time.time()
-        #print ('Delta time at start in seconds:', time.time() - start)
         # For the serial mode, call next here:
         if not FLAGS.DISTRIBUTED:
             self._larcv_interface.next(mode)
 
-        #print ('Delta time at next in seconds:', time.time() - start)
-        if mode == 'aux':
-          minibatch_data = self._larcv_interface.fetch_minibatch_data(mode, fetch_meta_data=metadata)
-        else:
-          minibatch_data = self._larcv_interface.fetch_minibatch_data(mode, fetch_meta_data=metadata)
-        #print ('Delta time at minibatch_data in seconds:', time.time() - start)
+        minibatch_data = self._larcv_interface.fetch_minibatch_data(mode, fetch_meta_data=metadata)
         minibatch_dims = self._larcv_interface.fetch_minibatch_dims(mode)
-        #print ('Delta time at minibatch_dims in seconds:', time.time() - start)
-
-        #print ('original data', minibatch_data)
-        #print ('original dims', minibatch_dims)
 
         for key in minibatch_data:
             if key == 'entries' or key == 'event_ids':
                 continue
             minibatch_data[key] = numpy.reshape(minibatch_data[key], minibatch_dims[key])
 
-        #print ('after resphape data', minibatch_data)
-        #print ('Delta time at reshape in seconds:', time.time() - start)
         # Strip off the primary/aux label in the keys:
         for key in minibatch_data:
             new_key = key.replace('aux_','')
             minibatch_data[new_key] = minibatch_data.pop(key)            
 
 
-        #print ('Delta time at pop in seconds:', time.time() - start)
         # Here, do some massaging to convert the input data to another format, if necessary:
         if FLAGS.IMAGE_MODE == 'dense' and not FLAGS.SPARSE:
             # Don't have to do anything here
@@ -565,7 +552,6 @@ class trainercore(object):
             else:
                 minibatch_data['image'] = data_transforms.larcvsparse_to_scnsparse_2d(minibatch_data['image'])
 
-        #print ('Delta time at image transform in seconds:', time.time() - start)
         return minibatch_data
 
     def increment_global_step(self):
@@ -637,6 +623,7 @@ class trainercore(object):
         io_start_time = datetime.datetime.now()
         minibatch_data = self.fetch_next_batch()
         io_end_time = datetime.datetime.now()
+
 
         minibatch_data = self.to_torch(minibatch_data)
 

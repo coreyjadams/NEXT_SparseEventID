@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os,sys,signal
-import time
+import time, datetime
 
 import numpy
 
@@ -25,16 +25,11 @@ def main():
     # FLAGS.dump_config()
 
     
-
-
-    
-
     if FLAGS.MODE is None:
         raise Exception()
 
     if FLAGS.DISTRIBUTED:
         from src.utils import distributed_trainer
-
         trainer = distributed_trainer.distributed_trainer()
     else:
         from src.utils import trainercore
@@ -58,11 +53,12 @@ def main():
             mb = trainer.fetch_next_batch()
             end = time.time()
             if not FLAGS.DISTRIBUTED:
-                print(i, ": Time to fetch a minibatch of data: {}".format(end - start))
+                print(i, ": Time to fetch a minibatch of data: {} seconds.".format(end - start))
             else:
                 if trainer._rank == 0:
-                    print(i, ": Time to fetch a minibatch of data: {}".format(end - start))
-            # time.sleep(0.5)
+                    print(i, ": Time to fetch a minibatch of data: {} seconds.".format(end - start))
+            time.sleep(0.5)
+            #print (mb)
 
     trainer.stop()
 
