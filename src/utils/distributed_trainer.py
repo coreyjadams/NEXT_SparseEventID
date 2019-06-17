@@ -120,7 +120,7 @@ class distributed_trainer(trainercore):
         # Put the IO rank as the last rank in the COMM, since rank 0 does tf saves
         root_rank = hvd.size() - 1
         # Unless we are reading from one rank in every node
-        if FLAGS.READ_OPTION is 'read_from_single_local_rank':
+        if FLAGS.READ_OPTION == "read_from_single_local_rank":
             root_rank = hvd.local_size() - 1
 
         if FLAGS.COMPUTE_MODE == "GPU":
@@ -203,8 +203,8 @@ class distributed_trainer(trainercore):
         print("HVD rank: {}".format(hvd.rank()))
 
 
-        if ((FLAGS.READ_OPTION is 'read_from_all_ranks')
-          or (FLAGS.READ_OPTION is 'read_from_single_local_rank')):
+        if ((FLAGS.READ_OPTION == "read_from_all_ranks")
+          or (FLAGS.READ_OPTION == "read_from_single_local_rank")):
             filename = self.get_file_name(FLAGS.FILE)
             auxfilename = self.get_file_name(FLAGS.AUX_FILE)
         else:
