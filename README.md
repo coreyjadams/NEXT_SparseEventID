@@ -17,7 +17,7 @@ Eventually, I want to add PointNet, PointNet++, and DGCNN (Edgeconvs for graph n
 
 Assuming you have these input files:
  - dataset for training: next_new_classification_train.h5
- - dataset for training: next_new_classification_test.h5
+ - dataset for testing: next_new_classification_test.h5
  
 To train the network, run:
 
@@ -39,27 +39,46 @@ To list all the available options, run
 
 `python bin/resnet3d.py --help` or `python bin/resnet3d.py train --help`
 
+### IO Test
+
+If you want to only study how long it takes for IO operations, without actually training the network, run:
+
+`python bin/resnet3d.py iotest -f next_new_classification_train.h5`
+
 
 ## Input files
 
 You can convert files from NEXT HDF5 to larcv HDF5 using the python script [to_larcv3.py](to_larcv3.py). 
-Open the script and modify the `top_level_path` appopriately. For example, this will be the path to the directory that contains all the Tl208_NEW_v1_03_01_nexus_v5_03_04_cut*.NN_points_10000.root.h5 MC files.
+Open the script and modify the `top_level_path` appropriately. For example, this will be the path to the directory that contains all the Tl208_NEW_v1_03_01_nexus_v5_03_04_cut*.NN_points_10000.root.h5 MC files.
 
 The conversion script will produce three files: next_new_classification_train.h5, next_new_classification_test.h5, next_new_classification_val.h5.
 
 The number of signal and background events in this dataset is not the same, and this requires to apply weights to signal and background to balance the loss. If you are using this dataset, you can just add the flag `-bl`, which will weight signal events with 1.60 and background events with 0.62. You can also specify your own weights by adding flags `--weight-sig 1.60 --weight-bkg 0.62`. 
 
+On some machines the MC files are already available here:
+
+| Machine         | Path to files  |
+| ----------------|-------------|
+| Summit (NPH133) | `/gpfs/alpine/proj-shared/nph133/nextnew/nextnew_Tl208_larcv/` |
+| gu1next         | `/home/deltutto/next_data_larcv/`    |
+
 
 ## Analyze the output
 
-The output in the log directory contains both checkpoints (snaphot of the trained model taken every 100 iterations), and tensorboard files. If you have tensorboard installed, you can quickly look at the results by doing:
+The output in the log directory contains both checkpoints (snaphot of the trained model taken every 100 iterations), and tensorboard files. If you have tensorboard installed, you can look at the results by doing:
 
 `tensorboard --logdir /path/to/log/dir/ [--host localhost]`
 
 
 ## Distributed training
 
-To be written...
+To run in distributed mode, just add the `-d` flag.
+
+For example, on Summit, to run over 3 nodes with 6 GPUs each:
+
+`jsrun -n18 -g1 -a1 -c7 -r6 python bin/resnet3d.py train -f next_new_classification_train.h5 --aux-file next_new_classification_test.h5 -i 10 -mb 1152 -bl -d`
+
+In this way, the 1152 images specified in the batch size are read by the last rank and then distributed to all the other ranks. In the end, every rank will have 64 images per iteration.
 
 ## Inference
 
