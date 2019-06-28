@@ -1,5 +1,6 @@
 from . import larcv_io
-
+from . import flags
+FLAGS = flags.FLAGS()
 
 
 # Here, we set up a bunch of template IO formats in the form of callable functions:
@@ -7,7 +8,7 @@ from . import larcv_io
 def train_io(input_file, image_dim, label_mode, prepend_names=""):
 
     max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"voxels\"", max_voxels=max_voxels)
+    data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"" + FLAGS.PRODUCER + "\"", max_voxels=max_voxels)
 
     label_proc = gen_label_filler(label_mode, prepend_names)
 
@@ -25,7 +26,7 @@ def train_io(input_file, image_dim, label_mode, prepend_names=""):
 def test_io(input_file, image_dim, label_mode, prepend_names="aux_"):
 
     max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"voxels\"", max_voxels=max_voxels)
+    data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"" + FLAGS.PRODUCER + "\"", max_voxels=max_voxels)
 
     label_proc = gen_label_filler(label_mode, prepend_names)
 
@@ -43,7 +44,7 @@ def test_io(input_file, image_dim, label_mode, prepend_names="aux_"):
 def ana_io(input_file, image_dim, label_mode, prepend_names=""):
 
     max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"voxels\"", max_voxels=max_voxels)
+    data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"" + FLAGS.PRODUCER + "\"", max_voxels=max_voxels)
 
 
     label_proc = gen_label_filler(label_mode, prepend_names)

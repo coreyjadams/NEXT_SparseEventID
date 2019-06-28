@@ -82,6 +82,7 @@ class FLAGS(Borg):
         self.WEIGHT_BKG            = 0.62
 
         self.DISTRIBUTED           = False
+        self.READ_OPTION           = 'read_from_single_rank'
 
         # To be clear, this is specifying the image mode from larcv ThreadIO,
         # Not the input to the network
@@ -96,6 +97,7 @@ class FLAGS(Borg):
         self.FILE                  = "/ccs/home/deltutto/data/next_new_classification_train.h5"
         self.IO_VERBOSITY          = 3
         self.KEYWORD_DATA          = 'data'
+        self.PRODUCER              = 'voxels'
         # For this classification task, the label can be split or all-in-one
         self.LABEL_MODE            = 'split' # could also be 'all'
 
@@ -104,7 +106,7 @@ class FLAGS(Borg):
         # self.KEYWORD_LABEL_ALL     = 'label'
         # self.KEYWORD_LABEL_SPLIT   = ['label_neut','label_cpi','label_npi','label_prot']
 
-        self.KEYWORD_LABEL         = None
+        self.KEYWORD_LABEL         = 'label'
 
         self.LR_SCHEDULE           = 'flat'
         self.OPTIMIZER             = "Adam"
@@ -143,6 +145,9 @@ class FLAGS(Borg):
 
         parser.add_argument('--label-mode', type=str, choices=['split', 'all'], default=self.LABEL_MODE,
             help="Run with split labels (multiple classifiers) or all in one [default: {}]".format(self.LABEL_MODE))
+
+        parser.add_argument('--producer', type=str, default=self.PRODUCER,
+            help="Sets the producer name for the voxels in the larcv file [default: {}]".format(self.PRODUCER))
 
         parser.add_argument('-mb','--minibatch-size',type=int, default=self.MINIBATCH_SIZE,
             help="Number of images in the minibatch size [default: {}]".format(self.MINIBATCH_SIZE))
@@ -235,6 +240,9 @@ class FLAGS(Borg):
 
         parser.add_argument('-d','--distributed', action='store_true', default=self.DISTRIBUTED,
             help="Run with the MPI compatible mode [default: {}]".format(self.DISTRIBUTED))
+        parser.add_argument('-ro','--read-option',type=str,choices=['read_from_single_rank', 'read_from_single_local_rank', 'read_from_all_ranks'],default=self.READ_OPTION,
+            help="Option to read the data (from one rank, from one rank in every node, from all ranks) [default: {}]".format(self.READ_OPTION))
+
         parser.add_argument('-m','--compute-mode', type=str, choices=['CPU','GPU'], default=self.COMPUTE_MODE,
             help="Selection of compute device, CPU or GPU  [default: {}]".format(self.COMPUTE_MODE))
         parser.add_argument('-im','--image-mode',type=str,choices=['dense', 'sparse'],default=self.IMAGE_MODE,

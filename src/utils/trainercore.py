@@ -40,14 +40,22 @@ class trainercore(object):
             os.unlink(f.name)
             
 
-    def _initialize_io(self):
+    def _initialize_io(self, filename=None, auxfilename=None):
+
+        if filename is None:
+            filename = FLAGS.FILE
+
+        if auxfilename is None:
+            auxfilename = FLAGS.AUX_FILE
+
+
 
         # Use the templates to generate a configuration string, which we store into a temporary file
         if FLAGS.TRAINING:
-            config = io_templates.train_io(input_file=FLAGS.FILE, image_dim=FLAGS.INPUT_DIMENSION, 
+            config = io_templates.train_io(input_file=filename, image_dim=FLAGS.INPUT_DIMENSION, 
                 label_mode=FLAGS.LABEL_MODE)
         else:
-            config = io_templates.ana_io(input_file=FLAGS.FILE, image_dim=FLAGS.INPUT_DIMENSION,
+            config = io_templates.ana_io(input_file=filename, image_dim=FLAGS.INPUT_DIMENSION,
                 label_mode=FLAGS.LABEL_MODE)
 
 
@@ -78,9 +86,9 @@ class trainercore(object):
         # Assign the keywords here:
         FLAGS.KEYWORD_LABEL = 'label'
 
-
         self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys)
 
+        print ('done prepare_manager')
         if not FLAGS.TRAINING:
             self._larcv_interface._dataloaders['primary'].set_next_index(0)
 
@@ -89,7 +97,7 @@ class trainercore(object):
 
 
             if FLAGS.TRAINING:
-                config = io_templates.test_io(input_file=FLAGS.AUX_FILE, image_dim=FLAGS.INPUT_DIMENSION, 
+                config = io_templates.test_io(input_file=auxfilename, image_dim=FLAGS.INPUT_DIMENSION, 
                     label_mode=FLAGS.LABEL_MODE)
 
                 # Generate a named temp file:
@@ -137,10 +145,10 @@ class trainercore(object):
     def init_network(self):
 
         dims = self._larcv_interface.fetch_minibatch_dims('primary')
-
+        print ('dims', dims)
         # This sets up the necessary output shape:
         output_shape = dims[FLAGS.KEYWORD_LABEL]
-
+        print ('output_shape', output_shape)
 
         self._net = FLAGS._net(output_shape)
 
@@ -409,8 +417,12 @@ class trainercore(object):
         # Which is just the ratio of the 0 : 1 label in each category.  So, they are learning to predict always zero, 
         # And it is difficult to bust out of that.
 
-
+        #print ('inputs', inputs)
+        #print ('FLAGS.KEYWORD_LABEL', FLAGS.KEYWORD_LABEL)
+        #print ('inputs', inputs['label'])
         values, target = torch.max(inputs[FLAGS.KEYWORD_LABEL], dim = 1)
+        #print ('logits', logits)
+        #print ('target', target)
         loss = self._criterion(logits, target=target)
         return loss
 
@@ -463,7 +475,7 @@ class trainercore(object):
       
 
             try:
-                s += " ({:.2}s / {:.2} IOs / {:.2})".format(
+                s += " ({:.3}s delta log / {:.3} IOs / {:.3}s step time)".format(
                     (self._current_log_time - self._previous_log_time).total_seconds(), 
                     metrics['io_fetch_time'],
                     metrics['step_time'])
@@ -504,7 +516,6 @@ class trainercore(object):
         minibatch_data = self._larcv_interface.fetch_minibatch_data(mode, fetch_meta_data=metadata)
         minibatch_dims = self._larcv_interface.fetch_minibatch_dims(mode)
 
-
         for key in minibatch_data:
             if key == 'entries' or key == 'event_ids':
                 continue
@@ -514,7 +525,6 @@ class trainercore(object):
         for key in minibatch_data:
             new_key = key.replace('aux_','')
             minibatch_data[new_key] = minibatch_data.pop(key)            
-
 
 
         # Here, do some massaging to convert the input data to another format, if necessary:
@@ -537,6 +547,7 @@ class trainercore(object):
 
         elif FLAGS.IMAGE_MODE == 'sparse' and FLAGS.SPARSE:
             if FLAGS.INPUT_DIMENSION == '3D':
+                #print ('here')
                 minibatch_data['image'] = data_transforms.larcvsparse_to_scnsparse_3d(minibatch_data['image'])
             else:
                 minibatch_data['image'] = data_transforms.larcvsparse_to_scnsparse_2d(minibatch_data['image'])
@@ -580,13 +591,13 @@ class trainercore(object):
                 if FLAGS.INPUT_DIMENSION == '3D':
                     minibatch_data['image'] = (
                             torch.tensor(minibatch_data['image'][0]).long(),
-                            torch.tensor(minibatch_data['image'][1], device=device),
+                            torch.tensor(minibatch_data['image'][1], device=device).float(),
                             minibatch_data['image'][2],
                         )
                 else:
                     minibatch_data['image'] = (
                             torch.tensor(minibatch_data['image'][0]).long(),
-                            torch.tensor(minibatch_data['image'][1], device=device),
+                            torch.tensor(minibatch_data['image'][1], device=device).float(),
                             minibatch_data['image'][2],
                         )
             else:
@@ -612,6 +623,7 @@ class trainercore(object):
         io_start_time = datetime.datetime.now()
         minibatch_data = self.fetch_next_batch()
         io_end_time = datetime.datetime.now()
+
 
         minibatch_data = self.to_torch(minibatch_data)
 
