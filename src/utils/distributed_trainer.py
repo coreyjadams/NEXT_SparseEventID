@@ -127,7 +127,7 @@ class distributed_trainer(trainercore):
             os.environ['CUDA_VISIBLE_DEVICES'] = str(hvd.local_rank())
             
 
-        self._larcv_interface = larcv_interface(root=root_rank, read_from_all_ranks=True, read_option=FLAGS.READ_OPTION, local_rank=hvd.local_rank(), local_size=hvd.local_size())
+        self._larcv_interface = larcv_interface(root=root_rank, read_option=FLAGS.READ_OPTION, local_rank=hvd.local_rank(), local_size=hvd.local_size())
         self._iteration       = 0
         self._rank            = hvd.rank()
         self._local_rank      = hvd.local_rank()
