@@ -97,6 +97,7 @@ class FLAGS(Borg):
         self.FILE                  = "/ccs/home/deltutto/data/next_new_classification_train.h5"
         self.IO_VERBOSITY          = 3
         self.KEYWORD_DATA          = 'data'
+        self.PRODUCER              = 'voxels'
         # For this classification task, the label can be split or all-in-one
         self.LABEL_MODE            = 'split' # could also be 'all'
 
@@ -144,6 +145,9 @@ class FLAGS(Borg):
 
         parser.add_argument('--label-mode', type=str, choices=['split', 'all'], default=self.LABEL_MODE,
             help="Run with split labels (multiple classifiers) or all in one [default: {}]".format(self.LABEL_MODE))
+
+        parser.add_argument('--producer', type=str, default=self.PRODUCER,
+            help="Sets the producer name for the voxels in the larcv file [default: {}]".format(self.PRODUCER))
 
         parser.add_argument('-mb','--minibatch-size',type=int, default=self.MINIBATCH_SIZE,
             help="Number of images in the minibatch size [default: {}]".format(self.MINIBATCH_SIZE))
