@@ -147,13 +147,16 @@ class trainercore(object):
         dims = self._larcv_interface.fetch_minibatch_dims('primary')
         print ('dims', dims)
         # This sets up the necessary output shape:
-        output_shape = dims[FLAGS.KEYWORD_LABEL]
+        if FLAGS.TRAINING:
+            output_shape = dims[FLAGS.KEYWORD_LABEL]
+        else:
+            output_shape = [dims['image'][0], 2]
         print ('output_shape', output_shape)
 
         self._net = FLAGS._net(output_shape)
 
 
-        if FLAGS.TRAINING: 
+        if FLAGS.TRAINING:
             self._net.train(True)
 
     def initialize(self, io_only=False):
@@ -736,6 +739,7 @@ class trainercore(object):
 
     def ana_step(self, iteration=None):
 
+        print ('ana_step starts')
         # First, validation only occurs on training:
         if FLAGS.TRAINING: return
 
@@ -748,6 +752,7 @@ class trainercore(object):
         # Fetch the next batch of data with larcv
         minibatch_data = self.fetch_next_batch(metadata=True)
 
+        print ('minibatch_data fetched')
 
         # Convert the input data to torch tensors
         minibatch_data = self.to_torch(minibatch_data)
@@ -756,6 +761,16 @@ class trainercore(object):
         with torch.no_grad():
             logits = self._net(minibatch_data['image'])
 
+        print ('forward pass run')
+
+        values, predict = torch.max(logits, dim=1)
+
+        print (predict)
+        print (torch.eq(predict,1))
+        exit()
+        
+
+        '''
         if FLAGS.LABEL_MODE == 'all':
             softmax = torch.nn.Softmax(dim=-1)(logits)
         else:
@@ -796,7 +811,7 @@ class trainercore(object):
             # self.summary(metrics, saver="test")
 
             return metrics
-
+   '''
 
     def stop(self):
         # Mostly, this is just turning off the io:
@@ -837,6 +852,7 @@ class trainercore(object):
                 self.train_step()
                 self.checkpoint()
             else:
+                print ('iteration', i)
                 self.ana_step(i)
 
 

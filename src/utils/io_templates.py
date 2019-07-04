@@ -47,15 +47,15 @@ def ana_io(input_file, image_dim, label_mode, prepend_names=""):
     data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"" + FLAGS.PRODUCER + "\"", max_voxels=max_voxels)
 
 
-    label_proc = gen_label_filler(label_mode, prepend_names)
+    #label_proc = gen_label_filler(label_mode, prepend_names)
 
 
     config = larcv_io.ThreadIOConfig(name="AnaIO")
     # Force ana files to go in order:
 
-    config._params['RandomAccess'] = "2"
+    #config._params['RandomAccess'] = "2"
     config.add_process(data_proc)
-    config.add_process(label_proc)
+    #config.add_process(label_proc)
 
     config.set_param("InputFiles", input_file)
 
