@@ -86,7 +86,7 @@ class trainercore(object):
         # Assign the keywords here:
         FLAGS.KEYWORD_LABEL = 'label'
 
-        self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys)
+        self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys, 0)
 
         print ('done prepare_manager')
         if not FLAGS.TRAINING:

@@ -11,8 +11,8 @@ import horovod.torch as hvd
 hvd.init()
 
 
-from larcv.distributed_larcv_interface import larcv_interface
-
+#from larcv.distributed_larcv_interface import larcv_interface
+from larcv.distributed_queue_interface import queue_interface
 
 from . import flags
 # from . import data_transforms
