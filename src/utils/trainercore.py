@@ -8,7 +8,8 @@ import numpy
 
 import torch
 
-from larcv import larcv_interface
+# from larcv import larcv_interface
+from larcv import threadloader
 
 from . import flags
 from . import data_transforms
@@ -29,7 +30,8 @@ class trainercore(object):
 
     '''
     def __init__(self,):
-        self._larcv_interface = larcv_interface.larcv_interface()
+        # self._larcv_interface = larcv_interface.larcv_interface()
+        self._larcv_interface = threadloader.thread_interface()
         self._iteration       = 0
         self._global_step     = -1
 
@@ -86,9 +88,9 @@ class trainercore(object):
         # Assign the keywords here:
         FLAGS.KEYWORD_LABEL = 'label'
 
+        # self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys)
         self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys, 0)
 
-        print ('done prepare_manager')
         if not FLAGS.TRAINING:
             self._larcv_interface._dataloaders['primary'].set_next_index(0)
 
@@ -516,7 +518,11 @@ class trainercore(object):
         if not FLAGS.DISTRIBUTED:
             self._larcv_interface.next(mode)
 
-        minibatch_data = self._larcv_interface.fetch_minibatch_data(mode, fetch_meta_data=metadata)
+        FLAGS.MPI_IO = True
+        if FLAGS.MPI_IO:
+            self._larcv_interface.prepare_next(mode)
+
+        minibatch_data = self._larcv_interface.fetch_minibatch_data(mode, pop=True, fetch_meta_data=metadata)
         minibatch_dims = self._larcv_interface.fetch_minibatch_dims(mode)
 
         for key in minibatch_data:
@@ -815,7 +821,8 @@ class trainercore(object):
 
     def stop(self):
         # Mostly, this is just turning off the io:
-        self._larcv_interface.stop()
+        return
+        #self._larcv_interface.stop()
 
     def checkpoint(self):
 

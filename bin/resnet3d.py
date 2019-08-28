@@ -47,26 +47,37 @@ def main():
     if FLAGS.MODE == 'iotest':
         trainer.initialize(io_only=True)
 
-        total_start_time = time.time()
-        # time.sleep(0.1)
-        start = time.time()
+        # total_start_time = time.time()
+        time.sleep(0.1)
+
+        times = []
+        
         for i in range(FLAGS.ITERATIONS):
+            start = time.time()
             mb = trainer.fetch_next_batch()
             end = time.time()
             if not FLAGS.DISTRIBUTED:
                 print(i, ": Time to fetch a minibatch of data: {} seconds.".format(end - start))
+                times.append(end - start)
             else:
                 if trainer._rank == 0:
+                    # print ('rank =', trainer._rank, '    ', len(mb['image'][1]))
                     print(i, ": Time to fetch a minibatch of data: {} seconds.".format(end - start))
-            time.sleep(0.5)
-            start = time.time()
+                    times.append(end - start)
+            time.sleep(0.1)
 
-        total_time = time.time() - total_start_time
-        print("Time to read {} batches of {} images each: {}".format(
-            FLAGS.ITERATIONS, 
-            FLAGS.MINIBATCH_SIZE,
-            time.time() - total_start_time
-            ))
+        if not FLAGS.DISTRIBUTED:
+                print ("Average time to fetch a minibatch of data: {} seconds.".format(numpy.array(times).mean()))
+        else:
+            if trainer._rank == 0: 
+                print ("Average time to fetch a minibatch of data: {} seconds.".format(numpy.array(times).mean()))
+                
+        # total_time = time.time() - total_start_time
+        # print("Time to read {} batches of {} images each: {}".format(
+        #     FLAGS.ITERATIONS, 
+        #     FLAGS.MINIBATCH_SIZE,
+        #     total_time
+        #     ))
 
     trainer.stop()
 

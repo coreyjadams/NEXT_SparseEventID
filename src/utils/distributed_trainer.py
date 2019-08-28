@@ -128,7 +128,7 @@ class distributed_trainer(trainercore):
             
 
         #self._larcv_interface = larcv_interface(root=root_rank, read_option=FLAGS.READ_OPTION, local_rank=hvd.local_rank(), local_size=hvd.local_size())
-        self._larcv_interface = queue_interface()
+        self._larcv_interface = queue_interface(random_access_mode = "serial_access")
         self._iteration       = 0
         self._rank            = hvd.rank()
         self._local_rank      = hvd.local_rank()
