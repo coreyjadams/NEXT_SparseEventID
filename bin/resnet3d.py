@@ -67,10 +67,10 @@ def main():
             time.sleep(0.1)
 
         if not FLAGS.DISTRIBUTED:
-                print ("Average time to fetch a minibatch of data: {} seconds.".format(numpy.array(times).mean()))
+                print ("Average time to fetch a minibatch of data: {} +- {} seconds.".format(numpy.array(times).mean(), numpy.array(times).std()))
         else:
             if trainer._rank == 0: 
-                print ("Average time to fetch a minibatch of data: {} seconds.".format(numpy.array(times).mean()))
+                print ("Average time to fetch a minibatch of data: {} +- {} seconds, (median: {}).".format(numpy.array(times).mean(), numpy.array(times).std(), numpy.median(numpy.array(times))))
                 
         # total_time = time.time() - total_start_time
         # print("Time to read {} batches of {} images each: {}".format(
