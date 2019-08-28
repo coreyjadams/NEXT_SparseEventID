@@ -88,8 +88,10 @@ class trainercore(object):
         # Assign the keywords here:
         FLAGS.KEYWORD_LABEL = 'label'
 
-        # self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys)
-        self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys, 0)
+        if FLAGS.MPIIO:
+            self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys, color=0)
+        else:
+            self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys)
 
         if not FLAGS.TRAINING:
             self._larcv_interface._dataloaders['primary'].set_next_index(0)
@@ -518,8 +520,7 @@ class trainercore(object):
         if not FLAGS.DISTRIBUTED:
             self._larcv_interface.next(mode)
 
-        FLAGS.MPI_IO = True
-        if FLAGS.MPI_IO:
+        if FLAGS.MPIIO:
             self._larcv_interface.prepare_next(mode)
 
         minibatch_data = self._larcv_interface.fetch_minibatch_data(mode, pop=True, fetch_meta_data=metadata)
@@ -821,8 +822,8 @@ class trainercore(object):
 
     def stop(self):
         # Mostly, this is just turning off the io:
-        return
-        #self._larcv_interface.stop()
+        if not FLAGS.MPIIO: 
+            self._larcv_interface.stop()
 
     def checkpoint(self):
 

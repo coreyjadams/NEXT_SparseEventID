@@ -82,6 +82,7 @@ class FLAGS(Borg):
         self.WEIGHT_BKG            = 0.62
 
         self.DISTRIBUTED           = False
+        self.MPIIO                 = False
         self.READ_OPTION           = 'read_from_single_rank'
 
         # To be clear, this is specifying the image mode from larcv ThreadIO,
@@ -240,6 +241,8 @@ class FLAGS(Borg):
 
         parser.add_argument('-d','--distributed', action='store_true', default=self.DISTRIBUTED,
             help="Run with the MPI compatible mode [default: {}]".format(self.DISTRIBUTED))
+        parser.add_argument('-mpi','--mpiio', action='store_true', default=self.MPIIO,
+            help="Use larcv MPI functionality for IO [default: {}]".format(self.MPIIO))
         parser.add_argument('-ro','--read-option',type=str,choices=['read_from_single_rank', 'read_from_single_local_rank', 'read_from_all_ranks'],default=self.READ_OPTION,
             help="Option to read the data (from one rank, from one rank in every node, from all ranks) [default: {}]".format(self.READ_OPTION))
 
@@ -258,6 +261,9 @@ class FLAGS(Borg):
             help="Weight applied to signal events during loss calculation [default: {}]".format(self.WEIGHT_SIG))
         parser.add_argument('--weight-bkg',type=float, default=self.WEIGHT_BKG,
             help="Weight applied to background events during loss calculation [default: {}]".format(self.WEIGHT_BKG))
+
+        if not self.DISTRIBUTED and self.MPIIO:
+            self.MPIIO = False
 
         return parser
 
