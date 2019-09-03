@@ -129,7 +129,10 @@ class trainercore(object):
 
 
 
-                self._larcv_interface.prepare_manager('aux', io_config, FLAGS.AUX_MINIBATCH_SIZE, data_keys)
+                if FLAGS.MPIIO:
+                    self._larcv_interface.prepare_manager('aux', io_config, FLAGS.AUX_MINIBATCH_SIZE, data_keys, color=0)
+                else:
+                    self._larcv_interface.prepare_manager('aux', io_config, FLAGS.AUX_MINIBATCH_SIZE, data_keys)
 
         if FLAGS.OUTPUT_FILE is not None:
             if not FLAGS.TRAINING:
