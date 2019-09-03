@@ -68,6 +68,7 @@ class FLAGS(Borg):
         # Parameters controlling training situations
         self.COMPUTE_MODE          = "GPU"
         self.TRAINING              = True
+        self.INFERENCE             = False
         self.MINIBATCH_SIZE        = 64
         self.CHECKPOINT_ITERATION  = 100
         self.SUMMARY_ITERATION     = 1
@@ -309,7 +310,7 @@ class FLAGS(Borg):
 
         if self.MODE == 'inference':
             self.TRAINING = False
-
+            self.INFERENCE = True
 
 
     def dump_config(self):

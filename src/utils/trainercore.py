@@ -136,6 +136,8 @@ class trainercore(object):
 
         if FLAGS.OUTPUT_FILE is not None:
             if not FLAGS.TRAINING:
+                self._outfile = open(FLAGS.OUTPUT_FILE, 'w')
+                '''
                 config = io_templates.output_io(input_file=FLAGS.FILE, output_file=FLAGS.OUTPUT_FILE)
                 
                 out_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
@@ -146,7 +148,7 @@ class trainercore(object):
                 self._cleanup.append(out_file)
 
                 self._larcv_interface.prepare_writer(out_file.name, FLAGS.OUTPUT_FILE)
-
+                '''
 
 
     def init_network(self):
@@ -747,9 +749,7 @@ class trainercore(object):
 
                 return metrics
 
-    def ana_step(self, iteration=None):
-
-        print ('ana_step starts')
+    def inference_step(self, iteration=None):
         # First, validation only occurs on training:
         if FLAGS.TRAINING: return
 
@@ -762,7 +762,46 @@ class trainercore(object):
         # Fetch the next batch of data with larcv
         minibatch_data = self.fetch_next_batch(metadata=True)
 
-        print ('minibatch_data fetched')
+        # Convert the input data to torch tensors
+        minibatch_data = self.to_torch(minibatch_data)
+
+        # Run a forward pass of the model on the input image:
+        with torch.no_grad():
+            logits = self._net(minibatch_data['image'])
+
+        values, predict = torch.max(logits, dim=1)
+
+        prediction_label = predict.data.cpu().numpy()[0]
+        total_energy = numpy.sum(minibatch_data['image'][1].data.cpu().numpy())
+        self._outfile.write(str(iteration) + ',' + str(prediction_label) + ',' + str(total_energy) + '\n')
+        
+        '''
+        larcv_particle = larcv.EventParticle.to_particle(self._io_mgr.get_data("particle", "label"))
+        particle = larcv.Particle()
+        particle.energy_init(0.)
+        particle.pdg_code(int(predict.data))
+        larcv_particle.emplace_back(particle)
+
+        event_sparse3d = larcv.EventSparseTensor3D.to_sparse_tensor(self._io_mgr.get_data("sparse3d", "voxels"))
+        st = larcv.SparseTensor3D()
+        st.meta(next_new_meta)
+        '''
+
+
+    def ana_step(self, iteration=None):
+
+        # First, validation only occurs on training:
+        if FLAGS.TRAINING: return
+
+        # perform a validation step
+
+        # Set network to eval mode
+        self._net.eval()
+        # self._net.train()
+
+        # Fetch the next batch of data with larcv
+        minibatch_data = self.fetch_next_batch(metadata=True)
+
 
         # Convert the input data to torch tensors
         minibatch_data = self.to_torch(minibatch_data)
@@ -771,16 +810,7 @@ class trainercore(object):
         with torch.no_grad():
             logits = self._net(minibatch_data['image'])
 
-        print ('forward pass run')
 
-        values, predict = torch.max(logits, dim=1)
-
-        print (predict)
-        print (torch.eq(predict,1))
-        exit()
-        
-
-        '''
         if FLAGS.LABEL_MODE == 'all':
             softmax = torch.nn.Softmax(dim=-1)(logits)
         else:
@@ -821,7 +851,6 @@ class trainercore(object):
             # self.summary(metrics, saver="test")
 
             return metrics
-   '''
 
     def stop(self):
         # Mostly, this is just turning off the io:
@@ -862,8 +891,10 @@ class trainercore(object):
                 self.val_step()
                 self.train_step()
                 self.checkpoint()
-            else:
+            elif FLAGS.INFERENCE:
                 print ('iteration', i)
+                self.inference_step(i)
+            else:
                 self.ana_step(i)
 
 
