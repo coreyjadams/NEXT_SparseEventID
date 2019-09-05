@@ -11,8 +11,8 @@ import horovod.torch as hvd
 hvd.init()
 
 
-from larcv.distributed_larcv_interface import larcv_interface
-
+from larcv.distributed_queue_interface import queue_interface
+from larcv.distributed_larcv_interface import thread_interface as larcv_interface
 
 from . import flags
 # from . import data_transforms
@@ -127,7 +127,11 @@ class distributed_trainer(trainercore):
             os.environ['CUDA_VISIBLE_DEVICES'] = str(hvd.local_rank())
             
 
-        self._larcv_interface = larcv_interface(root=root_rank, read_option=FLAGS.READ_OPTION, local_rank=hvd.local_rank(), local_size=hvd.local_size())
+        if FLAGS.MPIIO:
+            self._larcv_interface = queue_interface(random_access_mode = "random_blocks")
+        else: 
+            self._larcv_interface = larcv_interface(root=root_rank, read_option=FLAGS.READ_OPTION, local_rank=hvd.local_rank(), local_size=hvd.local_size())
+
         self._iteration       = 0
         self._rank            = hvd.rank()
         self._local_rank      = hvd.local_rank()

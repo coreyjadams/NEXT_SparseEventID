@@ -47,15 +47,15 @@ def ana_io(input_file, image_dim, label_mode, prepend_names=""):
     data_proc = gen_sparse3d_data_filler(name=prepend_names + "data", producer="\"" + FLAGS.PRODUCER + "\"", max_voxels=max_voxels)
 
 
-    label_proc = gen_label_filler(label_mode, prepend_names)
+    #label_proc = gen_label_filler(label_mode, prepend_names)
 
 
     config = larcv_io.ThreadIOConfig(name="AnaIO")
     # Force ana files to go in order:
 
-    config._params['RandomAccess'] = "2"
+    #config._params['RandomAccess'] = "2"
     config.add_process(data_proc)
-    config.add_process(label_proc)
+    #config.add_process(label_proc)
 
     config.set_param("InputFiles", input_file)
 
@@ -71,14 +71,17 @@ def output_io(input_file, output_file):
 
     config._params['RandomAccess'] = "0"
 
+    print ('output_io   input_file:', input_file, ' output_file:', output_file)
     config.set_param("InputFiles", input_file)
-    config.set_param("OutputFile", output_file)
+    config.set_param("OutFileName", output_file)
 
     # These lines slim down the output file.
     # Without them, 25 output events is 2.8M and takes 38s
     # With the, 25 output events is 119K and takes 36s
-    config.set_param("ReadOnlyType", "[\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\"]")  
-    config.set_param("ReadOnlyName", "[\"sbndneutrino\",\"sbndsegmerged\",\"cpiID\",\"neutID\",\"npiID\",\"protID\",\"all\"]")  
+    config.set_param("ReadOnlyType", "[\"sparse3d\",\"sparse3d\",\"sparse3d\",\"sparse3d\"]")
+    config.set_param("ReadOnlyName", "[\"voxels_E\",\"voxels_E_norm\",\"voxels_E_scaled\",\"voxels_Q\"]")
+   # config.set_param("ReadOnlyType", "[\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\"]")  
+   # config.set_param("ReadOnlyName", "[\"sbndneutrino\",\"sbndsegmerged\",\"cpiID\",\"neutID\",\"npiID\",\"protID\",\"all\"]")  
 
     return config
 
