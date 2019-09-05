@@ -137,6 +137,7 @@ class trainercore(object):
         if FLAGS.OUTPUT_FILE is not None:
             if not FLAGS.TRAINING:
                 self._outfile = open(FLAGS.OUTPUT_FILE, 'w')
+                self._outfile.write("event,label,energy\n")
                 '''
                 config = io_templates.output_io(input_file=FLAGS.FILE, output_file=FLAGS.OUTPUT_FILE)
                 
@@ -528,7 +529,10 @@ class trainercore(object):
         if FLAGS.MPIIO:
             self._larcv_interface.prepare_next(mode)
 
-        minibatch_data = self._larcv_interface.fetch_minibatch_data(mode, pop=True, fetch_meta_data=metadata)
+        if FLAGS.MPIIO:
+            minibatch_data = self._larcv_interface.fetch_minibatch_data(mode, pop=True, fetch_meta_data=metadata)
+        else:
+            minibatch_data = self._larcv_interface.fetch_minibatch_data(mode, fetch_meta_data=metadata)  
         minibatch_dims = self._larcv_interface.fetch_minibatch_dims(mode)
 
         for key in minibatch_data:
@@ -892,7 +896,7 @@ class trainercore(object):
                 self.train_step()
                 self.checkpoint()
             elif FLAGS.INFERENCE:
-                print ('iteration', i)
+                if (i % 500): print ('At inference iteration step', i)
                 self.inference_step(i)
             else:
                 self.ana_step(i)

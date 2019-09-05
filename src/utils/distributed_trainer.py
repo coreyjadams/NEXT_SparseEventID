@@ -128,7 +128,7 @@ class distributed_trainer(trainercore):
             
 
         if FLAGS.MPIIO:
-            self._larcv_interface = queue_interface(random_access_mode = "serial_access")
+            self._larcv_interface = queue_interface(random_access_mode = "random_blocks")
         else: 
             self._larcv_interface = larcv_interface(root=root_rank, read_option=FLAGS.READ_OPTION, local_rank=hvd.local_rank(), local_size=hvd.local_size())
 

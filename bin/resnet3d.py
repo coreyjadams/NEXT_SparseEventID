@@ -51,7 +51,7 @@ def main():
         time.sleep(0.1)
 
         times = []
-        
+       
         for i in range(FLAGS.ITERATIONS):
             start = time.time()
             mb = trainer.fetch_next_batch()
@@ -64,7 +64,7 @@ def main():
                     # print ('rank =', trainer._rank, '    ', len(mb['image'][1]))
                     print(i, ": Time to fetch a minibatch of data: {} seconds.".format(end - start))
                     times.append(end - start)
-            time.sleep(0.1)
+            time.sleep(0.5)
 
         if not FLAGS.DISTRIBUTED:
                 print ("Average time to fetch a minibatch of data: {} +- {} seconds.".format(numpy.array(times).mean(), numpy.array(times).std()))
