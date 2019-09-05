@@ -60,7 +60,7 @@ On some machines the MC files are already available here:
 | Machine         | Path to files  |
 | ----------------|-------------|
 | Summit (NPH133) | `/gpfs/alpine/proj-shared/nph133/nextnew/nextnew_Tl208_larcv/` |
-| gu1next         | `/home/deltutto/next_data_larcv/`    |
+| gpu1next        | `/home/deltutto/next_data_larcv/`    |
 
 
 ## Analyze the output
@@ -82,7 +82,16 @@ In this way, the 1152 images specified in the batch size are read by the last ra
 
 ## Inference
 
-To be written...
+To run in inference mode, use `inference` instead of `train`, set the minibatch size to 1 and the number of iterations to the total number of entry in the inferece file. In this case I am using NEXT data run 6826, which contains 4175 entries. I am also specifing an output file, here called `inference_run6826_Enorm.txt`, that contains the results of the network classification.
 
-
-
+`python bin/resnet3d.py inference -f run6826_full_dataset_cor_dv_larcv.h5 --producer voxels_E_norm -mb 1 -i 4175 -ld /gpfs/alpine/scratch/deltutto/nph133/next/log_next_mpiio_n10_r6_mb30720_bpl2_voxels_E_norm -out inference_run6826_Enorm.txt`
+ 
+The output file will look like:
+```
+event,label,energy
+0,1,1.0
+1,1,1.0
+2,0,1.0
+3,0,1.0
+```
+where the first column shows the event number, the second the resul of the classification (1 for signal and 0 for background) and the third the total event energy (here equal to 1 because the energy was normlized).
