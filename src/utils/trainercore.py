@@ -56,6 +56,9 @@ class trainercore(object):
         if FLAGS.TRAINING:
             config = io_templates.train_io(input_file=filename, image_dim=FLAGS.INPUT_DIMENSION, 
                 label_mode=FLAGS.LABEL_MODE)
+        if FLAGS.TESTING:
+            config = io_templates.test_io(input_file=filename, image_dim=FLAGS.INPUT_DIMENSION, 
+                label_mode=FLAGS.LABEL_MODE)
         else:
             config = io_templates.ana_io(input_file=filename, image_dim=FLAGS.INPUT_DIMENSION,
                 label_mode=FLAGS.LABEL_MODE)
@@ -752,7 +755,7 @@ class trainercore(object):
 
                 return metrics
 
-    def inference_step(self, iteration=None):
+    def inference_step(self, iteration=None, testing=False):
         # First, validation only occurs on training:
         if FLAGS.TRAINING: return
 
@@ -772,23 +775,15 @@ class trainercore(object):
         with torch.no_grad():
             logits = self._net(minibatch_data['image'])
 
-        values, predict = torch.max(logits, dim=1)
+        if not testing:
+            values, predict = torch.max(logits, dim=1)
 
-        prediction_label = predict.data.cpu().numpy()[0]
-        total_energy = numpy.sum(minibatch_data['image'][1].data.cpu().numpy())
-        self._outfile.write(str(iteration) + ',' + str(prediction_label) + ',' + str(total_energy) + '\n')
-        
-        '''
-        larcv_particle = larcv.EventParticle.to_particle(self._io_mgr.get_data("particle", "label"))
-        particle = larcv.Particle()
-        particle.energy_init(0.)
-        particle.pdg_code(int(predict.data))
-        larcv_particle.emplace_back(particle)
-
-        event_sparse3d = larcv.EventSparseTensor3D.to_sparse_tensor(self._io_mgr.get_data("sparse3d", "voxels"))
-        st = larcv.SparseTensor3D()
-        st.meta(next_new_meta)
-        '''
+            prediction_label = predict.data.cpu().numpy()[0]
+            total_energy = numpy.sum(minibatch_data['image'][1].data.cpu().numpy())
+            self._outfile.write(str(iteration) + ',' + str(prediction_label) + ',' + str(total_energy) + '\n')
+        else:
+            print ("============================>>>", logits)
+            print ("============================>>>", torch.nn.Softmax(dim=-1)(logits))
 
 
     def ana_step(self, iteration=None):
@@ -894,9 +889,9 @@ class trainercore(object):
                 self.val_step()
                 self.train_step()
                 self.checkpoint()
-            elif FLAGS.INFERENCE:
-                if (i % 500): print ('At inference iteration step', i)
-                self.inference_step(i)
+            elif FLAGS.TESTING or FLAGS.INFERENCE:
+                if (i % 500): print ('At iteration ', i)
+                self.inference_step(i, testing=FLAGS.TESTING)
             else:
                 self.ana_step(i)
 

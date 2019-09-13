@@ -184,7 +184,7 @@ class FLAGS(Borg):
         subparsers = self._parser.add_subparsers(title="Modules", 
                                                  description="Valid subcommands", 
                                                  dest='mode', 
-                                                 help="Available subcommands: train, iotest, inference")
+                                                 help="Available subcommands: train, iotest, test, inference")
       
       
 
@@ -223,7 +223,7 @@ class FLAGS(Borg):
         self.iotest_parser = self._add_core_configuration(self.iotest_parser)
 
 
-        # # inference parser
+        # inference parser
         self.inference_parser = subparsers.add_parser("inference",help="Run inference (optional output)")
         self.inference_parser = self._add_default_network_configuration(self.inference_parser)
         self.inference_parser = self._add_default_io_configuration(self.inference_parser)
@@ -231,8 +231,15 @@ class FLAGS(Borg):
         self.inference_parser = self._add_core_configuration(self.inference_parser)
         self.inference_parser.add_argument('-out','--output-file',type=str,default=self.OUTPUT_FILE,
             help="Override the destination of output in inference mode [default: {}]".format(self.OUTPUT_FILE))
-        # self.inference_parser = self._add_default_parser_configuration(inference_parser)
-        # self.iotest_parser    = self._add_default_parser_configuration(iotest_parser)
+  
+        # test parser
+        self.test_parser = subparsers.add_parser("train",help="Run test only (optional output)")
+        self.test_parser = self._add_default_network_configuration(self.test_parser)
+        self.test_parser = self._add_default_io_configuration(self.test_parser)
+        self.test_parser = self._add_aux_io_configuration(self.test_parser)
+        self.test_parser = self._add_core_configuration(self.test_parser)
+        self.test_parser.add_argument('-out','--output-file',type=str,default=self.OUTPUT_FILE,
+            help="Override the destination of output in inference mode [default: {}]".format(self.OUTPUT_FILE))
       
 
     def _add_core_configuration(self, parser):
@@ -310,7 +317,13 @@ class FLAGS(Borg):
 
         if self.MODE == 'inference':
             self.TRAINING = False
+            self.TESTING = False
             self.INFERENCE = True
+
+        if self.MODE == 'test':
+            self.TRAINING = False
+            self.TESTING = True
+            self.INFERENCE = False
 
 
     def dump_config(self):
