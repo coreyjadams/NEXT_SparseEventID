@@ -51,13 +51,9 @@ class trainercore(object):
             auxfilename = FLAGS.AUX_FILE
 
 
-
         # Use the templates to generate a configuration string, which we store into a temporary file
-        if FLAGS.TRAINING:
+        if FLAGS.TRAINING or FLAGS.TESTING:
             config = io_templates.train_io(input_file=filename, image_dim=FLAGS.INPUT_DIMENSION, 
-                label_mode=FLAGS.LABEL_MODE)
-        if FLAGS.TESTING:
-            config = io_templates.test_io(input_file=filename, image_dim=FLAGS.INPUT_DIMENSION, 
                 label_mode=FLAGS.LABEL_MODE)
         else:
             config = io_templates.ana_io(input_file=filename, image_dim=FLAGS.INPUT_DIMENSION,
@@ -96,8 +92,8 @@ class trainercore(object):
         else:
             self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys)
 
-        if not FLAGS.TRAINING:
-            self._larcv_interface._dataloaders['primary'].set_next_index(0)
+        # if not FLAGS.TRAINING:
+        #     self._larcv_interface._dataloaders['primary'].set_next_index(0)
 
         # All of the additional tools are in case there is a test set up:
         if FLAGS.AUX_FILE is not None:
@@ -137,9 +133,12 @@ class trainercore(object):
                     self._larcv_interface.prepare_manager('aux', io_config, FLAGS.AUX_MINIBATCH_SIZE, data_keys)
 
         if FLAGS.OUTPUT_FILE is not None:
-            if not FLAGS.TRAINING:
+            if FLAGS.INFERENCE:
                 self._outfile = open(FLAGS.OUTPUT_FILE, 'w')
-                self._outfile.write("event,label,energy\n")
+                self._outfile.write("event,prediction,prob_signal,energy\n")
+            if FLAGS.TESTING:
+                self._outfile = open(FLAGS.OUTPUT_FILE, 'w')
+                self._outfile.write("event,label,prob_sig,energy\n")
                 '''
                 config = io_templates.output_io(input_file=FLAGS.FILE, output_file=FLAGS.OUTPUT_FILE)
                 
@@ -152,7 +151,6 @@ class trainercore(object):
 
                 self._larcv_interface.prepare_writer(out_file.name, FLAGS.OUTPUT_FILE)
                 '''
-
 
     def init_network(self):
 
@@ -775,15 +773,22 @@ class trainercore(object):
         with torch.no_grad():
             logits = self._net(minibatch_data['image'])
 
-        if not testing:
-            values, predict = torch.max(logits, dim=1)
+        total_energy = numpy.sum(minibatch_data['image'][1].data.cpu().numpy())
+        values, predict = torch.max(logits, dim=1)
+        prediction_label = predict.data.cpu().numpy()[0]
 
-            prediction_label = predict.data.cpu().numpy()[0]
-            total_energy = numpy.sum(minibatch_data['image'][1].data.cpu().numpy())
-            self._outfile.write(str(iteration) + ',' + str(prediction_label) + ',' + str(total_energy) + '\n')
+        softmax = torch.nn.Softmax(dim=-1)(logits)
+        softmax = softmax.cpu().numpy()[0]
+        prob_signal = softmax[1] # probability of being signal
+
+        if not testing:
+            self._outfile.write(str(iteration) + ',' + str(prob_signal) + ',' + str(prediction_label) + ',' + str(total_energy) + '\n')
+            # print ("Iteration ", iteration, "first entry", minibatch_data['image'][1].data.cpu().numpy()[0], "=> Energy ", total_energy)
         else:
-            print ("============================>>>", logits)
-            print ("============================>>>", torch.nn.Softmax(dim=-1)(logits))
+            label = minibatch_data['label'].data.cpu().numpy()[0][1] # is 1 if it's true signal
+            self._outfile.write(str(iteration) + ',' + str(label) + ',' + str(prob_signal) + ',' + str(total_energy) + '\n')
+            # print ("Iteration ", iteration, "first entry", minibatch_data['image'][1].data.cpu().numpy()[0], "label", label, "=> Energy ", total_energy)
+            
 
 
     def ana_step(self, iteration=None):
@@ -890,8 +895,8 @@ class trainercore(object):
                 self.train_step()
                 self.checkpoint()
             elif FLAGS.TESTING or FLAGS.INFERENCE:
-                if (i % 500): print ('At iteration ', i)
-                self.inference_step(i, testing=FLAGS.TESTING)
+                if (i % 500 == 0): print ('At iteration ', i)
+                self.inference_step(iteration=i, testing=FLAGS.TESTING)
             else:
                 self.ana_step(i)
 

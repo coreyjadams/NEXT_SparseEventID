@@ -35,7 +35,7 @@ def main():
         from src.utils import trainercore
         trainer = trainercore.trainercore()
         
-    if FLAGS.MODE == 'train' or FLAGS.MODE == 'inference':
+    if FLAGS.MODE == 'train' or FLAGS.MODE == 'inference' or FLAGS.MODE == 'test':
         if FLAGS.SPARSE:
             net = sparseresnet3d.ResNet
         else:

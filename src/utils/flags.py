@@ -233,7 +233,7 @@ class FLAGS(Borg):
             help="Override the destination of output in inference mode [default: {}]".format(self.OUTPUT_FILE))
   
         # test parser
-        self.test_parser = subparsers.add_parser("train",help="Run test only (optional output)")
+        self.test_parser = subparsers.add_parser("test",help="Run test only (optional output)")
         self.test_parser = self._add_default_network_configuration(self.test_parser)
         self.test_parser = self._add_default_io_configuration(self.test_parser)
         self.test_parser = self._add_aux_io_configuration(self.test_parser)
@@ -321,6 +321,7 @@ class FLAGS(Borg):
             self.INFERENCE = True
 
         if self.MODE == 'test':
+            print ('Test mode')
             self.TRAINING = False
             self.TESTING = True
             self.INFERENCE = False

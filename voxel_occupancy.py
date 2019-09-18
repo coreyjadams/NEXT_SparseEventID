@@ -2,7 +2,7 @@ from larcv import larcv
 import numpy
 
 io = larcv.IOManager()
-io.add_in_file("next_new_classification_train.h5")
+io.add_in_file("/ccs/home/deltutto/data/next_new_classification_train.h5")
 io.initialize()
 
 voxel_counts3d = numpy.zeros((io.get_n_entries(), 1))
