@@ -56,11 +56,13 @@ def larcvsparse_to_scnsparse_3d(input_array):
     return output_array
 
 
-def larcvsparse_to_dense_3d(input_array, dense_shape=512):
+def larcvsparse_to_dense_3d(input_array):
 
 
     batch_size = input_array.shape[0]
-    output_array = numpy.zeros((batch_size, 1, 45, 45, 275), dtype=numpy.float32)
+    output_array = numpy.zeros((batch_size, 1, 48, 48, 276), dtype=numpy.float32)
+    # This is the "real" size:
+    # output_array = numpy.zeros((batch_size, 1, 45, 45, 275), dtype=numpy.float32)
 
     x_coords   = input_array[:,:,0]
     y_coords   = input_array[:,:,1]

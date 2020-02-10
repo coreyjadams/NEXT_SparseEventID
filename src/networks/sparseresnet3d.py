@@ -2,142 +2,45 @@ import torch
 import torch.nn as nn
 import sparseconvnet as scn
 
-from src import utils
-
-FLAGS = utils.flags.FLAGS()
-
-class SparseBlock(nn.Module):
-
-    def __init__(self, inplanes, outplanes):
-
-        nn.Module.__init__(self)
-        
-        self.conv1 = scn.SubmanifoldConvolution(
-            dimension   = 3, 
-            nIn         = inplanes, 
-            nOut        = outplanes, 
-            filter_size = 3, 
-            bias        = FLAGS.USE_BIAS)
-        
-        # if FLAGS.BATCH_NORM:
-        self.bn1 = scn.BatchNormReLU(outplanes)
-        # self.relu = scn.ReLU()
-
-    def forward(self, x):
-
-        out = self.conv1(x)
-        # if FLAGS.BATCH_NORM:
-        out = self.bn1(out)
-        # else:
-            # out = self.relu(out)
-
-        return out
+from sparse_building_blocks import SparseBlockSeries, SparseConvolutionDownsample, 
 
 
+class ResNetFlags(network_config):
 
-class SparseResidualBlock(nn.Module):
+    def __init__(self):
+        network_config.__init__(self)
+        self._name = "sparseresnet3d"
+        self._help = "Sparse Resnet"
 
-    def __init__(self, inplanes, outplanes):
-        nn.Module.__init__(self)
-        
-        
-        self.conv1 = scn.SubmanifoldConvolution(
-            dimension   = 3, 
-            nIn         = inplanes, 
-            nOut        = outplanes, 
-            filter_size = 3, 
-            bias        = FLAGS.USE_BIAS)
-        
+    def build_parser(self, network_parser):
+        # this_parser = network_parser
+        this_parser = network_parser.add_parser(self._name, help=self._help)
 
-        # if FLAGS.BATCH_NORM:
-        self.bn1 = scn.BatchNormReLU(outplanes)
+        this_parser.add_argument("--n-initial-filters",
+            type    = int,
+            default = 2,
+            help    = "Number of filters applied, per plane, for the initial convolution")
 
-        self.conv2 = scn.SubmanifoldConvolution(
-            dimension   = 3, 
-            nIn         = outplanes,
-            nOut        = outplanes,
-            filter_size = 3,
-            bias        = FLAGS.USE_BIAS)
+        this_parser.add_argument("--res-blocks-per-layer",
+            help    = "Number of residual blocks per layer",
+            type    = int,
+            default = 2)
 
-        # if FLAGS.BATCH_NORM:
-        self.bn2 = scn.BatchNormalization(outplanes)
+        this_parser.add_argument("--network-depth",
+            help    = "Total number of downsamples to apply",
+            type    = int,
+            default = 8)
 
-        self.residual = scn.Identity()
-        self.relu = scn.ReLU()
+        this_parser.add_argument("--batch-norm",
+            help    = "Run using batch normalization",
+            type    = str2bool,
+            default = True)
 
-        self.add = scn.AddTable()
+        this_parser.add_argument("--leaky-relu",
+            help    = "Run using leaky relu",
+            type    = str2bool,
+            default = False)
 
-    def forward(self, x):
-
-        residual = self.residual(x)
-
-        out = self.conv1(x)
-        # if FLAGS.BATCH_NORM:
-        out = self.bn1(out)
-        # else:
-            # out = self.relu(out)
-        out = self.conv2(out)
-
-        # if FLAGS.BATCH_NORM:
-        out = self.bn2(out)
-
-        # The addition of sparse tensors is not straightforward, since
-
-        out = self.add([out, residual])
-
-        out = self.relu(out)
-
-        return out
-
-
-
-
-class SparseConvolutionDownsample(nn.Module):
-
-    def __init__(self, inplanes, outplanes):
-        nn.Module.__init__(self)
-
-        self.conv = scn.Convolution(
-            dimension       = 3,
-            nIn             = inplanes,
-            nOut            = outplanes,
-            filter_size     = 2,
-            filter_stride   = 2,
-            bias            = FLAGS.USE_BIAS
-        )
-        # if FLAGS.BATCH_NORM:
-        self.bn   = scn.BatchNormalization(outplanes)
-        self.relu = scn.ReLU()
-
-    def forward(self, x):
-        out = self.conv(x)
-
-        # if FLAGS.BATCH_NORM:
-        out = self.bn(out)
-
-        out = self.relu(out)
-        return out
-
-
-class SparseBlockSeries(torch.nn.Module):
-
-
-    def __init__(self, inplanes, n_blocks, residual=False):
-        torch.nn.Module.__init__(self)
-
-        if residual:
-            self.blocks = [ SparseResidualBlock(inplanes, inplanes) for i in range(n_blocks) ]
-        else:
-            self.blocks = [ SparseBlock(inplanes, inplanes) for i in range(n_blocks)]
-
-        for i, block in enumerate(self.blocks):
-            self.add_module('block_{}'.format(i), block)
-
-
-    def forward(self, x):
-        for i in range(len(self.blocks)):
-            x = self.blocks[i](x)
-        return x
 
 
 def filter_increase(input_filters):

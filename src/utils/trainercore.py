@@ -8,12 +8,8 @@ import numpy
 
 import torch
 
-from larcv import larcv_interface
+from . larcvio import larcv_fetcher
 
-from . import flags
-from . import data_transforms
-from . import io_templates
-FLAGS = flags.FLAGS()
 
 import datetime
 
@@ -28,144 +24,35 @@ class trainercore(object):
     a NotImplemented error.
 
     '''
-    def __init__(self,):
-        self._larcv_interface = larcv_interface.larcv_interface()
-        self._iteration       = 0
-        self._global_step     = -1
-
-        self._cleanup         = []
-
-    def __del__(self):
-        for f in self._cleanup:
-            os.unlink(f.name)
-            
-
-    def _initialize_io(self):
-
-        # Use the templates to generate a configuration string, which we store into a temporary file
-        if FLAGS.TRAINING:
-            config = io_templates.train_io(input_file=FLAGS.FILE, image_dim=FLAGS.INPUT_DIMENSION, 
-                label_mode=FLAGS.LABEL_MODE)
-        else:
-            config = io_templates.ana_io(input_file=FLAGS.FILE, image_dim=FLAGS.INPUT_DIMENSION,
-                label_mode=FLAGS.LABEL_MODE)
-
-
-        # Generate a named temp file:
-        main_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
-        main_file.write(config.generate_config_str())
-
-        main_file.close()
-        self._cleanup.append(main_file)
-
-        # Prepare data managers:
-        io_config = {
-            'filler_name' : config._name,
-            'filler_cfg'  : main_file.name,
-            'verbosity'   : FLAGS.VERBOSITY,
-            'make_copy'   : True
-        }
-
-        # Build up the data_keys:
-        data_keys = OrderedDict()
-        data_keys['image'] = 'data'
-        for proc in config._process_list._processes:
-            if proc._name == 'data': 
-                continue
-            else:
-                data_keys[proc._name] = proc._name
-
-        # Assign the keywords here:
-        FLAGS.KEYWORD_LABEL = 'label'
-
-
-        self._larcv_interface.prepare_manager('primary', io_config, FLAGS.MINIBATCH_SIZE, data_keys)
-
-        if not FLAGS.TRAINING:
-            self._larcv_interface._dataloaders['primary'].set_next_index(0)
-
-        # All of the additional tools are in case there is a test set up:
-        if FLAGS.AUX_FILE is not None:
-
-
-            if FLAGS.TRAINING:
-                config = io_templates.test_io(input_file=FLAGS.AUX_FILE, image_dim=FLAGS.INPUT_DIMENSION, 
-                    label_mode=FLAGS.LABEL_MODE)
-
-                # Generate a named temp file:
-                aux_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
-                aux_file.write(config.generate_config_str())
-                # print([proc._name for proc in config._process_list._processes])
-
-                aux_file.close()
-                self._cleanup.append(aux_file)
-                io_config = {
-                    'filler_name' : config._name,
-                    'filler_cfg'  : aux_file.name,
-                    'verbosity'   : FLAGS.VERBOSITY,
-                    'make_copy'   : True
-                }
-
-                # Build up the data_keys:
-                data_keys = OrderedDict()
-                data_keys['image'] = 'aux_data'
-                for proc in config._process_list._processes:
-                    if proc._name == 'aux_data': 
-                        continue
-                    else:
-                        data_keys[proc._name] = proc._name
-
-
-
-                self._larcv_interface.prepare_manager('aux', io_config, FLAGS.AUX_MINIBATCH_SIZE, data_keys)
-
-        if FLAGS.OUTPUT_FILE is not None:
-            if not FLAGS.TRAINING:
-                config = io_templates.output_io(input_file=FLAGS.FILE, output_file=FLAGS.OUTPUT_FILE)
-                
-                out_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
-                out_file.write(config.generate_config_str())
-                print(config.generate_config_str())
-
-                out_file.close()
-                self._cleanup.append(out_file)
-
-                self._larcv_interface.prepare_writer(out_file.name, FLAGS.OUTPUT_FILE)
-
+    def __init__(self, args):
+        self._iteration     = 0
+        self._global_step   = -1
+        self.args           = args
+        self._epoch_size    = 1
+        self.larcv_fetcher  = larcv_fetcher.larcv_fetcher(self.args.distributed, seed=None)
 
 
     def init_network(self):
+        '''This function creates all networks needed for processing.
+        
+        '''
+        pass
 
-        dims = self._larcv_interface.fetch_minibatch_dims('primary')
-
-        # This sets up the necessary output shape:
-        output_shape = dims[FLAGS.KEYWORD_LABEL]
-
-
-        self._net = FLAGS._net(output_shape)
-
-
-        if FLAGS.TRAINING: 
-            self._net.train(True)
+    def initialize_io(self):
+        pass
 
     def initialize(self, io_only=False):
 
 
 
-        self._initialize_io()
+        self.initialize_io()
 
 
         if io_only:
             return
 
-        FLAGS.dump_config()
 
         self.init_network()
-
-        n_trainable_parameters = 0
-        for var in self._net.parameters():
-            n_trainable_parameters += numpy.prod(var.shape)
-        print("Total number of trainable parameters in this network: {}".format(n_trainable_parameters))
 
         self.init_optimizer()
 
@@ -178,95 +65,34 @@ class trainercore(object):
         else:
             self._global_step = 0
 
+        self.set_log_keys()
 
-        if FLAGS.COMPUTE_MODE == "CPU":
-            pass
-        if FLAGS.COMPUTE_MODE == "GPU":
-            self._net.cuda()
+        self.model_to_device()
 
-        self._log_keys = ['loss', 'accuracy']
+
+    def set_log_keys(self):
+        pass
 
     def get_device(self):
         # Convert the input data to torch tensors
-        if FLAGS.COMPUTE_MODE == "GPU":
+        if self.args.compute_mode == "GPU":
             device = torch.device('cuda')
             # print(device)
         else:
             device = torch.device('cpu')
 
-
         return device
 
     def init_optimizer(self):
-
-        # Create an optimizer:
-        if FLAGS.OPTIMIZER == "SDG":
-            self._opt = torch.optim.SGD(self._net.parameters(), lr=FLAGS.LEARNING_RATE,
-                weight_decay=FLAGS.WEIGHT_DECAY)
-        else:
-            self._opt = torch.optim.Adam(self._net.parameters(), lr=FLAGS.LEARNING_RATE,
-                weight_decay=FLAGS.WEIGHT_DECAY)
-
-
-
-
-
-        device = self.get_device()
-
-# This is doing loss balancing by class for the 36 class example.  We may want this 
-# for our two class network
-####################################################################################
-#        # here we store the loss weights:
-#        self._label_weights = torch.tensor([ 
-#            4930., 247., 2311., 225., 11833., 1592., 3887., 378., 4966., 1169., 1944., 335., 
-#            5430., 201., 1630., 67., 13426., 1314., 3111., 243., 5070., 788., 1464., 163.,
-#            5851.,3267.,1685.,183.,7211.,3283.,2744.,302.,5804.,1440.,1302., 204.
-#            ], device=device)
-#        weights = torch.sum(self._label_weights) / self._label_weights
-#        self._label_weights = weights / torch.sum(weights)
-#
-#        self._criterion = torch.nn.CrossEntropyLoss(weight=self._label_weights)
-####################################################################################
-
-        if FLAGS.WEIGHT_SIG is None or FLAGS.WEIGHT_BKG is None:
-            print ('You have requested to balance loss but have not set the weight for signal of background. I will ignore your request.')
-            FLAGS.BALANCE_LOSS = False
-
-
-        if FLAGS.BALANCE_LOSS:
-
-            weights = [FLAGS.WEIGHT_BKG, FLAGS.WEIGHT_SIG]
-            class_weights = torch.tensor(weights, device=device)
-            self._criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
-
-        else:
-
-            self._criterion = torch.nn.CrossEntropyLoss()
-
-       
-
+        pass
 
     def init_saver(self):
 
         # This sets up the summary saver:
-        if FLAGS.TRAINING:
-            self._saver = tensorboardX.SummaryWriter(FLAGS.LOG_DIRECTORY)
+        if self.args.training:
+            self._saver = tensorboardX.SummaryWriter(self.args.log_directory)
 
-        if FLAGS.AUX_FILE is not None and FLAGS.TRAINING:
-            self._aux_saver = tensorboardX.SummaryWriter(FLAGS.LOG_DIRECTORY + "/test/")
-        elif FLAGS.AUX_FILE is not None and not FLAGS.TRAINING:
-            self._aux_saver = tensorboardX.SummaryWriter(FLAGS.LOG_DIRECTORY + "/val/")
 
-        else:
-            self._aux_saver = None
-        # This code is supposed to add the graph definition.
-        # It doesn't currently work
-        # temp_dims = list(dims['image'])
-        # temp_dims[0] = 1
-        # dummy_input = torch.randn(size=tuple(temp_dims), requires_grad=True)
-        # self._saver.add_graph(self._net, (dummy_input,))
-
-        # Here, either restore the weights of the network or initialize it:
 
 
     def restore_model(self):
@@ -279,6 +105,7 @@ class trainercore(object):
         if not os.path.isfile(checkpoint_file_path):
             print("Returning none!")
             return None
+
         # Parse the checkpoint file and use that to get the latest file path
 
         with open(checkpoint_file_path, 'r') as _ckp:
@@ -289,7 +116,7 @@ class trainercore(object):
                     print("Restoring weights from ", chkp_file)
                     break
 
-        if FLAGS.COMPUTE_MODE == "CPU":
+        if self.args.compute_mode == "CPU":
             state = torch.load(chkp_file, map_location='cpu')
         else:
             state = torch.load(chkp_file)
@@ -298,20 +125,16 @@ class trainercore(object):
 
     def load_state(self, state):
 
+        pass
 
-        self._net.load_state_dict(state['state_dict'])
-        self._opt.load_state_dict(state['optimizer'])
-        self._global_step = state['global_step']
 
-        # If using GPUs, move the model to GPU:
-        if FLAGS.COMPUTE_MODE == "GPU":
-            for state in self._opt.state.values():
-                for k, v in state.items():
-                    if torch.is_tensor(v):
-                        state[k] = v.cuda()
+    def get_model_save_dict(self):
+        '''Return the save dict for the current models
+        
+        Expected to vary between cycleGAN and eventID
+        '''
 
-        return True
-
+        pass
 
     def save_model(self):
         '''Save the model to file
@@ -320,12 +143,7 @@ class trainercore(object):
 
         current_file_path, checkpoint_file_path = self.get_model_filepath()
 
-        # save the model state into the file path:
-        state_dict = {
-            'global_step' : self._global_step,
-            'state_dict'  : self._net.state_dict(),
-            'optimizer'   : self._opt.state_dict(),
-        }
+        state_dict = self.get_model_save_dict()
 
         # Make sure the path actually exists:
         if not os.path.isdir(os.path.dirname(current_file_path)):
@@ -375,10 +193,10 @@ class trainercore(object):
         '''
 
         # Find the base path of the log directory
-        if FLAGS.CHECKPOINT_DIRECTORY == None:
-            file_path= FLAGS.LOG_DIRECTORY  + "/checkpoints/"
+        if self.args.checkpoint_directory == None:
+            file_path= self.args.log_directory  + "/checkpoints/"
         else:
-            file_path= FLAGS.CHECKPOINT_DIRECTORY  + "/checkpoints/"
+            file_path= self.args.checkpoint_directory  + "/checkpoints/"
 
 
         name = file_path + 'model-{}.ckpt'.format(self._global_step)
@@ -386,66 +204,12 @@ class trainercore(object):
 
         return name, checkpoint_file_path
 
-    def _calculate_loss(self, inputs, logits):
-        ''' Calculate the loss.
 
-        returns a single scalar for the optimizer to use.
-        '''
-
-
-        # This dataset is not balanced across labels.  So, we can weight the loss according to the labels
-        # 
-        # 'label_cpi': array([1523.,  477.]), 
-        # 'label_prot': array([528., 964., 508.]), 
-        # 'label_npi': array([1699.,  301.]), 
-        # 'label_neut': array([655., 656., 689.])
-
-        # You can see that the only category that's truly balanced is the neutrino category.  
-        # The proton category has a ratio of 1 : 2 : 1 which isn't terrible, but can be fixed.  
-        # Both the proton and neutrino categories learn well.
-        #
-        #
-        # The pion categories learn poorly, and slowly.  They quickly reach ~75% and ~85% accuracy for c/n pi
-        # Which is just the ratio of the 0 : 1 label in each category.  So, they are learning to predict always zero, 
-        # And it is difficult to bust out of that.
-
-
-        values, target = torch.max(inputs[FLAGS.KEYWORD_LABEL], dim = 1)
-        loss = self._criterion(logits, target=target)
-        return loss
-
-
-    def _calculate_accuracy(self, logits, minibatch_data):
-        ''' Calculate the accuracy.
-
-        '''
-
-        # Compare how often the input label and the output prediction agree:
-
-
-        values, indices = torch.max(minibatch_data[FLAGS.KEYWORD_LABEL], dim = 1)
-        values, predict = torch.max(logits, dim=1)
-        correct_prediction = torch.eq(predict,indices)
-        accuracy = torch.mean(correct_prediction.float())
-
-        return accuracy
-
-
-    def _compute_metrics(self, logits, minibatch_data, loss):
-
-        # Call all of the functions in the metrics dictionary:
-        metrics = {}
-
-        metrics['loss']     = loss.data
-        accuracy = self._calculate_accuracy(logits, minibatch_data)
-        metrics['accuracy'] = accuracy
-
-        return metrics
 
     def log(self, metrics, saver=''):
 
 
-        if self._global_step % FLAGS.LOGGING_ITERATION == 0:
+        if self._global_step % self.args.logging_iteration == 0:
             
             self._current_log_time = datetime.datetime.now()
 
@@ -481,7 +245,7 @@ class trainercore(object):
         if self._saver is None:
             return
 
-        if self._global_step % FLAGS.SUMMARY_ITERATION == 0:
+        if self._global_step % self.args.summary_iteration == 0:
             for metric in metrics:
                 name = metric
                 if saver == "test":
@@ -495,59 +259,13 @@ class trainercore(object):
             self._saver.add_scalar("learning_rate", self._opt.state_dict()['param_groups'][0]['lr'], self._global_step)
             pass
 
-    def fetch_next_batch(self, mode='primary', metadata=False):
 
-        # For the serial mode, call next here:
-        if not FLAGS.DISTRIBUTED:
-            self._larcv_interface.next(mode)
-
-        minibatch_data = self._larcv_interface.fetch_minibatch_data(mode, fetch_meta_data=metadata)
-        minibatch_dims = self._larcv_interface.fetch_minibatch_dims(mode)
-
-
-        for key in minibatch_data:
-            if key == 'entries' or key == 'event_ids':
-                continue
-            minibatch_data[key] = numpy.reshape(minibatch_data[key], minibatch_dims[key])
-
-        # Strip off the primary/aux label in the keys:
-        for key in minibatch_data:
-            new_key = key.replace('aux_','')
-            minibatch_data[new_key] = minibatch_data.pop(key)            
-
-
-
-        # Here, do some massaging to convert the input data to another format, if necessary:
-        if FLAGS.IMAGE_MODE == 'dense' and not FLAGS.SPARSE:
-            # Don't have to do anything here
-            pass
-        elif FLAGS.IMAGE_MODE == 'dense' and FLAGS.SPARSE:
-            # Have to convert the input image from dense to sparse format:
-            if FLAGS.INPUT_DIMENSION == '3D':
-                minibatch_data['image'] = data_transforms.larcvdense_to_scnsparse_3d(minibatch_data['image'])
-            else:
-                minibatch_data['image'] = data_transforms.larcvdense_to_scnsparse_2d(minibatch_data['image'])
-        elif FLAGS.IMAGE_MODE == 'sparse' and not FLAGS.SPARSE:
-            # Need to convert sparse larcv into a dense numpy array:
-            if FLAGS.INPUT_DIMENSION == '3D':
-                minibatch_data['image'] = data_transforms.larcvsparse_to_dense_3d(minibatch_data['image'])
-            else:
-                minibatch_data['image'] = data_transforms.larcvsparse_to_dense_2d(minibatch_data['image'])
-
-
-        elif FLAGS.IMAGE_MODE == 'sparse' and FLAGS.SPARSE:
-            if FLAGS.INPUT_DIMENSION == '3D':
-                minibatch_data['image'] = data_transforms.larcvsparse_to_scnsparse_3d(minibatch_data['image'])
-            else:
-                minibatch_data['image'] = data_transforms.larcvsparse_to_scnsparse_2d(minibatch_data['image'])
-
-        return minibatch_data
 
     def increment_global_step(self):
 
-        previous_epoch = int((self._global_step * FLAGS.MINIBATCH_SIZE) / self._epoch_size)
+        previous_epoch = int((self._global_step * self.args.minibatch_size) / self._epoch_size)
         self._global_step += 1
-        current_epoch = int((self._global_step * FLAGS.MINIBATCH_SIZE) / self._epoch_size)
+        current_epoch = int((self._global_step * self.args.minibatch_size) / self._epoch_size)
 
         self.on_step_end()
 
@@ -560,267 +278,38 @@ class trainercore(object):
     def on_epoch_end(self):
         pass
 
-    def to_torch(self, minibatch_data, device=None):
 
-        # Convert the input data to torch tensors
-        if FLAGS.COMPUTE_MODE == "GPU":
-            if device is None:
-                device = torch.device('cuda')
-            # print(device)
 
-        else:
-            if device is None:
-                device = torch.device('cpu')
-
-
-        for key in minibatch_data:
-            if key == 'entries' or key =='event_ids':
-                continue
-            if key == 'image' and FLAGS.SPARSE:
-                if FLAGS.INPUT_DIMENSION == '3D':
-                    minibatch_data['image'] = (
-                            torch.tensor(minibatch_data['image'][0]).long(),
-                            torch.tensor(minibatch_data['image'][1], device=device),
-                            minibatch_data['image'][2],
-                        )
-                else:
-                    minibatch_data['image'] = (
-                            torch.tensor(minibatch_data['image'][0]).long(),
-                            torch.tensor(minibatch_data['image'][1], device=device),
-                            minibatch_data['image'][2],
-                        )
-            else:
-                minibatch_data[key] = torch.tensor(minibatch_data[key],device=device)
-        
-        return minibatch_data
-
-    def train_step(self):
-
-
-
-        # For a train step, we fetch data, run a forward and backward pass, and
-        # if this is a logging step, we compute some logging metrics.
-
-        self._net.train()
-
-        global_start_time = datetime.datetime.now()
-
-        # Reset the gradient values for this step:
-        self._opt.zero_grad()
-
-        # Fetch the next batch of data with larcv
-        io_start_time = datetime.datetime.now()
-        minibatch_data = self.fetch_next_batch()
-        io_end_time = datetime.datetime.now()
-
-        minibatch_data = self.to_torch(minibatch_data)
-
-
-        # Run a forward pass of the model on the input image:
-        logits = self._net(minibatch_data['image'])
-
-        # print("Completed Forward pass")
-        # Compute the loss based on the logits
-        loss = self._calculate_loss(minibatch_data, logits)
-        # print("Completed loss")
-
-        # Compute the gradients for the network parameters:
-        loss.backward()
-        # print("Completed backward pass")
-
-        # Compute any necessary metrics:
-        metrics = self._compute_metrics(logits, minibatch_data, loss)
-        
-
-
-        # Add the global step / second to the tensorboard log:
-        try:
-            metrics['global_step_per_sec'] = 1./self._seconds_per_global_step
-            metrics['images_per_second'] = FLAGS.MINIBATCH_SIZE / self._seconds_per_global_step
-        except:
-            metrics['global_step_per_sec'] = 0.0
-            metrics['images_per_second'] = 0.0
-
-        metrics['io_fetch_time'] = (io_end_time - io_start_time).total_seconds()
-
-        # print("Calculated metrics")
-
-
-        step_start_time = datetime.datetime.now()
-        # Apply the parameter update:
-        self._opt.step()
-        # print("Updated Weights")
-        global_end_time = datetime.datetime.now()
-
-        metrics['step_time'] = (global_end_time - step_start_time).total_seconds()
-
-
-        self.log(metrics, saver="train") 
-
-        # print("Completed Log")
-
-        self.summary(metrics, saver="train")       
-
-        # print("Summarized")
-
-        # Compute global step per second:
-        self._seconds_per_global_step = (global_end_time - global_start_time).total_seconds()
-
-        # Increment the global step value:
-        self.increment_global_step()
-
-
-
-        return metrics
-
-    def val_step(self, n_iterations=1):
-
-        # First, validation only occurs on training:
-        if not FLAGS.TRAINING: return
-
-        # Second, validation can not occur without a validation dataloader.
-        if FLAGS.AUX_FILE is None: return
-
-        # perform a validation step
-        # Validation steps can optionally accumulate over several minibatches, to
-        # fit onto a gpu or other accelerator
-
-        # self._net.eval()
-
-        with torch.no_grad():
-
-            if self._global_step != 0 and self._global_step % FLAGS.AUX_ITERATION == 0:
-
-
-                # Fetch the next batch of data with larcv
-                # (Make sure to pull from the validation set)
-                minibatch_data = self.fetch_next_batch('aux')        
-
-
-                # Convert the input data to torch tensors
-                minibatch_data = self.to_torch(minibatch_data)
-                
-                # Run a forward pass of the model on the input image:
-                logits = self._net(minibatch_data['image'])
-
-                # # Here, we have to map the logit keys to aux keys
-                # for key in logits.keys():
-                #     new_key = 'aux_' + key
-                #     logits[new_key] = logits.pop(key)
-
-
-
-                # Compute the loss
-                loss = self._calculate_loss(minibatch_data, logits)
-
-                # Compute the metrics for this iteration:
-                metrics = self._compute_metrics(logits, minibatch_data, loss)
-
-
-                self.log(metrics, saver="test")
-                self.summary(metrics, saver="test")
-
-                return metrics
-
-    def ana_step(self, iteration=None):
-
-        # First, validation only occurs on training:
-        if FLAGS.TRAINING: return
-
-        # perform a validation step
-
-        # Set network to eval mode
-        self._net.eval()
-        # self._net.train()
-
-        # Fetch the next batch of data with larcv
-        minibatch_data = self.fetch_next_batch(metadata=True)
-
-
-        # Convert the input data to torch tensors
-        minibatch_data = self.to_torch(minibatch_data)
-        
-        # Run a forward pass of the model on the input image:
-        with torch.no_grad():
-            logits = self._net(minibatch_data['image'])
-
-        if FLAGS.LABEL_MODE == 'all':
-            softmax = torch.nn.Softmax(dim=-1)(logits)
-        else:
-            softmax = { key : torch.nn.Softmax(dim=-1)(logits[key]) for key in logits } 
-
-        # print('label_neut', minibatch_data['label_neut'])
-        # print('label_npi', minibatch_data['label_npi'])
-        # print('label_cpi', minibatch_data['label_cpi'])
-        # print('label_prot', minibatch_data['label_prot'])
-        # print(softmax)
-
-        # Call the larcv interface to write data:
-        if FLAGS.OUTPUT_FILE is not None:
-            if FLAGS.LABEL_MODE == 'all':
-                writable_logits = numpy.asarray(softmax.cpu())
-                self._larcv_interface.write_output(data=writable_logits[0], datatype='meta', producer='all',
-                    entries=minibatch_data['entries'], event_ids=minibatch_data['event_ids'])
-            else:
-                for key in softmax:
-                    writable_logits = numpy.asarray(softmax[key].cpu())
-                    self._larcv_interface.write_output(data=writable_logits[0], datatype='meta', producer=key,
-                        entries=minibatch_data['entries'], event_ids=minibatch_data['event_ids'])
-
-        # If the input data has labels available, compute the metrics:
-        if (FLAGS.LABEL_MODE == 'all' and 'label' in minibatch_data) or \
-           (FLAGS.LABEL_MODE == 'split' and 'label_neut' in minibatch_data):
-            # Compute the loss
-            loss = self._calculate_loss(minibatch_data, logits)
-
-            # Compute the metrics for this iteration:
-            metrics = self._compute_metrics(logits, minibatch_data, loss)
-
-            if iteration is not None:
-                metrics.update({'it.' : iteration})
-
-
-            self.log(metrics, saver="test")
-            # self.summary(metrics, saver="test")
-
-            return metrics
-
-
-    def stop(self):
-        # Mostly, this is just turning off the io:
-        self._larcv_interface.stop()
 
     def checkpoint(self):
 
-        if FLAGS.CHECKPOINT_ITERATION == -1:
+        if self.args.checkpoint_iteration == -1:
             return
 
-        if self._global_step % FLAGS.CHECKPOINT_ITERATION == 0 and self._global_step != 0:
+        if self._global_step % self.args.checkpoint_iteration == 0 and self._global_step != 0:
             # Save a checkpoint, but don't do it on the first pass
             self.save_model()
 
 
     def batch_process(self):
-
-        # At the begining of batch process, figure out the epoch size:
-        self._epoch_size = self._larcv_interface.size('primary')
+        
 
         # This is the 'master' function, so it controls a lot
 
         # If we're not training, force the number of iterations to the epoch size or less
-        if not FLAGS.TRAINING:
-            if FLAGS.ITERATIONS > self._epoch_size:
-                FLAGS.ITERATIONS = self._epoch_size
+        if not self.args.training:
+            if self.args.iterations > self._epoch_size:
+                self.args.iterations = self._epoch_size
 
 
         # Run iterations
-        for i in range(FLAGS.ITERATIONS):
-            if FLAGS.TRAINING and self._iteration >= FLAGS.ITERATIONS:
+        for i in range(self.args.iterations):
+            if self.args.training and self._iteration >= self.args.iterations:
                 print('Finished training (iteration %d)' % self._iteration)
                 self.checkpoint()
                 break
 
-            if FLAGS.TRAINING:
+            if self.args.training:
                 self.val_step()
                 self.train_step()
                 self.checkpoint()
@@ -828,7 +317,7 @@ class trainercore(object):
                 self.ana_step(i)
 
 
-        if FLAGS.TRAINING:
+        if self.args.training:
             if self._saver is not None:
                 self._saver.close()
             if self._aux_saver is not None:
