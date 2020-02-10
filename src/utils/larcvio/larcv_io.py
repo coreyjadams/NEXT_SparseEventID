@@ -88,7 +88,7 @@ class IOManagerConfig(object):
     def set_defaults(self):
 
         if self._params['Verbosity'] is None:
-            self._params['Verbosity'] = "2"
+            self._params['Verbosity'] = "0"
         if self._params["IOMode"] is None:
             self._params["IOMode"] = "2"
         # if self._params["OutFileName"] is None:
@@ -200,7 +200,7 @@ class ThreadIOConfig(CoreConfig):
         if self._params['RandomSeed'] is None:
             self._params['RandomSeed'] = "0"
         if self._params['RandomAccess'] is None:
-            self._params['RandomAccess'] = "2"
+            self._params['RandomAccess'] = "0"
 
         self._defaults_set = True
 

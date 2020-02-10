@@ -8,7 +8,12 @@ import numpy
 
 import torch
 
+<<<<<<< HEAD
 from . larcvio import larcv_fetcher
+=======
+# from larcv import larcv_interface
+from larcv import threadloader
+>>>>>>> ab6413853e666a06ea8a9f3edf2abc1824280b65
 
 
 import datetime
@@ -205,7 +210,6 @@ class trainercore(object):
         return name, checkpoint_file_path
 
 
-
     def log(self, metrics, saver=''):
 
 
@@ -227,7 +231,7 @@ class trainercore(object):
       
 
             try:
-                s += " ({:.2}s / {:.2} IOs / {:.2})".format(
+                s += " ({:.3}s delta log / {:.3} IOs / {:.3}s step time)".format(
                     (self._current_log_time - self._previous_log_time).total_seconds(), 
                     metrics['io_fetch_time'],
                     metrics['step_time'])
@@ -260,7 +264,6 @@ class trainercore(object):
             pass
 
 
-
     def increment_global_step(self):
 
         previous_epoch = int((self._global_step * self.args.minibatch_size) / self._epoch_size)
@@ -277,7 +280,6 @@ class trainercore(object):
 
     def on_epoch_end(self):
         pass
-
 
 
 
@@ -313,6 +315,9 @@ class trainercore(object):
                 self.val_step()
                 self.train_step()
                 self.checkpoint()
+            elif FLAGS.INFERENCE:
+                if (i % 500): print ('At inference iteration step', i)
+                self.inference_step(i)
             else:
                 self.ana_step(i)
 
