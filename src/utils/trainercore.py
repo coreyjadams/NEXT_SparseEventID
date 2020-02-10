@@ -8,13 +8,7 @@ import numpy
 
 import torch
 
-<<<<<<< HEAD
 from . larcvio import larcv_fetcher
-=======
-# from larcv import larcv_interface
-from larcv import threadloader
->>>>>>> ab6413853e666a06ea8a9f3edf2abc1824280b65
-
 
 import datetime
 
@@ -39,7 +33,7 @@ class trainercore(object):
 
     def init_network(self):
         '''This function creates all networks needed for processing.
-        
+
         '''
         pass
 
@@ -135,7 +129,7 @@ class trainercore(object):
 
     def get_model_save_dict(self):
         '''Return the save dict for the current models
-        
+
         Expected to vary between cycleGAN and eventID
         '''
 
@@ -143,7 +137,7 @@ class trainercore(object):
 
     def save_model(self):
         '''Save the model to file
-        
+
         '''
 
         current_file_path, checkpoint_file_path = self.get_model_filepath()
@@ -172,7 +166,7 @@ class trainercore(object):
                         past_checkpoint_files.update({int(vals[0]) : vals[1].replace(' ', '')})
         except:
             pass
-        
+
 
         # Remove the oldest checkpoints while the number is greater than n_keep
         while len(past_checkpoint_files) >= n_keep:
@@ -193,8 +187,8 @@ class trainercore(object):
 
     def get_model_filepath(self):
         '''Helper function to build the filepath of a model for saving and restoring:
-        
-        
+
+
         '''
 
         # Find the base path of the log directory
@@ -214,7 +208,7 @@ class trainercore(object):
 
 
         if self._global_step % self.args.logging_iteration == 0:
-            
+
             self._current_log_time = datetime.datetime.now()
 
             s = ""
@@ -228,11 +222,11 @@ class trainercore(object):
                 s += ", ".join(["{0}: {1:.3}".format(key, metrics[key]) for key in self._log_keys])
             else:
                 s += ", ".join(["{0}: {1:.3}".format(key, metrics[key]) for key in metrics])
-      
+
 
             try:
                 s += " ({:.3}s delta log / {:.3} IOs / {:.3}s step time)".format(
-                    (self._current_log_time - self._previous_log_time).total_seconds(), 
+                    (self._current_log_time - self._previous_log_time).total_seconds(),
                     metrics['io_fetch_time'],
                     metrics['step_time'])
             except:
@@ -294,7 +288,7 @@ class trainercore(object):
 
 
     def batch_process(self):
-        
+
 
         # This is the 'master' function, so it controls a lot
 
@@ -327,4 +321,3 @@ class trainercore(object):
                 self._saver.close()
             if self._aux_saver is not None:
                 self._aux_saver.close()
-
