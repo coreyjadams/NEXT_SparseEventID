@@ -50,33 +50,33 @@ The most commonly used commands are:
 
     def add_shared_training_arguments(self, parser):
 
-        parser.add_argument('-lr','--learning-rate', 
-            type    = float, 
+        parser.add_argument('-lr','--learning-rate',
+            type    = float,
             default = 0.003,
             help    = 'Initial learning rate')
-        parser.add_argument('-ci','--checkpoint-iteration', 
-            type    = int, 
-            default = 100,
+        parser.add_argument('-ci','--checkpoint-iteration',
+            type    = int,
+            default = 500,
             help    = 'Period (in steps) to store snapshot of weights')
-        parser.add_argument('-si','--summary-iteration', 
-            type    = int, 
+        parser.add_argument('-si','--summary-iteration',
+            type    = int,
             default = 1,
             help    = 'Period (in steps) to store summary in tensorboard log')
-        parser.add_argument('-li','--logging-iteration', 
-            type    = int, 
+        parser.add_argument('-li','--logging-iteration',
+            type    = int,
             default = 1,
             help    = 'Period (in steps) to print values to log')
-        parser.add_argument('-cd','--checkpoint-directory', 
-            type    = str, 
+        parser.add_argument('-cd','--checkpoint-directory',
+            type    = str,
             default = None,
             help    = 'Directory to store model snapshots')
-        self.parser.add_argument('--optimizer', 
-            type    = str, 
-            choices = ['adam', 'rmsprop',], 
+        self.parser.add_argument('--optimizer',
+            type    = str,
+            choices = ['adam', 'rmsprop',],
             default = 'rmsprop',
             help    = 'Optimizer to use')
-        self.parser.add_argument('--weight-decay', 
-            type    = float, 
+        self.parser.add_argument('--weight-decay',
+            type    = float,
             default = 0.0,
             help    = "Weight decay strength")
 
@@ -89,8 +89,8 @@ The most commonly used commands are:
         self.add_core_configuration(self.parser)
         self.add_shared_training_arguments(self.parser)
 
-        self.parser.add_argument('--cycle-lambda', 
-            type    = float, 
+        self.parser.add_argument('--cycle-lambda',
+            type    = float,
             default = '10',
             help    = 'Lambda balancing between cycle loss and GAN loss')
 
@@ -119,9 +119,9 @@ The most commonly used commands are:
 
         # Define parameters exclusive to training eventID:
 
-        self.parser.add_argument('--lr-schedule', 
-            type    = str, 
-            choices = ['flat', '1cycle', 'triangle_clr', 'exp_range_clr', 'decay', 'expincrease'], 
+        self.parser.add_argument('--lr-schedule',
+            type    = str,
+            choices = ['flat', '1cycle', 'triangle_clr', 'exp_range_clr', 'decay', 'expincrease'],
             default = 'flat',
             help    = 'Apply a learning rate schedule')
 
@@ -143,14 +143,9 @@ The most commonly used commands are:
 
     def add_eventID_parsers(self, parser):
 
-        network_parser = parser.add_subparsers( 
-            title          = "Networks", 
-            dest           = "network",
-            description    = 'Which network architecture to use.')
-
         # Add the sparse resnet:
         from src.networks.sparseresnet3d import ResNetFlags
-        ResNetFlags().build_parser(network_parser)
+        ResNetFlags().build_parser(parser)
 
 
     def add_cycleGAN_parsers(self, parser):
@@ -162,20 +157,6 @@ The most commonly used commands are:
         DiscriminatorFlags().build_parser(parser)
         pass
 
-    def add_network_parsers(self, parser):
-        # Here, we define the networks available.  In io test mode, used to determine what the IO is.
-        network_parser = parser.add_subparsers( 
-            title          = "Networks", 
-            dest           = "network",
-            description    = 'Which network architecture to use.')
-
-        # Here, we do a switch on the networks allowed:        
-        # resnet.ResNetFlags().build_parser(network_parser)
-        # sparseresnet.ResNetFlags().build_parser(network_parser)
-        # sparseresnet3d.ResNetFlags().build_parser(network_parser)
-        # pointnet.PointNetFlags().build_parser(network_parser)
-        # gcn.GCNFlags().build_parser(network_parser)
-        # dgcnn.DGCNNFlags().build_parser(network_parser)
 
 
     def iotest(self):
@@ -261,21 +242,21 @@ The most commonly used commands are:
 
     def add_core_configuration(self, parser):
         # These are core parameters that are important for all modes:
-        parser.add_argument('-i', '--iterations', 
-            type    = int, 
+        parser.add_argument('-i', '--iterations',
+            type    = int,
             default = 5000,
             help    = "Number of iterations to process")
 
-        parser.add_argument('-d','--distributed', 
-            action  = 'store_true', 
+        parser.add_argument('-d','--distributed',
+            action  = 'store_true',
             default = False,
             help    = "Run with the MPI compatible mode")
-        parser.add_argument('-m','--compute-mode', 
-            type    = str, 
-            choices = ['CPU','GPU'], 
-            default = 'CPU',
+        parser.add_argument('-m','--compute-mode',
+            type    = str,
+            choices = ['CPU','GPU'],
+            default = 'GPU',
             help    = "Selection of compute device, CPU or GPU ")
-        parser.add_argument('-ld','--log-directory', 
+        parser.add_argument('-ld','--log-directory',
             default ="log/",
             help    ="Prefix (directory) for logging information")
 
@@ -285,45 +266,45 @@ The most commonly used commands are:
     def add_io_arguments_eventID(self, parser):
 
         # IO PARAMETERS FOR INPUT:
-        parser.add_argument('-f','--file', 
-            type    = str, 
-            default = "/lus/theta-fs0/projects/datascience/cadams/wire_pixel_preprocessed_files_split/train_event_id.root",
+        parser.add_argument('-f','--file',
+            type    = str,
+            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/next_new_classification_train.h5",
             help    = "IO Input File")
-        parser.add_argument('--input-dimension', 
-            type    = int, 
+        parser.add_argument('--input-dimension',
+            type    = int,
             default = 3,
             help    = "Dimensionality of data to use",
             choices = [2, 3] )
-        parser.add_argument('--start-index', 
-            type    = int, 
+        parser.add_argument('--start-index',
+            type    = int,
             default = 0,
             help    = "Start index, only used in inference mode")
 
-        parser.add_argument('--label-mode', 
-            type    = str, 
-            choices = ['split', 'all'], 
+        parser.add_argument('--label-mode',
+            type    = str,
+            choices = ['split', 'all'],
             default = 'split',
             help    = "Run with split labels (multiple classifiers) or all in one" )
 
         parser.add_argument('-mb','--minibatch-size',
-            type    = int, 
+            type    = int,
             default = 2,
             help    = "Number of images in the minibatch size")
-        
+
         # IO PARAMETERS FOR AUX INPUT:
-        parser.add_argument('--aux-file', 
-            type    = str, 
-            default = None,
+        parser.add_argument('--aux-file',
+            type    = str,
+            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/next_new_classification_test.h5",
             help    = "IO Aux Input File, or output file in inference mode")
 
 
         parser.add_argument('--aux-iteration',
-            type    = int, 
+            type    = int,
             default = 10,
             help    = "Iteration to run the aux operations")
 
         parser.add_argument('--aux-minibatch-size',
-            type    = int, 
+            type    = int,
             default = 2,
             help    = "Number of images in the minibatch size")
 
@@ -332,24 +313,24 @@ The most commonly used commands are:
     def add_io_arguments_cycleGAN(self, parser):
 
         # IO PARAMETERS FOR DATA INPUT:
-        parser.add_argument('--data-file', 
-            type    = str, 
-            default = "/Users/corey.adams/data/NEXT/cycleGAN/nextDATA_RUNS.h5",
+        parser.add_argument('--data-file',
+            type    = str,
+            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/nextDATA_RUNS.h5",
             help    = "Real data file")
 
         parser.add_argument('-mb','--minibatch-size',
-            type    = int, 
+            type    = int,
             default = 2,
             help    = "Number of images in the minibatch size")
-        
-        parser.add_argument('--sim-file', 
-            type    = str, 
-            default = "/Users/corey.adams/data/NEXT/cycleGAN/next_new_classification_val.h5",
+
+        parser.add_argument('--sim-file',
+            type    = str,
+            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/next_new_classification_val.h5",
             help    = "Simulated data file")
 
-        return       
+        return
 
 
 
 if __name__ == '__main__':
-    s = exec()  
+    s = exec()
