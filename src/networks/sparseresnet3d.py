@@ -2,55 +2,53 @@ import torch
 import torch.nn as nn
 import sparseconvnet as scn
 
-from sparse_building_blocks import SparseBlockSeries, SparseConvolutionDownsample, 
+from . sparse_building_blocks import SparseBlockSeries, SparseConvolutionDownsample
+from . network_config  import str2bool
 
 
-class ResNetFlags(network_config):
+class ResNetFlags(object):
 
     def __init__(self):
-        network_config.__init__(self)
         self._name = "sparseresnet3d"
         self._help = "Sparse Resnet"
 
-    def build_parser(self, network_parser):
-        # this_parser = network_parser
-        this_parser = network_parser.add_parser(self._name, help=self._help)
+    def build_parser(self, parser):
 
-        this_parser.add_argument("--n-initial-filters",
+        parser.add_argument("--n-initial-filters",
             type    = int,
             default = 2,
             help    = "Number of filters applied, per plane, for the initial convolution")
 
-        this_parser.add_argument("--res-blocks-per-layer",
+        parser.add_argument("--res-blocks-per-layer",
             help    = "Number of residual blocks per layer",
             type    = int,
             default = 2)
 
-        this_parser.add_argument("--network-depth",
+        parser.add_argument("--network-depth",
             help    = "Total number of downsamples to apply",
             type    = int,
             default = 8)
 
-        this_parser.add_argument("--batch-norm",
+        parser.add_argument("--batch-norm",
             help    = "Run using batch normalization",
             type    = str2bool,
             default = True)
 
-        this_parser.add_argument("--leaky-relu",
+        parser.add_argument("--use-bias",
+            help    = "Use a bias unit in layers",
+            type    = str2bool,
+            default = True)
+
+        parser.add_argument("--leaky-relu",
             help    = "Run using leaky relu",
             type    = str2bool,
             default = False)
 
 
 
-def filter_increase(input_filters):
-    # return input_filters * 2
-    return input_filters + FLAGS.N_INITIAL_FILTERS
-
-
 class ResNet(torch.nn.Module):
 
-    def __init__(self, output_shape):
+    def __init__(self, args):
         torch.nn.Module.__init__(self)
         # All of the parameters are controlled via the flags module
 
@@ -61,61 +59,61 @@ class ResNet(torch.nn.Module):
         # Here, define the layers we will need in the forward path:
 
 
-        
+
         # The convolutional layers, which can be shared or not across planes,
         # are defined below
 
         # We apply an initial convolution, to each plane, to get n_inital_filters
 
         self.initial_convolution = scn.SubmanifoldConvolution(
-                dimension   = 3, 
-                nIn         = 1, 
-                nOut        = FLAGS.N_INITIAL_FILTERS, 
-                filter_size = 5, 
-                bias        = FLAGS.USE_BIAS
+                dimension   = 3,
+                nIn         = 1,
+                nOut        = args.n_initial_filters,
+                filter_size = 5,
+                bias        = args.use_bias
             )
 
-        n_filters = FLAGS.N_INITIAL_FILTERS
+        n_filters = args.n_initial_filters
         # Next, build out the convolution steps
 
 
 
 
-        self.convolutional_layers = []
-        for layer in range(FLAGS.NETWORK_DEPTH):
+        self.convolutional_layers = torch.nn.ModuleList()
+        for layer in range(args.network_depth):
 
             self.convolutional_layers.append(
                 SparseBlockSeries(
-                    n_filters, 
-                    FLAGS.RES_BLOCKS_PER_LAYER,
+                    n_filters,
+                    args.res_blocks_per_layer,
+                    args.use_bias,
                     residual = True)
                 )
-            out_filters = filter_increase(n_filters)
+            out_filters = 2*n_filters
 
             self.convolutional_layers.append(
                 SparseConvolutionDownsample(
                     inplanes  = n_filters,
-                    outplanes = out_filters)
+                    outplanes = out_filters,
+                    bias = args.use_bias)
                 )
-                # outplanes = n_filters + FLAGS.N_INITIAL_FILTERS))
+                # outplanes = n_filters + args.n_initial_filters))
             n_filters = out_filters
-
-            self.add_module("conv_{}".format(layer), self.convolutional_layers[-2])
-            self.add_module("down_{}".format(layer), self.convolutional_layers[-1])
 
         # Here, take the final output and convert to a dense tensor:
 
 
         self.final_layer = SparseBlockSeries(
-                    inplanes = n_filters, 
-                    n_blocks = FLAGS.RES_BLOCKS_PER_LAYER,
+                    inplanes = n_filters,
+                    n_blocks = args.res_blocks_per_layer,
+                    bias = args.use_bias,
                     residual = True)
-                
-        self.bottleneck  = scn.SubmanifoldConvolution(dimension=3, 
-                    nIn=n_filters, 
-                    nOut=2, 
-                    filter_size=3, 
-                    bias=FLAGS.USE_BIAS)
+
+        self.bottleneck  = scn.SubmanifoldConvolution(dimension=3,
+                    nIn=n_filters,
+                    nOut=2,
+                    filter_size=3,
+                    bias=args.use_bias)
 
         self.sparse_to_dense = scn.SparseToDense(dimension=3, nPlanes=2)
 
@@ -134,13 +132,12 @@ class ResNet(torch.nn.Module):
 
 
     def forward(self, x):
-        
+
         batch_size = x[2]
 
-        FLAGS = utils.flags.FLAGS()
 
 
-        x = self.input_tensor(x) 
+        x = self.input_tensor(x)
 
         x = self.initial_convolution(x)
 
@@ -160,7 +157,7 @@ class ResNet(torch.nn.Module):
 
         output = self.sparse_to_dense(output)
 
-        # Apply global average pooling 
+        # Apply global average pooling
         kernel_size = output.shape[2:]
         output = torch.squeeze(nn.AvgPool3d(kernel_size, ceil_mode=False)(output))
         output = output.view([batch_size, output.shape[-1]])
@@ -169,6 +166,3 @@ class ResNet(torch.nn.Module):
 
 
         return output
-
-
-

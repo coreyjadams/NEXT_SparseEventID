@@ -19,7 +19,7 @@ class trainer_cycleGAN(trainercore):
         self._print = True
 
     def set_log_keys(self):
-        self._log_keys = ['loss', 'accuracy']
+        self._log_keys = ['generator_loss', 'discriminator_loss']
 
 
     def initialize_io(self):
@@ -72,17 +72,17 @@ class trainer_cycleGAN(trainercore):
 
         # Create an optimizer:
         if self.args.optimizer.lower() == "adam":
-            
+
             self.generator_opt = torch.optim.Adam(
                         itertools.chain(self.generators['real_to_sim'].parameters(),
-                                        self.generators['sim_to_real'].parameters()), 
+                                        self.generators['sim_to_real'].parameters()),
                         lr=self.args.learning_rate,
                         weight_decay=self.args.weight_decay
                       )
-            
+
             self.discriminator_opt = torch.optim.Adam(
                         itertools.chain(self.discriminators['real_data'].parameters(),
-                                        self.discriminators['sim_data'].parameters()), 
+                                        self.discriminators['sim_data'].parameters()),
                         lr=self.args.learning_rate,
                         weight_decay=self.args.weight_decay
                       )
@@ -90,14 +90,14 @@ class trainer_cycleGAN(trainercore):
         else:
             self.generator_opt = torch.optim.RMSprop(
                         itertools.chain(self.generators['real_to_sim'].parameters(),
-                                        self.generators['sim_to_real'].parameters()), 
+                                        self.generators['sim_to_real'].parameters()),
                         lr=self.args.learning_rate,
                         weight_decay=self.args.weight_decay
                       )
-            
+
             self.discriminator_opt = torch.optim.RMSprop(
                         itertools.chain(self.discriminators['real_data'].parameters(),
-                                        self.discriminators['sim_data'].parameters()), 
+                                        self.discriminators['sim_data'].parameters()),
                         lr=self.args.learning_rate,
                         weight_decay=self.args.weight_decay
                       )
@@ -107,45 +107,57 @@ class trainer_cycleGAN(trainercore):
         device = self.get_device()
 
 
-   
+
 
     def get_model_save_dict(self):
         '''Return the save dict for the current models
-        
+
         Expected to vary between cycleGAN and eventID
         '''
 
                 # save the model state(s) into the file path:
         state_dict = {
-            'global_step' : self._global_step,
-            'state_dict'  : self._net.state_dict(),
-            'optimizer'   : self._opt.state_dict(),
+            'gen_real_to_sim' : self.generators['real_to_sim'].state_dict(),
+            'gen_sim_to_real' : self.generators['sim_to_real'].state_dict(),
+            'disc_real_data'  : self.discriminators['real_data'].state_dict(),
+            'disc_sim_data'   : self.discriminators['sim_data'].state_dict(),
+            'global_step'     : self._global_step,
+            'gen_optimizer'   : self.generator_opt.state_dict(),
+            'disc_optimizer'  : self.discriminator_opt.state_dict(),
         }
-        
+
         return state_dict
 
     def load_state(self, state):
-
-        self._net.load_state_dict(state['state_dict'])
-        self._opt.load_state_dict(state['optimizer'])
+        self.generators['real_to_sim'].load_state_dict(state['gen_real_to_sim'])
+        self.generators['sim_to_real'].load_state_dict(state['gen_sim_to_real'])
+        self.discriminators['real_data'].load_state_dict(state['disc_real_data'])
+        self.discriminators['sim_data'].load_state_dict(state['disc_sim_data'])
+        self.generator_opt.load_state_dict(state['gen_optimizer'])
+        self.discriminator_opt.load_state_dict(state['disc_optimizer'])
         self._global_step = state['global_step']
 
         # If using GPUs, move the model to GPU:
         if self.args.compute_mode == "GPU":
-            for state in self._opt.state.values():
+            for state in self.generator_opt.state.values():
                 for k, v in state.items():
                     if torch.is_tensor(v):
                         state[k] = v.cuda()
 
-        return True       
+            for state in self.discriminator_opt.state.values():
+                for k, v in state.items():
+                    if torch.is_tensor(v):
+                        state[k] = v.cuda()
+
+        return True
 
     def model_to_device(self):
-        
+
         if self.args.compute_mode == "CPU":
             pass
         if self.args.compute_mode == "GPU":
-            for key in self.generators:     self.generators[key].cuda()     
-            for key in self.discriminators: self.discriminators[key].cuda() 
+            for key in self.generators:     self.generators[key].cuda()
+            for key in self.discriminators: self.discriminators[key].cuda()
 
 
     def _calculate_accuracy(self, logits, minibatch_data):
@@ -155,22 +167,22 @@ class trainer_cycleGAN(trainercore):
 
         # Compare how often the input label and the output prediction agree:
 
+        # Compute the accuracy of the discriminator:
 
-        values, indices = torch.max(minibatch_data[self.args.KEYWORD_LABEL], dim = 1)
-        values, predict = torch.max(logits, dim=1)
-        correct_prediction = torch.eq(predict,indices)
-        accuracy = torch.mean(correct_prediction.float())
+        # We want to know how often each discriminator
 
-        return accuracy
+        # return accuracy
+        return
 
-    def _compute_metrics(self, logits, minibatch_data, loss):
+    def _compute_metrics(self, discriminator_score, loss):
 
         # Call all of the functions in the metrics dictionary:
         metrics = {}
 
-        metrics['loss']     = loss.data
-        accuracy = self._calculate_accuracy(logits, minibatch_data)
-        metrics['accuracy'] = accuracy
+        for key in loss:
+            metrics[key]     = loss[key].data
+        # accuracy = self._calculate_accuracy(discriminator_score)
+        # metrics['accuracy'] = accuracy
 
         return metrics
 
@@ -185,15 +197,15 @@ class trainer_cycleGAN(trainercore):
         # This is not the "traditional" GAN loss but rather
         # The "more stable" version from the cycle gan paper
 
-        generator_loss = self.discriminator_criterion(fake_score, 1)
+        generator_loss = self.discriminator_criterion(fake_score, torch.ones_like(fake_score))
 
         return generator_loss
 
     def compute_discriminator_loss(self, real_score, fake_score):
         # This is not the "traditional" GAN loss but rather
         # The "more stable" version from the cycle gan paper
-        discriminator_loss  = self.discriminator_criterion(real_score, 1)
-        discriminator_loss += self.discriminator_criterion(fake_score, 0)
+        discriminator_loss  = self.discriminator_criterion(real_score, torch.ones_like(real_score))
+        discriminator_loss += self.discriminator_criterion(fake_score, torch.zeros_like(real_score))
 
         return discriminator_loss
 
@@ -242,22 +254,26 @@ class trainer_cycleGAN(trainercore):
         # And, run forward on the fake data to get back to simulation:
         cycled_simulation = self.generators['real_to_sim'](fake_real_data)
         # print("cycled_simulation.shape: ", cycled_simulation.shape)
-        
+
         # print("Cycled fake images")
 
 
-        # Now, all networks have done their forward pass.  
+        # Now, all networks have done their forward pass.
         # We need to compute the adversarial losses:
 
-        discriminator_score_real_data = self.discriminators['real_data'](real_minibatch_data['image'])
-        discriminator_score_fake_data = self.discriminators['real_data'](fake_real_data)
+        discriminator_score = {}
+        discriminator_score['real_data'] = self.discriminators['real_data'](real_minibatch_data['image'])
+        discriminator_score['fake_data'] = self.discriminators['real_data'](fake_real_data)
 
-        discriminator_score_real_sim  = self.discriminators['sim_data'](sim_minibatch_data['image'])
-        discriminator_score_fake_sim  = self.discriminators['sim_data'](fake_simulation)
+        discriminator_score['real_sim']  = self.discriminators['sim_data'](sim_minibatch_data['image'])
+        discriminator_score['fake_sim']  = self.discriminators['sim_data'](fake_simulation)
 
 
         # Next, we begin computing loss values:
         loss = {}
+
+        # We don't need
+
         # Compute the cycle loss between the two categories:
         loss['real_cycle_loss'] = self.compute_cycle_loss(real_minibatch_data['image'], cycled_real_data)
         loss['sim_cycle_loss']  = self.compute_cycle_loss(sim_minibatch_data['image'],  cycled_simulation)
@@ -265,36 +281,32 @@ class trainer_cycleGAN(trainercore):
         loss['total_cycle_loss'] = loss['real_cycle_loss'] + loss['sim_cycle_loss']
 
         # We next compute the GAN loss for the generators:
-        loss['gan_real_to_sim'] = self.compute_generator_loss(discriminator_score_fake_sim)
-        loss['gan_sim_to_real'] = self.compute_generator_loss(discriminator_score_fake_data)
+        loss['gan_real_to_sim'] = self.compute_generator_loss(discriminator_score['fake_sim'])
+        loss['gan_sim_to_real'] = self.compute_generator_loss(discriminator_score['fake_data'])
         loss['gan_loss'] = loss['gan_real_to_sim'] + loss['gan_sim_to_real']
 
+        # Compute the gradients for the network parameters:
+        loss['generator_loss'] = self.args.cycle_lambda *loss['total_cycle_loss'] + loss['gan_loss']
+        loss['generator_loss'].backward(retain_graph=True)
 
-        loss['generator_loss'] = args.cycle_lambda *loss['total_cycle_loss'] + loss['gan_loss']
 
         # Next, compute GAN Loss values for the discriminator:
-        loss['disc_real_data'] = self.compute_discriminator_loss(discriminator_score_real_data, discriminator_score_fake_data)
-        loss['disc_dism_data'] = self.compute_discriminator_loss(discriminator_score_real_sim, discriminator_score_fake_sim)
-        loss['disc_loss'] = loss['disc_dism_data'] + loss['disc_real_data']
+        loss['discriminator_real_data'] = self.compute_discriminator_loss(discriminator_score['real_data'], discriminator_score['fake_data'])
+        loss['discriminator_sim_data']  = self.compute_discriminator_loss(discriminator_score['real_sim'], discriminator_score['fake_sim'])
+        loss['discriminator_loss'] = loss['discriminator_sim_data'] + loss['discriminator_real_data']
 
-
-        # Compute the gradients for the network parameters:
-        loss['generator_loss'].backward()
-        self.generator_opt.step()
-        
-        loss['disc_loss'].backward()
-        self.generator_opt.step()
+        loss['discriminator_loss'].backward()
         # print("Completed backward pass")
 
         # Compute any necessary metrics:
-        metrics = self._compute_metrics(logits, minibatch_data, loss)
-        
+        metrics = self._compute_metrics(discriminator_score, loss)
+
 
 
         # Add the global step / second to the tensorboard log:
         try:
             metrics['global_step_per_sec'] = 1./self._seconds_per_global_step
-            metrics['images_per_second'] = self.args.MINIBATCH_SIZE / self._seconds_per_global_step
+            metrics['images_per_second'] = self.args.minibatch_size / self._seconds_per_global_step
         except:
             metrics['global_step_per_sec'] = 0.0
             metrics['images_per_second'] = 0.0
@@ -306,18 +318,19 @@ class trainer_cycleGAN(trainercore):
 
         step_start_time = datetime.datetime.now()
         # Apply the parameter update:
-        self._opt.step()
+        self.generator_opt.step()
+        self.discriminator_opt.step()
         # print("Updated Weights")
         global_end_time = datetime.datetime.now()
 
         metrics['step_time'] = (global_end_time - step_start_time).total_seconds()
 
 
-        self.log(metrics, saver="train") 
+        self.log(metrics, saver="train")
 
         # print("Completed Log")
 
-        self.summary(metrics, saver="train")       
+        self.summary(metrics, saver="train")
 
         # print("Summarized")
 
@@ -339,5 +352,5 @@ class trainer_cycleGAN(trainercore):
         pass
 
     def ana_step(self, iteration=None):
-        
+
         pass

@@ -254,7 +254,7 @@ class trainercore(object):
 
             # try to get the learning rate
             # print self._lr_scheduler.get_lr()
-            self._saver.add_scalar("learning_rate", self._opt.state_dict()['param_groups'][0]['lr'], self._global_step)
+            # self._saver.add_scalar("learning_rate", self._opt.state_dict()['param_groups'][0]['lr'], self._global_step)
             pass
 
 

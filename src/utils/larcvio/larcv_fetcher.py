@@ -1,5 +1,5 @@
 import os
-import torch 
+import torch
 
 from . import data_transforms
 from . import io_templates
@@ -12,7 +12,7 @@ class larcv_fetcher(object):
     def __init__(self, distributed, seed=None):
 
         if distributed:
-            from larcv import distributed_queue_interface 
+            from larcv import distributed_queue_interface
             self._larcv_interface = distributed_queue_interface.queue_interface()
         else:
             from larcv import queueloader
@@ -53,15 +53,15 @@ class larcv_fetcher(object):
 
         return self._larcv_interface.size(name)
 
-    def prepare_eventD_sample(self, name, input_file, batch_size):
-        config = io_templates.event_id_io(input_file=input_fle, name=name)
+    def prepare_eventID_sample(self, name, input_file, batch_size):
+        config = io_templates.event_id_io(input_file=input_file, name=name)
 
         # Generate a named temp file:
         main_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
         main_file.write(config.generate_config_str())
 
         main_file.close()
-        self._cleanup.appenId(main_file)
+        self._cleanup.append(main_file)
 
         io_config = {
             'filler_name' : config._name,
@@ -71,15 +71,12 @@ class larcv_fetcher(object):
         }
 
         # Build up the data_keys:
-        data_keys = {}
-        data_keys['image'] = 'data'
-        for proc in config._process_list._processes:
-            if proc._name == 'data': 
-                continue
-            else:
-                data_keys[proc._name] = proc._name
+        data_keys = {
+            'image' : name + "data",
+            'label' : name + "label"
+        }
 
-
+        print(data_keys)
 
         self._larcv_interface.prepare_manager(name, io_config, batch_size, data_keys)
 
@@ -88,7 +85,7 @@ class larcv_fetcher(object):
 
     def prepare_eventID_output(self, name, input_file, output_file):
         config = io_templates.output_io(input_file=input_file, output_file=output_file)
-            
+
         out_file_config = tempfile.NamedTemporaryFile(mode='w', delete=False)
         out_file_config.write(config.generate_config_str())
         print(config.generate_config_str())
@@ -110,8 +107,24 @@ class larcv_fetcher(object):
         # Here, do some massaging to convert the input data to another format, if necessary:
         # Need to convert sparse larcv into a dense numpy array:
         minibatch_data['image'] = data_transforms.larcvsparse_to_dense_3d(minibatch_data['image'])
-        
+
         return minibatch_data
+
+
+    def fetch_next_eventID_batch(self, name):
+
+        # For the serial mode, call next here:
+        self._larcv_interface.prepare_next(name)
+
+        minibatch_data = self._larcv_interface.fetch_minibatch_data(name, pop=True, fetch_meta_data=False)
+        minibatch_dims = self._larcv_interface.fetch_minibatch_dims(name)
+
+        # Here, do some massaging to convert the input data to another format, if necessary:
+        # Need to convert sparse larcv into a dense numpy array:
+        minibatch_data['image'] = data_transforms.larcvsparse_to_scnsparse_3d(minibatch_data['image'])
+
+        return minibatch_data
+
 
     def to_torch_cycleGAN(self, minibatch_data, device=None):
 
@@ -127,7 +140,7 @@ class larcv_fetcher(object):
                 continue
             else:
                 minibatch_data[key] = torch.tensor(minibatch_data[key],device=device)
-        
+
         return minibatch_data
 
 
@@ -143,20 +156,13 @@ class larcv_fetcher(object):
         for key in minibatch_data:
             if key == 'entries' or key =='event_ids':
                 continue
-            if key == 'image' and self.args.SPARSE:
-                if self.args.INPUT_DIMENSION == '3D':
-                    minibatch_data['image'] = (
-                            torch.tensor(minibatch_data['image'][0]).long(),
-                            torch.tensor(minibatch_data['image'][1], device=device),
-                            minibatch_data['image'][2],
-                        )
-                else:
-                    minibatch_data['image'] = (
-                            torch.tensor(minibatch_data['image'][0]).long(),
-                            torch.tensor(minibatch_data['image'][1], device=device),
-                            minibatch_data['image'][2],
-                        )
+            if key == 'image':
+                minibatch_data['image'] = (
+                        torch.tensor(minibatch_data['image'][0]).long(),
+                        torch.tensor(minibatch_data['image'][1], device=device),
+                        minibatch_data['image'][2],
+                    )
             else:
                 minibatch_data[key] = torch.tensor(minibatch_data[key],device=device)
-        
+
         return minibatch_data

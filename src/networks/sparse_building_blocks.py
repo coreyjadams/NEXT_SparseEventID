@@ -4,17 +4,17 @@ import sparseconvnet as scn
 
 class SparseBlock(nn.Module):
 
-    def __init__(self, inplanes, outplanes):
+    def __init__(self, inplanes, outplanes, bias):
 
         nn.Module.__init__(self)
-        
+
         self.conv1 = scn.SubmanifoldConvolution(
-            dimension   = 3, 
-            nIn         = inplanes, 
-            nOut        = outplanes, 
-            filter_size = 3, 
-            bias        = FLAGS.USE_BIAS)
-        
+            dimension   = 3,
+            nIn         = inplanes,
+            nOut        = outplanes,
+            filter_size = 3,
+            bias        = bias)
+
         # if FLAGS.BATCH_NORM:
         self.bn1 = scn.BatchNormReLU(outplanes)
         # self.relu = scn.ReLU()
@@ -33,27 +33,27 @@ class SparseBlock(nn.Module):
 
 class SparseResidualBlock(nn.Module):
 
-    def __init__(self, inplanes, outplanes):
+    def __init__(self, inplanes, outplanes, bias):
         nn.Module.__init__(self)
-        
-        
+
+
         self.conv1 = scn.SubmanifoldConvolution(
-            dimension   = 3, 
-            nIn         = inplanes, 
-            nOut        = outplanes, 
-            filter_size = 3, 
-            bias        = FLAGS.USE_BIAS)
-        
+            dimension   = 3,
+            nIn         = inplanes,
+            nOut        = outplanes,
+            filter_size = 3,
+            bias        = bias)
+
 
         # if FLAGS.BATCH_NORM:
         self.bn1 = scn.BatchNormReLU(outplanes)
 
         self.conv2 = scn.SubmanifoldConvolution(
-            dimension   = 3, 
+            dimension   = 3,
             nIn         = outplanes,
             nOut        = outplanes,
             filter_size = 3,
-            bias        = FLAGS.USE_BIAS)
+            bias        = bias)
 
         # if FLAGS.BATCH_NORM:
         self.bn2 = scn.BatchNormalization(outplanes)
@@ -90,7 +90,7 @@ class SparseResidualBlock(nn.Module):
 
 class SparseConvolutionDownsample(nn.Module):
 
-    def __init__(self, inplanes, outplanes):
+    def __init__(self, inplanes, outplanes, bias):
         nn.Module.__init__(self)
 
         self.conv = scn.Convolution(
@@ -99,7 +99,7 @@ class SparseConvolutionDownsample(nn.Module):
             nOut            = outplanes,
             filter_size     = 2,
             filter_stride   = 2,
-            bias            = FLAGS.USE_BIAS
+            bias            = bias
         )
         # if FLAGS.BATCH_NORM:
         self.bn   = scn.BatchNormalization(outplanes)
@@ -118,13 +118,13 @@ class SparseConvolutionDownsample(nn.Module):
 class SparseBlockSeries(torch.nn.Module):
 
 
-    def __init__(self, inplanes, n_blocks, residual=False):
+    def __init__(self, inplanes, n_blocks, bias, residual=False):
         torch.nn.Module.__init__(self)
 
         if residual:
-            self.blocks = [ SparseResidualBlock(inplanes, inplanes) for i in range(n_blocks) ]
+            self.blocks = [ SparseResidualBlock(inplanes, inplanes, bias) for i in range(n_blocks) ]
         else:
-            self.blocks = [ SparseBlock(inplanes, inplanes) for i in range(n_blocks)]
+            self.blocks = [ SparseBlock(inplanes, inplanes, bias) for i in range(n_blocks)]
 
         for i, block in enumerate(self.blocks):
             self.add_module('block_{}'.format(i), block)

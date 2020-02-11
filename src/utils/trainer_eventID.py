@@ -1,4 +1,11 @@
+import datetime
+import numpy
+
+import torch
+import tensorboardX
+
 from .trainercore import trainercore
+from ..networks import sparseresnet3d
 
 class trainer_eventID(trainercore):
 
@@ -14,27 +21,20 @@ class trainer_eventID(trainercore):
         self._log_keys = ['loss', 'accuracy']
 
 
-    def initialize_io(self, args):
+    def initialize_io(self):
 
-        self.larcv_fetcher = larcv_fetcher.larcv_fetcher(args.distributed)
+        if self.args.training:
+            self._epoch_size = self.larcv_fetcher.prepare_eventID_sample("train", self.args.file, self.args.minibatch_size)
 
-        if args.training:
-            self._epoch_size = self.larcv_fetcher.prepare_eventID_sample("train", args.file, args.minibatch_size):
+            if self.args.aux_file is not None:
+                self._epoch_size = self.larcv_fetcher.prepare_eventID_sample("test", self.args.aux_file, self.args.minibatch_size)
 
     def init_network(self):
 
-        pass
-
-        dims = self._larcv_interface.fetch_minibatch_dims('primary')
-
-        # This sets up the necessary output shape:
-        output_shape = dims[self.args.KEYWORD_LABEL]
+        self._net = sparseresnet3d.ResNet(self.args)
 
 
-        self._net = self.args._net(output_shape)
-
-
-        if self.args.TRAINING: 
+        if self.args.training:
             self._net.train(True)
 
 
@@ -45,8 +45,9 @@ class trainer_eventID(trainercore):
             print("Total number of trainable parameters in this network: {}".format(n_trainable_parameters))
 
     def init_saver(self):
+
         trainercore.init_saver(self)
-        
+
         if self.args.aux_file is not None and self.args.training:
             self._aux_saver = tensorboardX.SummaryWriter(self.args.log_directory + "/test/")
         elif self.args.aux_file is not None and not self.args.training:
@@ -60,38 +61,38 @@ class trainer_eventID(trainercore):
     def init_optimizer(self):
 
         # Create an optimizer:
-        if self.args.OPTIMIZER == "SDG":
-            self._opt = torch.optim.SGD(self._net.parameters(), lr=self.args.LEARNING_RATE,
-                weight_decay=self.args.WEIGHT_DECAY)
+        if self.args.optimizer == "SDG":
+            self._opt = torch.optim.SGD(self._net.parameters(), lr=self.args.learning_rate,
+                weight_decay=self.args.weight_decay)
         else:
-            self._opt = torch.optim.Adam(self._net.parameters(), lr=self.args.LEARNING_RATE,
-                weight_decay=self.args.WEIGHT_DECAY)
+            self._opt = torch.optim.Adam(self._net.parameters(), lr=self.args.learning_rate,
+                weight_decay=self.args.weight_decay)
 
 
 
 
 
         device = self.get_device()
+        #
+        # if self.args.weight_sig is None or self.args.weight_bkg is None:
+        #     print ('You have requested to balance loss but have not set the weight for signal of background. I will ignore your request.')
+        #     self.args.balance_loss = False
 
-        if self.args.WEIGHT_SIG is None or self.args.WEIGHT_BKG is None:
-            print ('You have requested to balance loss but have not set the weight for signal of background. I will ignore your request.')
-            self.args.BALANCE_LOSS = False
+        #
+        # if self.args.balance_loss:
+        #
+        #     weights = [self.args.weight_bkg, self.args.weight_sig]
+        #     class_weights = torch.tensor(weights, device=device)
+        #     self._criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+        #
+        # else:
 
+        self._criterion = torch.nn.CrossEntropyLoss()
 
-        if self.args.BALANCE_LOSS:
-
-            weights = [self.args.WEIGHT_BKG, self.args.WEIGHT_SIG]
-            class_weights = torch.tensor(weights, device=device)
-            self._criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
-
-        else:
-
-            self._criterion = torch.nn.CrossEntropyLoss()
-   
 
     def get_model_save_dict(self):
         '''Return the save dict for the current models
-        
+
         Expected to vary between cycleGAN and eventID
         '''
 
@@ -101,7 +102,7 @@ class trainer_eventID(trainercore):
             'state_dict'  : self._net.state_dict(),
             'optimizer'   : self._opt.state_dict(),
         }
-        
+
         return state_dict
 
     def load_state(self, state):
@@ -117,10 +118,10 @@ class trainer_eventID(trainercore):
                     if torch.is_tensor(v):
                         state[k] = v.cuda()
 
-        return True       
+        return True
 
     def model_to_device(self):
-        
+
         if self.args.compute_mode == "CPU":
             pass
         if self.args.compute_mode == "GPU":
@@ -135,23 +136,23 @@ class trainer_eventID(trainercore):
         pass
 
         # This dataset is not balanced across labels.  So, we can weight the loss according to the labels
-        # 
-        # 'label_cpi': array([1523.,  477.]), 
-        # 'label_prot': array([528., 964., 508.]), 
-        # 'label_npi': array([1699.,  301.]), 
+        #
+        # 'label_cpi': array([1523.,  477.]),
+        # 'label_prot': array([528., 964., 508.]),
+        # 'label_npi': array([1699.,  301.]),
         # 'label_neut': array([655., 656., 689.])
 
-        # You can see that the only category that's truly balanced is the neutrino category.  
-        # The proton category has a ratio of 1 : 2 : 1 which isn't terrible, but can be fixed.  
+        # You can see that the only category that's truly balanced is the neutrino category.
+        # The proton category has a ratio of 1 : 2 : 1 which isn't terrible, but can be fixed.
         # Both the proton and neutrino categories learn well.
         #
         #
         # The pion categories learn poorly, and slowly.  They quickly reach ~75% and ~85% accuracy for c/n pi
-        # Which is just the ratio of the 0 : 1 label in each category.  So, they are learning to predict always zero, 
+        # Which is just the ratio of the 0 : 1 label in each category.  So, they are learning to predict always zero,
         # And it is difficult to bust out of that.
 
 
-        values, target = torch.max(inputs[self.args.KEYWORD_LABEL], dim = 1)
+        values, target = torch.max(inputs['label'], dim = 1)
         loss = self._criterion(logits, target=target)
         return loss
 
@@ -164,7 +165,7 @@ class trainer_eventID(trainercore):
         # Compare how often the input label and the output prediction agree:
 
 
-        values, indices = torch.max(minibatch_data[self.args.KEYWORD_LABEL], dim = 1)
+        values, indices = torch.max(minibatch_data['label'], dim = 1)
         values, predict = torch.max(logits, dim=1)
         correct_prediction = torch.eq(predict,indices)
         accuracy = torch.mean(correct_prediction.float())
@@ -200,10 +201,10 @@ class trainer_eventID(trainercore):
 
         # Fetch the next batch of data with larcv
         io_start_time = datetime.datetime.now()
-        minibatch_data = self.fetch_next_batch()
+        minibatch_data = self.larcv_fetcher.fetch_next_eventID_batch("train")
         io_end_time = datetime.datetime.now()
 
-        minibatch_data = self.to_torch(minibatch_data)
+        minibatch_data = self.larcv_fetcher.to_torch_eventID(minibatch_data)
 
 
         # Run a forward pass of the model on the input image:
@@ -220,13 +221,13 @@ class trainer_eventID(trainercore):
 
         # Compute any necessary metrics:
         metrics = self._compute_metrics(logits, minibatch_data, loss)
-        
+
 
 
         # Add the global step / second to the tensorboard log:
         try:
             metrics['global_step_per_sec'] = 1./self._seconds_per_global_step
-            metrics['images_per_second'] = self.args.MINIBATCH_SIZE / self._seconds_per_global_step
+            metrics['images_per_second'] = self.args.minibatch_size / self._seconds_per_global_step
         except:
             metrics['global_step_per_sec'] = 0.0
             metrics['images_per_second'] = 0.0
@@ -245,11 +246,11 @@ class trainer_eventID(trainercore):
         metrics['step_time'] = (global_end_time - step_start_time).total_seconds()
 
 
-        self.log(metrics, saver="train") 
+        self.log(metrics, saver="train")
 
         # print("Completed Log")
 
-        self.summary(metrics, saver="train")       
+        self.summary(metrics, saver="train")
 
         # print("Summarized")
 
@@ -279,17 +280,17 @@ class trainer_eventID(trainercore):
 
         with torch.no_grad():
 
-            if self._global_step != 0 and self._global_step % self.args.AUX_ITERATION == 0:
+            if self._global_step != 0 and self._global_step % self.args.aux_iteration == 0:
 
 
                 # Fetch the next batch of data with larcv
                 # (Make sure to pull from the validation set)
-                minibatch_data = self.fetch_next_batch('aux')        
+                minibatch_data = self.larcv_fetcher.fetch_next_eventID_batch('test')
 
 
                 # Convert the input data to torch tensors
-                minibatch_data = self.to_torch(minibatch_data)
-                
+                minibatch_data = self.larcv_fetcher.to_torch_eventID(minibatch_data)
+
                 # Run a forward pass of the model on the input image:
                 logits = self._net(minibatch_data['image'])
 
@@ -329,7 +330,7 @@ class trainer_eventID(trainercore):
 
         # Convert the input data to torch tensors
         minibatch_data = self.to_torch(minibatch_data)
-        
+
         # Run a forward pass of the model on the input image:
         with torch.no_grad():
             logits = self._net(minibatch_data['image'])
@@ -337,7 +338,7 @@ class trainer_eventID(trainercore):
         if self.args.LABEL_MODE == 'all':
             softmax = torch.nn.Softmax(dim=-1)(logits)
         else:
-            softmax = { key : torch.nn.Softmax(dim=-1)(logits[key]) for key in logits } 
+            softmax = { key : torch.nn.Softmax(dim=-1)(logits[key]) for key in logits }
 
         # print('label_neut', minibatch_data['label_neut'])
         # print('label_npi', minibatch_data['label_npi'])

@@ -15,7 +15,7 @@ class DiscriminatorFlags(object):
 
         parser.add_argument("--discriminator-n-initial-filters",
             type    = int,
-            default = 2,
+            default = 8,
             help    = "Number of filters applied, per plane, for the initial convolution")
 
         parser.add_argument("--discriminator-blocks-per-layer",
@@ -55,8 +55,8 @@ class Discriminator(torch.nn.Module):
 
         n_filters = params.discriminator_n_initial_filters
         self.initial_convolution = torch.nn.Conv3d(
-            in_channels  = 1, 
-            out_channels = n_filters, 
+            in_channels  = 1,
+            out_channels = n_filters,
             kernel_size  = [3, 3, 3], # Could be 5,5,5 with padding 2 or stride 2?
             stride       = [1, 1, 1],
             padding      = [1, 1, 1],
@@ -68,15 +68,15 @@ class Discriminator(torch.nn.Module):
         self.convolutional_layers = torch.nn.ModuleList()
         for layer in range(params.discriminator_network_depth):
 
-            self.convolutional_layers.append( 
+            self.convolutional_layers.append(
                 BlockSeries(
-                    n_filters, 
+                    n_filters,
                     params.discriminator_blocks_per_layer,
                     bias = params.discriminator_use_bias,
                     residual = True)
                 )
             out_filters = 2*n_filters
-            self.convolutional_layers.append( 
+            self.convolutional_layers.append(
                 ConvolutionDownsample(
                     inplanes  = n_filters,
                     outplanes = out_filters,
@@ -90,14 +90,14 @@ class Discriminator(torch.nn.Module):
 
 
         self.final_layer = BlockSeries(
-                    inplanes = n_filters, 
+                    inplanes = n_filters,
                     n_blocks = params.discriminator_blocks_per_layer,
                     residual = True,
                     bias = params.discriminator_use_bias)
-                
+
         self.bottleneck  = torch.nn.Conv3d(
-            in_channels  = n_filters, 
-            out_channels = 1, 
+            in_channels  = n_filters,
+            out_channels = 1,
             kernel_size  = [1, 1, 1],
             stride       = [1, 1, 1],
             padding      = [0, 0, 0],
@@ -119,7 +119,7 @@ class Discriminator(torch.nn.Module):
 
 
     def forward(self, x):
-        
+
         batch_size = x.shape[0]
 
         x = self.initial_convolution(x)
@@ -140,7 +140,7 @@ class Discriminator(torch.nn.Module):
         output = self.bottleneck(output)
 
         # print(output.shape)
-        # Apply global average pooling 
+        # Apply global average pooling
         kernel_size = output.shape[2:]
         output = torch.squeeze(nn.AvgPool3d(kernel_size, ceil_mode=False)(output))
         # print(output.shape)
@@ -149,6 +149,3 @@ class Discriminator(torch.nn.Module):
         # print(output.shape)
 
         return output
-
-
-
