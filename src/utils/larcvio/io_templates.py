@@ -3,24 +3,24 @@ from . import larcv_io
 
 # Here, we set up a bunch of template IO formats in the form of callable functions:
 
-def event_id_io(input_file, name):
+def event_id_io(input_file, name, labeled, augment = True):
     max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_E\"", max_voxels=max_voxels)
-
-    label_proc = gen_label_filler(name)
+    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_E\"", max_voxels=max_voxels, augment=augment)
 
 
     config = larcv_io.ThreadIOConfig(name=name)
 
     config.add_process(data_proc)
-    config.add_process(label_proc)
+    if labeled:
+        label_proc = gen_label_filler(name)
+        config.add_process(label_proc)
 
     config.set_param("InputFiles", input_file)
     return config
 
-def cycleGAN_io(input_file, name):
+def cycleGAN_io(input_file, name, augment = True):
     max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_E\"", max_voxels=max_voxels)
+    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_E\"", max_voxels=max_voxels, augment=augment)
 
     config = larcv_io.ThreadIOConfig(name=name)
 
@@ -53,7 +53,7 @@ def output_io(input_file, output_file):
     return config
 
 
-def gen_sparse3d_data_filler(name, producer, max_voxels):
+def gen_sparse3d_data_filler(name, producer, max_voxels, augment = True):
 
     proc = larcv_io.ProcessConfig(proc_name=name, proc_type="BatchFillerSparseTensor3D")
 
@@ -62,7 +62,10 @@ def gen_sparse3d_data_filler(name, producer, max_voxels):
     proc.set_param("IncludeValues",     "true")
     proc.set_param("MaxVoxels",         max_voxels)
     proc.set_param("UnfilledVoxelValue","-999")
-    proc.set_param("Augment",           "true")
+    if augment:
+        proc.set_param("Augment",           "true")
+    else:
+        proc.set_param("Augment",           "false")
 
     return proc
 

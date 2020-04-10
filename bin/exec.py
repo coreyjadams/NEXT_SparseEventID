@@ -113,7 +113,7 @@ The most commonly used commands are:
             description     = 'Run Network Training',
             formatter_class = argparse.ArgumentDefaultsHelpFormatter)
 
-        self.add_io_arguments_eventID(self.parser)
+        self.add_io_arguments_eventID(self.parser, training=True)
         self.add_core_configuration(self.parser)
         self.add_shared_training_arguments(self.parser)
 
@@ -225,7 +225,7 @@ The most commonly used commands are:
             description     = 'Run Network Training',
             formatter_class = argparse.ArgumentDefaultsHelpFormatter)
 
-        self.add_io_arguments_eventID(self.parser)
+        self.add_io_arguments_eventID(self.parser, training=False)
         self.add_core_configuration(self.parser)
         self.add_shared_training_arguments(self.parser)
 
@@ -243,6 +243,7 @@ The most commonly used commands are:
 
         self.trainer.initialize()
         self.trainer.batch_process()
+
     def __str__(self):
         s = "\n\n-- CONFIG --\n"
         for name in iter(sorted(vars(self.args))):
@@ -286,42 +287,41 @@ The most commonly used commands are:
 
         return parser
 
-    def add_io_arguments_eventID(self, parser):
+    def add_io_arguments_eventID(self, parser, training):
 
         data_directory = "/home/cadams/NEXT/cycleGAN/"
 
         # IO PARAMETERS FOR INPUT:
-        parser.add_argument('-f','--file',
-            type    = str,
-            default = data_directory + "next_new_classification_train.h5",
-            help    = "IO Input File")
-        parser.add_argument('--input-dimension',
-            type    = int,
-            default = 3,
-            help    = "Dimensionality of data to use",
-            choices = [2, 3] )
-        parser.add_argument('--start-index',
-            type    = int,
-            default = 0,
-            help    = "Start index, only used in inference mode")
 
-        parser.add_argument('--label-mode',
-            type    = str,
-            choices = ['split', 'all'],
-            default = 'split',
-            help    = "Run with split labels (multiple classifiers) or all in one" )
+        if training:
+            parser.add_argument('-f','--train-file',
+                type    = str,
+                default = data_directory + "next_new_classification_train.h5",
+                help    = "IO Input File")
+
+            # IO PARAMETERS FOR AUX INPUT:
+            parser.add_argument('--test-file',
+                type    = str,
+                default = data_directory + "next_new_classification_test.h5",
+                help    = "IO Aux Input File, or output file in inference mode")
+
+        else:
+
+            parser.add_argument('-f','--sim-file',
+                type    = str,
+                default = data_directory + "next_new_classification_val.h5",
+                help    = "IO Input File")
+
+            # IO PARAMETERS FOR AUX INPUT:
+            parser.add_argument('--data-file',
+                type    = str,
+                default = data_directory + "nextDATA_RUNS.h5",
+                help    = "IO Aux Input File, or output file in inference mode")
 
         parser.add_argument('-mb','--minibatch-size',
             type    = int,
             default = 2,
             help    = "Number of images in the minibatch size")
-
-        # IO PARAMETERS FOR AUX INPUT:
-        parser.add_argument('--aux-file',
-            type    = str,
-            default = data_directory + "next_new_classification_test.h5",
-            help    = "IO Aux Input File, or output file in inference mode")
-
 
         parser.add_argument('--aux-iteration',
             type    = int,

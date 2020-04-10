@@ -1,4 +1,4 @@
-import datetime
+import time, datetime
 import numpy
 
 import torch
@@ -17,20 +17,33 @@ class trainer_eventID(trainercore):
         # In a distributed case it's set to false except on one rank
         self._print = True
 
+        # This is for inference to keep track, at the end of an epoch say,
+        # The performance on data
+
+        self.inference_results = {}
+
     def set_log_keys(self):
         self._log_keys = ['loss', 'accuracy']
 
 
     def initialize_io(self):
 
-        if self.args.training:
-            self._epoch_size = self.larcv_fetcher.prepare_eventID_sample("train", self.args.file, self.args.minibatch_size)
+        self._epoch_size = {}
 
-            if self.args.aux_file is not None:
-                self._epoch_size = self.larcv_fetcher.prepare_eventID_sample("test", self.args.aux_file, self.args.minibatch_size)
+        if self.args.training:
+            self._epoch_size["train"] = self.larcv_fetcher.prepare_eventID_sample(
+                "train", self.args.train_file, self.args.minibatch_size)
+
+            if self.args.test_file is not None:
+                self._epoch_size["test"] = self.larcv_fetcher.prepare_eventID_sample(
+                    "test", self.args.test_file, self.args.minibatch_size)
         else:
             # Inference mode
-            self._n_events = self.larcv_fetcher.prepare_eventID_sample("val", self.args.file, self.args.minibatch_size)
+            self._epoch_size["sim"] = self.larcv_fetcher.prepare_eventID_sample(
+                "sim", self.args.sim_file, self.args.minibatch_size)
+
+            self._epoch_size["data"] = self.larcv_fetcher.prepare_eventID_sample(
+                "data", self.args.data_file, self.args.minibatch_size)
 
 
     def init_network(self):
@@ -52,10 +65,8 @@ class trainer_eventID(trainercore):
 
         trainercore.init_saver(self)
 
-        if self.args.aux_file is not None and self.args.training:
+        if self.args.training and self.args.test_file is not None:
             self._aux_saver = tensorboardX.SummaryWriter(self.args.log_directory + "/test/")
-        elif self.args.aux_file is not None and not self.args.training:
-            self._aux_saver = tensorboardX.SummaryWriter(self.args.log_directory + "/val/")
 
         else:
             self._aux_saver = None
@@ -63,6 +74,9 @@ class trainer_eventID(trainercore):
 
 
     def init_optimizer(self):
+
+        if not self.args.training:
+            return
 
         # Create an optimizer:
         if self.args.optimizer == "SDG":
@@ -95,9 +109,7 @@ class trainer_eventID(trainercore):
         # For the criterion, get the relative ratios of the classes:
         all_labels = self.larcv_fetcher.eventID_labels('train')
         labels,counts = numpy.unique(all_labels, return_counts=True)
-        print(counts)
         weights = (numpy.sum(counts) - counts) / numpy.sum(counts)
-        print(weights)
         weights = 2 * torch.tensor(weights, device=device).float()
 
         self._criterion = torch.nn.CrossEntropyLoss(weights)
@@ -121,15 +133,17 @@ class trainer_eventID(trainercore):
     def load_state(self, state):
 
         self._net.load_state_dict(state['state_dict'])
-        self._opt.load_state_dict(state['optimizer'])
-        self._global_step = state['global_step']
+        if self.args.training:
+            self._opt.load_state_dict(state['optimizer'])
+            self._global_step = state['global_step']
 
         # If using GPUs, move the model to GPU:
         if self.args.compute_mode == "GPU":
-            for state in self._opt.state.values():
-                for k, v in state.items():
-                    if torch.is_tensor(v):
-                        state[k] = v.cuda()
+            if self.args.training:
+                for state in self._opt.state.values():
+                    for k, v in state.items():
+                        if torch.is_tensor(v):
+                            state[k] = v.cuda()
 
         return True
 
@@ -272,7 +286,7 @@ class trainer_eventID(trainercore):
         if not self.args.training: return
 
         # Second, validation can not occur without a validation dataloader.
-        if self.args.aux_file is None: return
+        if self.args.test_file is None: return
 
         # perform a validation step
         # Validation steps can optionally accumulate over several minibatches, to
@@ -315,39 +329,97 @@ class trainer_eventID(trainercore):
 
                 return metrics
 
-    def ana_step(self, iteration=None):
+    def sum_over_images(self, images):
+
+        if type(images) is tuple:
+            locations = images[0][:,0:3]
+            batch     = images[0][:,3]
+            values    = images[1]
+            n_images = len(torch.unique(batch))
+            energy = torch.zeros(size=(n_images,)).float()
+            for b in range(n_images):
+                energy[b] = torch.sum(values[batch == b])
+            # indexes = torch.
+        else:
+            pass
+
+        return energy
+
+    def ana_epoch(self, target):
+        print("Starting")
+        self.inference_results[target] = {
+            'energy' : None,
+            'label'  : None,
+            'pred'   : None,
+            'entries': None,
+        }
+
+        n_events = self._epoch_size[target]
+
+        n_processed = 0
+        print(n_events)
+        start = time.time()
+        while n_processed < n_events*.1:
 
 
+            # perform a validation step
 
-        # First, validation only occurs on not training:
-        if self.args.training: return
+            # Set network to eval mode
+            self._net.eval()
+            # self._net.train()
 
-        # perform a validation step
-
-        # Set network to eval mode
-        self._net.eval()
-        # self._net.train()
-
-        # Fetch the next batch of data with larcv
-        io_start_time = datetime.datetime.now()
-        minibatch_data = self.larcv_fetcher.fetch_next_eventID_batch("val")
-        io_end_time = datetime.datetime.now()
+            # Fetch the next batch of data with larcv
+            io_start_time = datetime.datetime.now()
+            minibatch_data = self.larcv_fetcher.fetch_next_eventID_batch(target)
+            io_end_time = datetime.datetime.now()
 
 
-        # Convert the input data to torch tensors
-        minibatch_data = self.larcv_fetcher.to_torch_eventID(minibatch_data)
+            # Convert the input data to torch tensors
+            minibatch_data = self.larcv_fetcher.to_torch_eventID(minibatch_data)
 
-        # Run a forward pass of the model on the input image:
-        with torch.no_grad():
-            logits = self._net(minibatch_data['image'])
+            # Run a forward pass of the model on the input image:
+            with torch.no_grad():
+                logits = self._net(minibatch_data['image'])
 
-        softmax = torch.nn.Softmax(dim=-1)(logits)
-        argmax  = torch.argmax(logits, dim=-1)
+            prediction = torch.argmax(logits, dim=-1)
+
+            # What is the energy of each event?
+            # Sum the voxels:
+            energy = self.sum_over_images(minibatch_data['image'])
+
+            keys = ["energy", "pred"]
+
+            if "label" in minibatch_data:
+                label      = torch.argmax(minibatch_data['label'], dim=-1)
+                keys.append("label")
 
 
-        print(softmax)
-        print(argmax)
+            for key in keys:
+                if key == "energy": tensor = energy
+                if key == "label":  tensor = label
+                if key == "pred":   tensor = prediction
+                if self.inference_results[target][key] is None:
+                    self.inference_results[target][key] = tensor
+                else:
+                    self.inference_results[target][key] = torch.cat([self.inference_results[target][key], tensor])
 
+
+            if self.inference_results[target]['entries'] is None:
+                self.inference_results[target]['entries'] = minibatch_data['entries']
+            else:
+                self.inference_results[target]['entries'] = numpy.concatenate([self.inference_results[target]['entries'], minibatch_data['entries']])
+
+
+            # print(self.inference_results[target]['energy'][minibatch_data['entries'],])
+            # self.inference_results[target]['energy'][minibatch_data['entries'],] = energy
+            # self.inference_results[target]['pred'][minibatch_data['entries']]   = prediction
+            # if "label" in minibatch_data:
+            #     self.inference_results[target]['label'][minibatch_data['entries']] = label
+
+            n_processed += self.args.minibatch_size
+
+        end = time.time()
+        print (f"Processed {n_processed} images at {n_processed / (end-start):.2f} Img/s")
 
         # # Call the larcv interface to write data:
         # if self.args.OUTPUT_FILE is not None:
@@ -378,3 +450,15 @@ class trainer_eventID(trainercore):
         #     # self.summary(metrics, saver="test")
 
         #     return metrics
+
+    def make_analysis(self):
+        if self.inference_results is None:
+            raise(Exception)
+
+
+        min_bin = 1500
+        max_bin = 2500
+        n_bins  = 50
+
+        # if "sim" in self.inference_results:
+

@@ -1,4 +1,6 @@
 import os
+import time
+
 import torch
 
 from . import data_transforms
@@ -9,21 +11,27 @@ import numpy, h5py
 
 class larcv_fetcher(object):
 
-    def __init__(self, distributed, seed=None):
+    def __init__(self, distributed, seed=None, inference=False):
 
         self._cleanup = []
         self._eventID_labels   = {}
         self._eventID_energies = {}
 
+        if inference:
+            random_access_mode = "serial_access"
+        else:
+            random_access_mode = "random_blocks"
+
         self._color = None
         if distributed:
             from larcv import distributed_queue_interface
-            self._larcv_interface = distributed_queue_interface.queue_interface()
+            self._larcv_interface = distributed_queue_interface.queue_interface(random_access_mode=random_access_mode)
             self._color = 0
         else:
             from larcv import queueloader
-            self._larcv_interface = queueloader.queue_interface(random_access_mode="random_blocks", seed=None)
+            self._larcv_interface = queueloader.queue_interface(random_access_mode=random_access_mode, seed=None)
 
+        self.inference = inference
 
     def __del__(self):
         for f in self._cleanup:
@@ -66,7 +74,24 @@ class larcv_fetcher(object):
             return self._eventID_energies[name]
 
     def prepare_eventID_sample(self, name, input_file, batch_size):
-        config = io_templates.event_id_io(input_file=input_file, name=name)
+
+
+        # For this work, we can cache all of the labels and energies:
+        import h5py
+        f = h5py.File(input_file, 'r')
+        # This is for simulation files only:
+        if 'Data/particle_label_group/' in f:
+            labeled = True
+            self._eventID_labels[name] = f['Data/particle_label_group/particles/']['pdg']
+            self._eventID_energies[name] = f['Data/particle_label_group/particles/']['energy_init']
+        else:
+            labeled = False
+            self._eventID_labels[name] = None
+            self._eventID_energies[name] = None
+
+
+        augment = not self.inference
+        config = io_templates.event_id_io(input_file=input_file, name=name, labeled=labeled, augment=augment)
 
         # Generate a named temp file:
         main_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
@@ -85,20 +110,22 @@ class larcv_fetcher(object):
         # Build up the data_keys:
         data_keys = {
             'image' : name + "data",
-            'label' : name + "label"
         }
 
-        # For this work, we can cache all of the labels and energies:
-        import h5py
-        f = h5py.File(input_file, 'r')
-        self._eventID_labels[name] = f['Data/particle_label_group/particles/']['pdg']
-        self._eventID_energies[name] = f['Data/particle_label_group/particles/']['energy_init']
-
+        if labeled:
+            data_keys['label'] = name + "label"
 
 
         self._larcv_interface.prepare_manager(name, io_config, batch_size, data_keys,color=self._color)
+
+        if self.inference:
+            self._larcv_interface.set_next_index(name, 0)
+
         self._larcv_interface.prepare_next(name)
 
+        # Pause to preload the first batch:
+        while self._larcv_interface.is_reading(name):
+            time.sleep(0.1)
 
         return self._larcv_interface.size(name)
 
@@ -133,7 +160,7 @@ class larcv_fetcher(object):
 
         # For the serial mode, call next here:
 
-        minibatch_data = self._larcv_interface.fetch_minibatch_data(name, pop=True, fetch_meta_data=False)
+        minibatch_data = self._larcv_interface.fetch_minibatch_data(name, pop=True, fetch_meta_data=True)
         minibatch_dims = self._larcv_interface.fetch_minibatch_dims(name)
 
         # For the serial mode, call next here:
