@@ -198,9 +198,9 @@ The most commonly used commands are:
     def make_trainer_eventID(self):
 
         if self.args.distributed:
-            from src.utils import distributed_trainer
+            from src.utils import distributed_eventID
 
-            self.trainer = distributed_trainer.distributed_trainer(self.args)
+            self.trainer = distributed_eventID.distributed_eventID(self.args)
         else:
             from src.utils import trainer_eventID
             self.trainer = trainer_eventID.trainer_eventID(self.args)
@@ -265,10 +265,12 @@ The most commonly used commands are:
 
     def add_io_arguments_eventID(self, parser):
 
+        data_directory="/lus/theta-fs0/projects/datascience/cadams/datasets/NEXT/cycleGAN/"
+
         # IO PARAMETERS FOR INPUT:
         parser.add_argument('-f','--file',
             type    = str,
-            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/next_new_classification_train.h5",
+            default = data_directory + "next_new_classification_train.h5",
             help    = "IO Input File")
         parser.add_argument('--input-dimension',
             type    = int,
@@ -294,7 +296,7 @@ The most commonly used commands are:
         # IO PARAMETERS FOR AUX INPUT:
         parser.add_argument('--aux-file',
             type    = str,
-            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/next_new_classification_test.h5",
+            default = data_directory + "next_new_classification_test.h5",
             help    = "IO Aux Input File, or output file in inference mode")
 
 
@@ -311,11 +313,12 @@ The most commonly used commands are:
         return
 
     def add_io_arguments_cycleGAN(self, parser):
+        data_directory="/lus/theta-fs0/projects/datascience/cadams/datasets/NEXT/cycleGAN/"
 
         # IO PARAMETERS FOR DATA INPUT:
         parser.add_argument('--data-file',
             type    = str,
-            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/nextDATA_RUNS.h5",
+            default = data_directory + "nextDATA_RUNS.h5",
             help    = "Real data file")
 
         parser.add_argument('-mb','--minibatch-size',
@@ -325,7 +328,7 @@ The most commonly used commands are:
 
         parser.add_argument('--sim-file',
             type    = str,
-            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/next_new_classification_val.h5",
+            default = data_directory + "next_new_classification_val.h5",
             help    = "Simulated data file")
 
         return

@@ -46,14 +46,13 @@ class trainercore(object):
 
         self.initialize_io()
 
-
+        print("Here")
         if io_only:
             return
 
 
         self.init_network()
 
-        self.init_optimizer()
 
         self.init_saver()
 
@@ -67,6 +66,8 @@ class trainercore(object):
         self.set_log_keys()
 
         self.model_to_device()
+
+        self.init_optimizer()
 
 
     def set_log_keys(self):
