@@ -1,7 +1,7 @@
 import sys, os
 from collections import OrderedDict
 
-''' 
+'''
 The point of this class is to take a loose configuration specification
 and return a properly formated larcv IO configuration.  So, it can spit out
 a full configuration string, or even a temp file.
@@ -92,9 +92,9 @@ class IOManagerConfig(object):
         if self._params["IOMode"] is None:
             self._params["IOMode"] = "2"
         # if self._params["OutFileName"] is None:
-        #     self._params["OutFileName"] = 
+        #     self._params["OutFileName"] =
         # if self._params["InputFiles"] is None:
-        #     self._params["InputFiles"] = 
+        #     self._params["InputFiles"] =
         if self._params["InputDirs"] is None:
             self._params["InputDirs"] = "[]"
         if self._params["StoreOnlyName"] is None:
@@ -139,7 +139,7 @@ class IOManagerConfig(object):
         output_str += "{indent}}}\n".format(indent=" "*indent_level)
 
         return output_str
-        
+
     def set_param(self, param, value):
         self._params[param] = value
 
@@ -190,7 +190,7 @@ class ThreadIOConfig(CoreConfig):
     def set_defaults(self):
 
         if self._params['Verbosity'] is None:
-            self._params['Verbosity'] = "2"
+            self._params['Verbosity'] = "3"
         if self._params['EnableFilter'] is None:
             self._params['EnableFilter'] = "false"
         if self._params['NumThreads'] is None:
@@ -247,10 +247,3 @@ class ThreadIOConfig(CoreConfig):
 
 
         return output_str
-
-
-
-
-
-
-

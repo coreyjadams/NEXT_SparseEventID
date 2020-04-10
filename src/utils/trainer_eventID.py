@@ -91,7 +91,16 @@ class trainer_eventID(trainercore):
         #
         # else:
 
-        self._criterion = torch.nn.CrossEntropyLoss()
+
+        # For the criterion, get the relative ratios of the classes:
+        all_labels = self.larcv_fetcher.eventID_labels('train')
+        labels,counts = numpy.unique(all_labels, return_counts=True)
+        print(counts)
+        weights = (numpy.sum(counts) - counts) / numpy.sum(counts)
+        print(weights)
+        weights = 2 * torch.tensor(weights, device=device).float()
+
+        self._criterion = torch.nn.CrossEntropyLoss(weights)
 
 
     def get_model_save_dict(self):
@@ -130,6 +139,11 @@ class trainer_eventID(trainercore):
             pass
         if self.args.compute_mode == "GPU":
             self._net.cuda()
+            # for state in self._opt.state.values:
+            #     for k, v in state.items():
+            #         if torch.is_tensor(v):
+            #             state[k] = v.cuda()
+            # This moves the optimizer to the GPU:
 
 
     def _calculate_loss(self, inputs, logits):
@@ -138,22 +152,6 @@ class trainer_eventID(trainercore):
         returns a single scalar for the optimizer to use.
         '''
         pass
-
-        # This dataset is not balanced across labels.  So, we can weight the loss according to the labels
-        #
-        # 'label_cpi': array([1523.,  477.]),
-        # 'label_prot': array([528., 964., 508.]),
-        # 'label_npi': array([1699.,  301.]),
-        # 'label_neut': array([655., 656., 689.])
-
-        # You can see that the only category that's truly balanced is the neutrino category.
-        # The proton category has a ratio of 1 : 2 : 1 which isn't terrible, but can be fixed.
-        # Both the proton and neutrino categories learn well.
-        #
-        #
-        # The pion categories learn poorly, and slowly.  They quickly reach ~75% and ~85% accuracy for c/n pi
-        # Which is just the ratio of the 0 : 1 label in each category.  So, they are learning to predict always zero,
-        # And it is difficult to bust out of that.
 
 
         values, target = torch.max(inputs['label'], dim = 1)
