@@ -5,7 +5,7 @@ from . import larcv_io
 
 def event_id_io(input_file, name):
     max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_Q\"", max_voxels=max_voxels)
+    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_E\"", max_voxels=max_voxels)
 
     label_proc = gen_label_filler(name)
 
@@ -20,7 +20,7 @@ def event_id_io(input_file, name):
 
 def cycleGAN_io(input_file, name):
     max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_Q\"", max_voxels=max_voxels)
+    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_E\"", max_voxels=max_voxels)
 
     config = larcv_io.ThreadIOConfig(name=name)
 
@@ -47,8 +47,8 @@ def output_io(input_file, output_file):
     # With the, 25 output events is 119K and takes 36s
     config.set_param("ReadOnlyType", "[\"sparse3d\",\"sparse3d\",\"sparse3d\",\"sparse3d\"]")
     config.set_param("ReadOnlyName", "[\"voxels_E\",\"voxels_E_norm\",\"voxels_E_scaled\",\"voxels_Q\"]")
-   # config.set_param("ReadOnlyType", "[\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\"]")  
-   # config.set_param("ReadOnlyName", "[\"sbndneutrino\",\"sbndsegmerged\",\"cpiID\",\"neutID\",\"npiID\",\"protID\",\"all\"]")  
+   # config.set_param("ReadOnlyType", "[\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\"]")
+   # config.set_param("ReadOnlyName", "[\"sbndneutrino\",\"sbndsegmerged\",\"cpiID\",\"neutID\",\"npiID\",\"protID\",\"all\"]")
 
     return config
 

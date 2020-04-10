@@ -216,10 +216,33 @@ The most commonly used commands are:
             self.trainer = trainer_cycleGAN.trainer_cycleGAN(self.args)
 
 
-    def inference(self):
+    def inference_cycleGAN(self):
         pass
 
 
+    def inference_eventID(self):
+        self.parser = argparse.ArgumentParser(
+            description     = 'Run Network Training',
+            formatter_class = argparse.ArgumentDefaultsHelpFormatter)
+
+        self.add_io_arguments_eventID(self.parser)
+        self.add_core_configuration(self.parser)
+        self.add_shared_training_arguments(self.parser)
+
+
+        self.add_eventID_parsers(self.parser)
+
+        self.args = self.parser.parse_args(sys.argv[2:])
+        self.args.training = False
+
+
+        self.make_trainer_eventID()
+
+        print("Running Inference")
+        print(self.__str__())
+
+        self.trainer.initialize()
+        self.trainer.batch_process()
     def __str__(self):
         s = "\n\n-- CONFIG --\n"
         for name in iter(sorted(vars(self.args))):
@@ -265,10 +288,12 @@ The most commonly used commands are:
 
     def add_io_arguments_eventID(self, parser):
 
+        file_dir = "/home/cadams/NEXT/cycleGAN/"
+
         # IO PARAMETERS FOR INPUT:
         parser.add_argument('-f','--file',
             type    = str,
-            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/next_new_classification_train.h5",
+            default = file_dir + "next_new_classification_train.h5",
             help    = "IO Input File")
         parser.add_argument('--input-dimension',
             type    = int,
@@ -294,7 +319,7 @@ The most commonly used commands are:
         # IO PARAMETERS FOR AUX INPUT:
         parser.add_argument('--aux-file',
             type    = str,
-            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/next_new_classification_test.h5",
+            default = file_dir + "next_new_classification_test.h5",
             help    = "IO Aux Input File, or output file in inference mode")
 
 

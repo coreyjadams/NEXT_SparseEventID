@@ -99,10 +99,10 @@ class larcv_fetcher(object):
     def fetch_next_cycleGAN_batch(self, name):
 
         # For the serial mode, call next here:
-        self._larcv_interface.prepare_next(name)
 
         minibatch_data = self._larcv_interface.fetch_minibatch_data(name, pop=True, fetch_meta_data=False)
         minibatch_dims = self._larcv_interface.fetch_minibatch_dims(name)
+        self._larcv_interface.prepare_next(name)
 
         # Here, do some massaging to convert the input data to another format, if necessary:
         # Need to convert sparse larcv into a dense numpy array:
@@ -114,10 +114,10 @@ class larcv_fetcher(object):
     def fetch_next_eventID_batch(self, name):
 
         # For the serial mode, call next here:
-        self._larcv_interface.prepare_next(name)
 
         minibatch_data = self._larcv_interface.fetch_minibatch_data(name, pop=True, fetch_meta_data=False)
         minibatch_dims = self._larcv_interface.fetch_minibatch_dims(name)
+        self._larcv_interface.prepare_next(name)
 
         # Here, do some massaging to convert the input data to another format, if necessary:
         # Need to convert sparse larcv into a dense numpy array:

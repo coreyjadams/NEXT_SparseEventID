@@ -309,10 +309,8 @@ class trainercore(object):
                 self.val_step()
                 self.train_step()
                 self.checkpoint()
-            elif FLAGS.INFERENCE:
-                if (i % 500): print ('At inference iteration step', i)
-                self.inference_step(i)
             else:
+                if (i % 500): print ('At inference iteration step', i)
                 self.ana_step(i)
 
 

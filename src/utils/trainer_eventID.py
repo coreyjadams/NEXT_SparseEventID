@@ -28,6 +28,10 @@ class trainer_eventID(trainercore):
 
             if self.args.aux_file is not None:
                 self._epoch_size = self.larcv_fetcher.prepare_eventID_sample("test", self.args.aux_file, self.args.minibatch_size)
+        else:
+            # Inference mode
+            self._n_events = self.larcv_fetcher.prepare_eventID_sample("val", self.args.file, self.args.minibatch_size)
+
 
     def init_network(self):
 
@@ -315,7 +319,9 @@ class trainer_eventID(trainercore):
 
     def ana_step(self, iteration=None):
 
-        # First, validation only occurs on training:
+
+
+        # First, validation only occurs on not training:
         if self.args.training: return
 
         # perform a validation step
@@ -325,53 +331,52 @@ class trainer_eventID(trainercore):
         # self._net.train()
 
         # Fetch the next batch of data with larcv
-        minibatch_data = self.fetch_next_batch(metadata=True)
+        io_start_time = datetime.datetime.now()
+        minibatch_data = self.larcv_fetcher.fetch_next_eventID_batch("val")
+        io_end_time = datetime.datetime.now()
 
 
         # Convert the input data to torch tensors
-        minibatch_data = self.to_torch(minibatch_data)
+        minibatch_data = self.larcv_fetcher.to_torch_eventID(minibatch_data)
 
         # Run a forward pass of the model on the input image:
         with torch.no_grad():
             logits = self._net(minibatch_data['image'])
 
-        if self.args.LABEL_MODE == 'all':
-            softmax = torch.nn.Softmax(dim=-1)(logits)
-        else:
-            softmax = { key : torch.nn.Softmax(dim=-1)(logits[key]) for key in logits }
-
-        # print('label_neut', minibatch_data['label_neut'])
-        # print('label_npi', minibatch_data['label_npi'])
-        # print('label_cpi', minibatch_data['label_cpi'])
-        # print('label_prot', minibatch_data['label_prot'])
-        # print(softmax)
-
-        # Call the larcv interface to write data:
-        if self.args.OUTPUT_FILE is not None:
-            if self.args.LABEL_MODE == 'all':
-                writable_logits = numpy.asarray(softmax.cpu())
-                self._larcv_interface.write_output(data=writable_logits[0], datatype='meta', producer='all',
-                    entries=minibatch_data['entries'], event_ids=minibatch_data['event_ids'])
-            else:
-                for key in softmax:
-                    writable_logits = numpy.asarray(softmax[key].cpu())
-                    self._larcv_interface.write_output(data=writable_logits[0], datatype='meta', producer=key,
-                        entries=minibatch_data['entries'], event_ids=minibatch_data['event_ids'])
-
-        # If the input data has labels available, compute the metrics:
-        if (self.args.LABEL_MODE == 'all' and 'label' in minibatch_data) or \
-           (self.args.LABEL_MODE == 'split' and 'label_neut' in minibatch_data):
-            # Compute the loss
-            loss = self._calculate_loss(minibatch_data, logits)
-
-            # Compute the metrics for this iteration:
-            metrics = self._compute_metrics(logits, minibatch_data, loss)
-
-            if iteration is not None:
-                metrics.update({'it.' : iteration})
+        softmax = torch.nn.Softmax(dim=-1)(logits)
+        argmax  = torch.argmax(logits, dim=-1)
 
 
-            self.log(metrics, saver="test")
-            # self.summary(metrics, saver="test")
+        print(softmax)
+        print(argmax)
 
-            return metrics
+
+        # # Call the larcv interface to write data:
+        # if self.args.OUTPUT_FILE is not None:
+        #     if self.args.LABEL_MODE == 'all':
+        #         writable_logits = numpy.asarray(softmax.cpu())
+        #         self._larcv_interface.write_output(data=writable_logits[0], datatype='meta', producer='all',
+        #             entries=minibatch_data['entries'], event_ids=minibatch_data['event_ids'])
+        #     else:
+        #         for key in softmax:
+        #             writable_logits = numpy.asarray(softmax[key].cpu())
+        #             self._larcv_interface.write_output(data=writable_logits[0], datatype='meta', producer=key,
+        #                 entries=minibatch_data['entries'], event_ids=minibatch_data['event_ids'])
+
+        # # If the input data has labels available, compute the metrics:
+        # if (self.args.LABEL_MODE == 'all' and 'label' in minibatch_data) or \
+        #    (self.args.LABEL_MODE == 'split' and 'label_neut' in minibatch_data):
+        #     # Compute the loss
+        #     loss = self._calculate_loss(minibatch_data, logits)
+
+        #     # Compute the metrics for this iteration:
+        #     metrics = self._compute_metrics(logits, minibatch_data, loss)
+
+        #     if iteration is not None:
+        #         metrics.update({'it.' : iteration})
+
+
+        #     self.log(metrics, saver="test")
+        #     # self.summary(metrics, saver="test")
+
+        #     return metrics

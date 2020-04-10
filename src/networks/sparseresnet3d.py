@@ -16,7 +16,7 @@ class ResNetFlags(object):
 
         parser.add_argument("--n-initial-filters",
             type    = int,
-            default = 2,
+            default = 8,
             help    = "Number of filters applied, per plane, for the initial convolution")
 
         parser.add_argument("--res-blocks-per-layer",
@@ -27,7 +27,7 @@ class ResNetFlags(object):
         parser.add_argument("--network-depth",
             help    = "Total number of downsamples to apply",
             type    = int,
-            default = 8)
+            default = 5)
 
         parser.add_argument("--batch-norm",
             help    = "Run using batch normalization",
