@@ -28,7 +28,7 @@ class trainercore(object):
         self._global_step   = -1
         self.args           = args
         self._epoch_size    = 1
-        self.larcv_fetcher  = larcv_fetcher.larcv_fetcher(self.args.distributed, seed=None)
+        self.larcv_fetcher  = larcv_fetcher.larcv_fetcher(self.args.distributed, seed=None, inference=(not args.training))
 
 
     def init_network(self):
@@ -292,28 +292,23 @@ class trainercore(object):
 
         # This is the 'master' function, so it controls a lot
 
-        # If we're not training, force the number of iterations to the epoch size or less
-        if not self.args.training:
-            if self.args.iterations > self._epoch_size:
-                self.args.iterations = self._epoch_size
-
 
         # Run iterations
-        for i in range(self.args.iterations):
-            if self.args.training and self._iteration >= self.args.iterations:
-                print('Finished training (iteration %d)' % self._iteration)
-                self.checkpoint()
-                break
+        if self.args.training:
+            for i in range(self.args.iterations):
 
-            if self.args.training:
-                self.val_step()
-                self.train_step()
-                self.checkpoint()
-            elif FLAGS.INFERENCE:
-                if (i % 500): print ('At inference iteration step', i)
-                self.inference_step(i)
-            else:
-                self.ana_step(i)
+                if self.args.training and self._iteration >= self.args.iterations:
+                    print('Finished training (iteration %d)' % self._iteration)
+                    self.checkpoint()
+                    break
+
+                    self.val_step()
+                    self.train_step()
+                    self.checkpoint()
+
+
+        self.ana_epoch('sim')
+        self.ana_epoch('data')
 
 
         if self.args.training:

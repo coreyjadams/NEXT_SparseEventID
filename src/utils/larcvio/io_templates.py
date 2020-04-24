@@ -3,24 +3,24 @@ from . import larcv_io
 
 # Here, we set up a bunch of template IO formats in the form of callable functions:
 
-def event_id_io(input_file, name):
+def event_id_io(input_file, name, labeled, augment = True):
     max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_Q\"", max_voxels=max_voxels)
-
-    label_proc = gen_label_filler(name)
+    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_E\"", max_voxels=max_voxels, augment=augment)
 
 
     config = larcv_io.ThreadIOConfig(name=name)
 
     config.add_process(data_proc)
-    config.add_process(label_proc)
+    if labeled:
+        label_proc = gen_label_filler(name)
+        config.add_process(label_proc)
 
     config.set_param("InputFiles", input_file)
     return config
 
-def cycleGAN_io(input_file, name):
+def cycleGAN_io(input_file, name, augment = True):
     max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_Q\"", max_voxels=max_voxels)
+    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_E\"", max_voxels=max_voxels, augment=augment)
 
     config = larcv_io.ThreadIOConfig(name=name)
 
@@ -47,13 +47,13 @@ def output_io(input_file, output_file):
     # With the, 25 output events is 119K and takes 36s
     config.set_param("ReadOnlyType", "[\"sparse3d\",\"sparse3d\",\"sparse3d\",\"sparse3d\"]")
     config.set_param("ReadOnlyName", "[\"voxels_E\",\"voxels_E_norm\",\"voxels_E_scaled\",\"voxels_Q\"]")
-   # config.set_param("ReadOnlyType", "[\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\"]")  
-   # config.set_param("ReadOnlyName", "[\"sbndneutrino\",\"sbndsegmerged\",\"cpiID\",\"neutID\",\"npiID\",\"protID\",\"all\"]")  
+   # config.set_param("ReadOnlyType", "[\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\",\"particle\"]")
+   # config.set_param("ReadOnlyName", "[\"sbndneutrino\",\"sbndsegmerged\",\"cpiID\",\"neutID\",\"npiID\",\"protID\",\"all\"]")
 
     return config
 
 
-def gen_sparse3d_data_filler(name, producer, max_voxels):
+def gen_sparse3d_data_filler(name, producer, max_voxels, augment = True):
 
     proc = larcv_io.ProcessConfig(proc_name=name, proc_type="BatchFillerSparseTensor3D")
 
@@ -62,7 +62,10 @@ def gen_sparse3d_data_filler(name, producer, max_voxels):
     proc.set_param("IncludeValues",     "true")
     proc.set_param("MaxVoxels",         max_voxels)
     proc.set_param("UnfilledVoxelValue","-999")
-    proc.set_param("Augment",           "true")
+    if augment:
+        proc.set_param("Augment",           "true")
+    else:
+        proc.set_param("Augment",           "false")
 
     return proc
 

@@ -113,7 +113,7 @@ The most commonly used commands are:
             description     = 'Run Network Training',
             formatter_class = argparse.ArgumentDefaultsHelpFormatter)
 
-        self.add_io_arguments_eventID(self.parser)
+        self.add_io_arguments_eventID(self.parser, training=True)
         self.add_core_configuration(self.parser)
         self.add_shared_training_arguments(self.parser)
 
@@ -198,9 +198,9 @@ The most commonly used commands are:
     def make_trainer_eventID(self):
 
         if self.args.distributed:
-            from src.utils import distributed_trainer
+            from src.utils import distributed_eventID
 
-            self.trainer = distributed_trainer.distributed_trainer(self.args)
+            self.trainer = distributed_eventID.distributed_eventID(self.args)
         else:
             from src.utils import trainer_eventID
             self.trainer = trainer_eventID.trainer_eventID(self.args)
@@ -216,9 +216,33 @@ The most commonly used commands are:
             self.trainer = trainer_cycleGAN.trainer_cycleGAN(self.args)
 
 
-    def inference(self):
+    def inference_cycleGAN(self):
         pass
 
+
+    def inference_eventID(self):
+        self.parser = argparse.ArgumentParser(
+            description     = 'Run Network Training',
+            formatter_class = argparse.ArgumentDefaultsHelpFormatter)
+
+        self.add_io_arguments_eventID(self.parser, training=False)
+        self.add_core_configuration(self.parser)
+        self.add_shared_training_arguments(self.parser)
+
+
+        self.add_eventID_parsers(self.parser)
+
+        self.args = self.parser.parse_args(sys.argv[2:])
+        self.args.training = False
+
+
+        self.make_trainer_eventID()
+
+        print("Running Inference")
+        print(self.__str__())
+
+        self.trainer.initialize()
+        self.trainer.batch_process()
 
     def __str__(self):
         s = "\n\n-- CONFIG --\n"
@@ -263,40 +287,41 @@ The most commonly used commands are:
 
         return parser
 
-    def add_io_arguments_eventID(self, parser):
+    def add_io_arguments_eventID(self, parser, training):
+
+        data_directory = "/home/cadams/NEXT/cycleGAN/"
 
         # IO PARAMETERS FOR INPUT:
-        parser.add_argument('-f','--file',
-            type    = str,
-            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/next_new_classification_train.h5",
-            help    = "IO Input File")
-        parser.add_argument('--input-dimension',
-            type    = int,
-            default = 3,
-            help    = "Dimensionality of data to use",
-            choices = [2, 3] )
-        parser.add_argument('--start-index',
-            type    = int,
-            default = 0,
-            help    = "Start index, only used in inference mode")
 
-        parser.add_argument('--label-mode',
-            type    = str,
-            choices = ['split', 'all'],
-            default = 'split',
-            help    = "Run with split labels (multiple classifiers) or all in one" )
+        if training:
+            parser.add_argument('-f','--train-file',
+                type    = str,
+                default = data_directory + "next_new_classification_train.h5",
+                help    = "IO Input File")
+
+            # IO PARAMETERS FOR AUX INPUT:
+            parser.add_argument('--test-file',
+                type    = str,
+                default = data_directory + "next_new_classification_test.h5",
+                help    = "IO Aux Input File, or output file in inference mode")
+
+        else:
+
+            parser.add_argument('-f','--sim-file',
+                type    = str,
+                default = data_directory + "next_new_classification_val.h5",
+                help    = "IO Input File")
+
+            # IO PARAMETERS FOR AUX INPUT:
+            parser.add_argument('--data-file',
+                type    = str,
+                default = data_directory + "nextDATA_RUNS.h5",
+                help    = "IO Aux Input File, or output file in inference mode")
 
         parser.add_argument('-mb','--minibatch-size',
             type    = int,
             default = 2,
             help    = "Number of images in the minibatch size")
-
-        # IO PARAMETERS FOR AUX INPUT:
-        parser.add_argument('--aux-file',
-            type    = str,
-            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/next_new_classification_test.h5",
-            help    = "IO Aux Input File, or output file in inference mode")
-
 
         parser.add_argument('--aux-iteration',
             type    = int,
@@ -311,11 +336,12 @@ The most commonly used commands are:
         return
 
     def add_io_arguments_cycleGAN(self, parser):
+        data_directory="/lus/theta-fs0/projects/datascience/cadams/datasets/NEXT/cycleGAN/"
 
         # IO PARAMETERS FOR DATA INPUT:
         parser.add_argument('--data-file',
             type    = str,
-            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/nextDATA_RUNS.h5",
+            default = data_directory + "nextDATA_RUNS.h5",
             help    = "Real data file")
 
         parser.add_argument('-mb','--minibatch-size',
@@ -325,7 +351,7 @@ The most commonly used commands are:
 
         parser.add_argument('--sim-file',
             type    = str,
-            default = "/gpfs/jlse-fs0/users/cadams/datasets/NEXT/next_new_classification_val.h5",
+            default = data_directory + "next_new_classification_val.h5",
             help    = "Simulated data file")
 
         return
