@@ -112,6 +112,8 @@ class trainer_eventID(trainercore):
         weights = (numpy.sum(counts) - counts) / numpy.sum(counts)
         weights = 2 * torch.tensor(weights, device=device).float()
 
+        print("Computed weights as ", weights)
+
         self._criterion = torch.nn.CrossEntropyLoss(weights)
 
 
@@ -203,8 +205,6 @@ class trainer_eventID(trainercore):
 
     def train_step(self):
 
-
-
         # For a train step, we fetch data, run a forward and backward pass, and
         # if this is a logging step, we compute some logging metrics.
 
@@ -221,7 +221,6 @@ class trainer_eventID(trainercore):
         io_end_time = datetime.datetime.now()
 
         minibatch_data = self.larcv_fetcher.to_torch_eventID(minibatch_data)
-
 
         # Run a forward pass of the model on the input image:
         logits = self._net(minibatch_data['image'])
@@ -252,7 +251,7 @@ class trainer_eventID(trainercore):
 
         # print("Calculated metrics")
 
-
+        # print(self._opt.device)
         step_start_time = datetime.datetime.now()
         # Apply the parameter update:
         self._opt.step()
@@ -461,4 +460,3 @@ class trainer_eventID(trainercore):
         n_bins  = 50
 
         # if "sim" in self.inference_results:
-

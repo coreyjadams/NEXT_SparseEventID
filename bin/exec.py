@@ -135,8 +135,9 @@ The most commonly used commands are:
 
         self.make_trainer_eventID()
 
-        print("Running Training")
-        print(self.__str__())
+        self.trainer.print("Running Training")
+        self.trainer.print(self.__str__())
+
 
         self.trainer.initialize()
         self.trainer.batch_process()
@@ -170,10 +171,11 @@ The most commonly used commands are:
         # TWO argvs, ie the command (exec.py) and the subcommand (iotest)
         self.args = self.parser.parse_args(sys.argv[2:])
         self.args.training = False
-        print("Running IO Test")
-        print(self.__str__())
 
         self.make_trainer()
+
+        self.trainer.print("Running IO Test")
+        self.trainer.print(self.__str__())
 
         self.trainer.initialize(io_only=True)
 
@@ -183,15 +185,15 @@ The most commonly used commands are:
         for i in range(self.args.iterations):
             start = time.time()
             mb = self.trainer.fetch_next_batch()
-            # print(mb.keys())
+            # self.trainer.print(mb.keys())
             # label_stats += numpy.sum(mb['label'], axis=0)
 
             end = time.time()
             if not self.args.distributed:
-                print(i, ": Time to fetch a minibatch of data: {}".format(end - start))
+                self.trainer.print(i, ": Time to fetch a minibatch of data: {}".format(end - start))
             else:
                 if self.trainer._rank == 0:
-                    print(i, ": Time to fetch a minibatch of data: {}".format(end - start))
+                    self.trainer.print(i, ": Time to fetch a minibatch of data: {}".format(end - start))
             # time.sleep(0.5)
         # print(label_stats)
 
@@ -238,8 +240,8 @@ The most commonly used commands are:
 
         self.make_trainer_eventID()
 
-        print("Running Inference")
-        print(self.__str__())
+        self.trainer.print("Running Inference")
+        self.trainer.print(self.__str__())
 
         self.trainer.initialize()
         self.trainer.batch_process()
@@ -289,20 +291,21 @@ The most commonly used commands are:
 
     def add_io_arguments_eventID(self, parser, training):
 
-        data_directory = "/home/cadams/NEXT/cycleGAN/"
+        # data_directory = "/home/cadams/NEXT/cycleGAN/"
+        data_directory="/gpfs/jlse-fs0/users/cadams/datasets/NEXT/second_dataset/"
 
         # IO PARAMETERS FOR INPUT:
 
         if training:
             parser.add_argument('-f','--train-file',
                 type    = str,
-                default = data_directory + "next_new_classification_train.h5",
+                default = data_directory + "NEXT_White_Tl_train.h5",
                 help    = "IO Input File")
 
             # IO PARAMETERS FOR AUX INPUT:
             parser.add_argument('--test-file',
                 type    = str,
-                default = data_directory + "next_new_classification_test.h5",
+                default = data_directory + "NEXT_White_Tl_test.h5",
                 help    = "IO Aux Input File, or output file in inference mode")
 
         else:
@@ -336,7 +339,7 @@ The most commonly used commands are:
         return
 
     def add_io_arguments_cycleGAN(self, parser):
-        data_directory="/lus/theta-fs0/projects/datascience/cadams/datasets/NEXT/cycleGAN/"
+        data_directory="/gpfs/jlse-fs0/users/cadams/datasets/NEXT/second_dataset/"
 
         # IO PARAMETERS FOR DATA INPUT:
         parser.add_argument('--data-file',

@@ -175,6 +175,11 @@ class distributed_eventID(trainer_eventID):
         else:
             return None
 
+    def print(self, *argv):
+        if self._rank == 0:
+            trainer_eventID.print(self, *argv)
+
+
     def model_to_device(self):
 
         # Broadcast from rank 0 to sync weights before Training
