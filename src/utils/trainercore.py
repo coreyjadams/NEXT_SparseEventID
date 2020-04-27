@@ -53,6 +53,8 @@ class trainercore(object):
 
         self.init_network()
 
+        self.model_to_device()
+
         self.init_optimizer()
 
         self.init_saver()
@@ -66,7 +68,6 @@ class trainercore(object):
 
         self.set_log_keys()
 
-        self.model_to_device()
 
 
     def set_log_keys(self):
@@ -91,6 +92,13 @@ class trainercore(object):
         if self.args.training:
             self._saver = tensorboardX.SummaryWriter(self.args.log_directory)
 
+
+    def print(self, *argv):
+        ''' Function for logging as needed.  Works correctly in distributed mode'''
+
+        message = " ".join([ str(s) for s in argv] )
+
+        sys.stdout.write(message + "\n")
 
 
 
@@ -260,14 +268,14 @@ class trainercore(object):
 
     def increment_global_step(self):
 
-        previous_epoch = int((self._global_step * self.args.minibatch_size) / self._epoch_size)
+        # previous_epoch = int((self._global_step * self.args.minibatch_size) / self._epoch_size)
         self._global_step += 1
-        current_epoch = int((self._global_step * self.args.minibatch_size) / self._epoch_size)
+        # current_epoch = int((self._global_step * self.args.minibatch_size) / self._epoch_size)
 
         self.on_step_end()
 
-        if previous_epoch != current_epoch:
-            self.on_epoch_end()
+        # if previous_epoch != current_epoch:
+        #     self.on_epoch_end()
 
     def on_step_end(self):
         pass
@@ -292,9 +300,11 @@ class trainercore(object):
 
         # This is the 'master' function, so it controls a lot
 
+        print("Batch Process")
 
         # Run iterations
         if self.args.training:
+            print("Training")
             for i in range(self.args.iterations):
 
                 if self.args.training and self._iteration >= self.args.iterations:
@@ -302,13 +312,13 @@ class trainercore(object):
                     self.checkpoint()
                     break
 
-                    self.val_step()
-                    self.train_step()
-                    self.checkpoint()
+                self.val_step()
+                self.train_step()
+                self.checkpoint()
 
 
-        self.ana_epoch('sim')
-        self.ana_epoch('data')
+        # self.ana_epoch('sim')
+        # self.ana_epoch('data')
 
 
         if self.args.training:

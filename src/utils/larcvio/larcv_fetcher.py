@@ -33,9 +33,9 @@ class larcv_fetcher(object):
 
         self.inference = inference
 
-    def __del__(self):
-        for f in self._cleanup:
-            os.unlink(f.name)
+    # def __del__(self):
+    #     for f in self._cleanup:
+    #         os.unlink(f.name)
 
     def prepare_cycleGAN_sample(self, name, input_file, batch_size):
 

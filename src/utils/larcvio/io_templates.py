@@ -5,7 +5,7 @@ from . import larcv_io
 
 def event_id_io(input_file, name, labeled, augment = True):
     max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_E\"", max_voxels=max_voxels, augment=augment)
+    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels\"", max_voxels=max_voxels, augment=augment)
 
 
     config = larcv_io.ThreadIOConfig(name=name)
@@ -20,7 +20,7 @@ def event_id_io(input_file, name, labeled, augment = True):
 
 def cycleGAN_io(input_file, name, augment = True):
     max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels_E\"", max_voxels=max_voxels, augment=augment)
+    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels\"", max_voxels=max_voxels, augment=augment)
 
     config = larcv_io.ThreadIOConfig(name=name)
 
@@ -79,7 +79,3 @@ def gen_label_filler(prepend_names):
     proc.set_param("PdgClassList",      "[{}]".format(",".join([str(i) for i in range(2)])))
 
     return proc
-
-
-
-
