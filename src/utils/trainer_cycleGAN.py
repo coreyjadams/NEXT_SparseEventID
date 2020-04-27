@@ -66,8 +66,6 @@ class trainer_cycleGAN(trainercore):
         self.discriminators['sim_data'] = discriminator.Discriminator(self.args)
 
 
-
-
     def init_optimizer(self):
 
         # Create an optimizer:
@@ -208,6 +206,25 @@ class trainer_cycleGAN(trainercore):
         discriminator_loss += self.discriminator_criterion(fake_score, torch.zeros_like(real_score))
 
         return discriminator_loss
+
+    def data_to_simulation(self, data_batch):
+        '''This function runs inference
+        
+        Compute the transformation to map data to simulation and return the result.
+        
+        '''
+        return self.generators['sim_to_real'](data_batch)
+
+
+
+    def simulation_to_data(self, sim_batch):
+        '''This function runs inference
+        
+        Compute the transformation to map data to simulation and return the result.
+        
+        '''
+        return self.generators['real_to_sim'](sim_batch)
+
 
     def train_step(self):
 
