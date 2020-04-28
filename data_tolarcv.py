@@ -4,9 +4,8 @@ import os
 import pathlib
 from random import shuffle
 
-
+import argparse
 import numpy as np
-import pandas as pd
 import tables as tb
 
 import larcv
@@ -18,16 +17,25 @@ top_input_path  = pathlib.Path("/Users/corey.adams/data/NEXT/mmkekic_second_prod
 output_path     = pathlib.Path("/Users/corey.adams/data/NEXT/mmkekic_second_production/data/7470_larcv/")
 
 
-def main():
+def main(args):
 
 
+    # Create the meta object:
     next_new_meta = larcv.ImageMeta3D()
     next_new_meta.set_dimension(0, 510, 51, -205)
     next_new_meta.set_dimension(1, 510, 51, -205)
     next_new_meta.set_dimension(2, 540, 108, 0)
-    #next_new_meta.set_dimension(0, 2600, 260, -1300)
-    #next_new_meta.set_dimension(1, 2600, 260, -1300)
-    #next_new_meta.set_dimension(2, 2600, 260, -1300)
+    
+
+    # Next, make sure the input file exists:
+    args.input_file = pathlib.Path(args.input_file)
+    args.output_file = pathlib.Path(args.output_file)
+
+    if not args.input_file.exists():
+        raise Exception("Input file doesn't exist!")
+
+    # Make sure the output directory exists:
+    args.output_file.parent.mkdir(exist_ok=True)
 
     # # This code loops over training set files:
     file_list = list(top_input_path.glob("*.h5"))
@@ -35,52 +43,33 @@ def main():
     output_path.mkdir(exist_ok=True)
 
 
-    print('Found %s input data files'%len(file_list))
+    # Now, begin conversion:
+
+    file_name = args.input_file.name
 
 
-    for i, f in enumerate(file_list):
-
-        file_name = f.name
-        output_file = output_path / file_name.replace(".root.h5", "_larcv.h5")
-
-        _, run, subrun = file_name.replace(".h5","").split("_")
+    _, run, subrun = file_name.replace(".h5","").split("_")
 
 
-        print(file_name)
+    # output_trn = os.path.basename('NextNEW_Tl208_10mm_larcv_noshf_train_200k.h5')
+    io_manager = larcv.IOManager(larcv.IOManager.kWRITE)
+    io_manager.set_out_file(str(args.output_file))
+    io_manager.initialize()
+    # convert train files
+    print(f'Converting file: {file_name} from {args.start_entry} to {args.end_entry}')
+    convert_file(io_manager, next_new_meta, args.input_file, run, subrun, args.start_entry, args.end_entry)
+    io_manager.finalize()
 
-
-        if os.path.exists(output_file):
-            continue
-
-        # output_trn = os.path.basename('NextNEW_Tl208_10mm_larcv_noshf_train_200k.h5')
-        io_manager = larcv.IOManager(larcv.IOManager.kWRITE)
-        io_manager.set_out_file(str(output_file))
-        io_manager.initialize()
-        # convert train files
-        print(f'Converting file {i}: {file_name}')
-        convert_files(io_manager, next_new_meta, f, run, subrun)
-        io_manager.finalize()
-
-        break
-    # output_tst = os.path.basename('NextNEW_Tl208_10mm_larcv_noshf_test_200k.h5')
-    # output_tst = output_path + "/" + output_tst
-    # io_manager_tst = larcv.IOManager(larcv.IOManager.kWRITE)
-    # io_manager_tst.set_out_file(output_tst)
-    # io_manager_tst.initialize()
-    # # convert test files
-    # print('Converting test files')
-    # convert_files(io_manager_tst, next_new_meta, test_list)
-    # io_manager_tst.finalize()
 
 # @profile
-def convert_files( io_manager, next_new_meta, fname, run, subrun):
+def convert_file(io_manager, next_new_meta, fname, run, subrun, start_entry, end_entry):
 
     evtfile = tb.open_file(str(fname), 'r')
     events = evtfile.root.Run.events.read()
 
     event_numbers = events['evt_number']
 
-    convert_low_th = False
+    convert_low_th = True
 
     # Instead of slicing and dicing later, we read everything into memory up front:
     high_threshold_voxels = evtfile.root.CHITS.highTh.read()
@@ -90,7 +79,10 @@ def convert_files( io_manager, next_new_meta, fname, run, subrun):
 
     n_events = len(event_numbers)
 
-    for ievt,event in enumerate(event_numbers):
+
+    # Only loop over the needed entries:
+    for ievt in range(start_entry, end_entry):
+        event = event_numbers[ievt]
         
         if ievt % 10 == 0:
             print(f"Beginning entry {ievt} of {n_events} which is event {event}")
@@ -165,4 +157,32 @@ def convert_files( io_manager, next_new_meta, fname, run, subrun):
 
 
 if __name__ == '__main__':
-    main()
+
+
+    parser = argparse.ArgumentParser(
+        description     = 'Convert NEXT data files into larcv format',
+        formatter_class = argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('--input-file',
+        type    = str,
+        default = "",
+        help    = 'Input file to convert')
+
+    parser.add_argument('--output-file',
+        type    = str,
+        default = "",
+        help    = 'Output name for the larcv file')
+
+
+    parser.add_argument('--start-entry',
+        type    = int,
+        default = 0,
+        help    = 'Entry to start conversion at')
+
+    parser.add_argument('--end-entry',
+        type    = int,
+        default = -1,
+        help    = 'Entry to end conversion at')
+
+    args = parser.parse_args()
+    main(args)
