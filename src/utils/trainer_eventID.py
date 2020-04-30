@@ -39,11 +39,13 @@ class trainer_eventID(trainercore):
                     "test", self.args.test_file, self.args.minibatch_size)
         else:
             # Inference mode
-            self._epoch_size["sim"] = self.larcv_fetcher.prepare_eventID_sample(
-                "sim", self.args.sim_file, self.args.minibatch_size)
+            if self.args.sim_file is not None and self.args.sim_file != "none":
+                self._epoch_size["sim"] = self.larcv_fetcher.prepare_eventID_sample(
+                    "sim", self.args.sim_file, self.args.minibatch_size)
 
-            self._epoch_size["data"] = self.larcv_fetcher.prepare_eventID_sample(
-                "data", self.args.data_file, self.args.minibatch_size)
+            if self.args.data_file is not None and self.args.data_file != "none":
+                self._epoch_size["data"] = self.larcv_fetcher.prepare_eventID_sample(
+                    "data", self.args.data_file, self.args.minibatch_size)
 
 
     def init_network(self):
@@ -345,12 +347,16 @@ class trainer_eventID(trainercore):
         return energy
 
     def ana_epoch(self, target):
+
+        if target not in self._epoch_size:
+            return
         print("Starting")
         self.inference_results[target] = {
-            'energy' : None,
-            'label'  : None,
-            'pred'   : None,
-            'entries': None,
+            'energy'  : None,
+            'label'   : None,
+            'pred'    : None,
+            'entries' : None,
+            'softmax' : None,
         }
 
         n_events = self._epoch_size[target]
@@ -358,7 +364,7 @@ class trainer_eventID(trainercore):
         n_processed = 0
         print(n_events)
         start = time.time()
-        while n_processed < n_events*.1:
+        while n_processed < n_events:
 
 
             # perform a validation step
@@ -372,13 +378,13 @@ class trainer_eventID(trainercore):
             minibatch_data = self.larcv_fetcher.fetch_next_eventID_batch(target)
             io_end_time = datetime.datetime.now()
 
-
             # Convert the input data to torch tensors
             minibatch_data = self.larcv_fetcher.to_torch_eventID(minibatch_data)
 
             # Run a forward pass of the model on the input image:
             with torch.no_grad():
                 logits = self._net(minibatch_data['image'])
+                softmax = torch.softmax(logits, dim=-1)
 
             prediction = torch.argmax(logits, dim=-1)
 
@@ -386,69 +392,48 @@ class trainer_eventID(trainercore):
             # Sum the voxels:
             energy = self.sum_over_images(minibatch_data['image'])
 
-            keys = ["energy", "pred"]
+            keys = ["energy", "pred", "softmax"]
 
             if "label" in minibatch_data:
                 label      = torch.argmax(minibatch_data['label'], dim=-1)
                 keys.append("label")
 
+            if len(energy) == self.args.minibatch_size :
 
-            for key in keys:
-                if key == "energy": tensor = energy
-                if key == "label":  tensor = label
-                if key == "pred":   tensor = prediction
-                if self.inference_results[target][key] is None:
-                    self.inference_results[target][key] = tensor
+                for key in keys:
+                    if key == "energy":  tensor = energy
+                    if key == "label":   tensor = label
+                    if key == "softmax": tensor = softmax
+                    if key == "pred":    tensor = prediction
+                    if self.inference_results[target][key] is None:
+                        self.inference_results[target][key] = tensor
+                    else:
+                        self.inference_results[target][key] = torch.cat([self.inference_results[target][key], tensor])
+
+
+                if self.inference_results[target]['entries'] is None:
+                    self.inference_results[target]['entries'] = minibatch_data['entries']
                 else:
-                    self.inference_results[target][key] = torch.cat([self.inference_results[target][key], tensor])
+                    self.inference_results[target]['entries'] = numpy.concatenate([self.inference_results[target]['entries'], minibatch_data['entries']])
 
-
-            if self.inference_results[target]['entries'] is None:
-                self.inference_results[target]['entries'] = minibatch_data['entries']
-            else:
-                self.inference_results[target]['entries'] = numpy.concatenate([self.inference_results[target]['entries'], minibatch_data['entries']])
-
-
-            # print(self.inference_results[target]['energy'][minibatch_data['entries'],])
-            # self.inference_results[target]['energy'][minibatch_data['entries'],] = energy
-            # self.inference_results[target]['pred'][minibatch_data['entries']]   = prediction
-            # if "label" in minibatch_data:
-            #     self.inference_results[target]['label'][minibatch_data['entries']] = label
 
             n_processed += self.args.minibatch_size
 
         end = time.time()
         print (f"Processed {n_processed} images at {n_processed / (end-start):.2f} Img/s")
 
-        # # Call the larcv interface to write data:
-        # if self.args.OUTPUT_FILE is not None:
-        #     if self.args.LABEL_MODE == 'all':
-        #         writable_logits = numpy.asarray(softmax.cpu())
-        #         self._larcv_interface.write_output(data=writable_logits[0], datatype='meta', producer='all',
-        #             entries=minibatch_data['entries'], event_ids=minibatch_data['event_ids'])
-        #     else:
-        #         for key in softmax:
-        #             writable_logits = numpy.asarray(softmax[key].cpu())
-        #             self._larcv_interface.write_output(data=writable_logits[0], datatype='meta', producer=key,
-        #                 entries=minibatch_data['entries'], event_ids=minibatch_data['event_ids'])
-
-        # # If the input data has labels available, compute the metrics:
-        # if (self.args.LABEL_MODE == 'all' and 'label' in minibatch_data) or \
-        #    (self.args.LABEL_MODE == 'split' and 'label_neut' in minibatch_data):
-        #     # Compute the loss
-        #     loss = self._calculate_loss(minibatch_data, logits)
-
-        #     # Compute the metrics for this iteration:
-        #     metrics = self._compute_metrics(logits, minibatch_data, loss)
-
-        #     if iteration is not None:
-        #         metrics.update({'it.' : iteration})
+        # Save the inference results:
+        for key in self.inference_results[target].keys():
+            if key not in keys:
+                continue
+            if key != "entries":
+                self.inference_results[target][key] = self.inference_results[target][key].cpu().numpy()
 
 
-        #     self.log(metrics, saver="test")
-        #     # self.summary(metrics, saver="test")
+        numpy.savez(f"inference_results_{target}",
+                    list(self.inference_results[target].items()),
+                    list(self.inference_results[target].keys()))
 
-        #     return metrics
 
     def make_analysis(self):
         if self.inference_results is None:

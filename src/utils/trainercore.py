@@ -316,9 +316,11 @@ class trainercore(object):
                 self.train_step()
                 self.checkpoint()
 
-
-        # self.ana_epoch('sim')
-        # self.ana_epoch('data')
+        else:
+            if self.args.sim_file is not "none":
+                self.ana_epoch('sim')
+            if self.args.data_file is not "none":
+                self.ana_epoch('data')
 
 
         if self.args.training:

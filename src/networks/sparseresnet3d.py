@@ -84,18 +84,20 @@ class ResNet(torch.nn.Module):
 
             self.convolutional_layers.append(
                 SparseBlockSeries(
-                    n_filters,
-                    args.res_blocks_per_layer,
-                    args.use_bias,
-                    residual = True)
+                    inplanes    = n_filters,
+                    n_blocks    = args.res_blocks_per_layer,
+                    bias        = args.use_bias,
+                    batch_norm  = args.batch_norm,
+                    residual    = True)
                 )
             out_filters = 2*n_filters
 
             self.convolutional_layers.append(
                 SparseConvolutionDownsample(
-                    inplanes  = n_filters,
-                    outplanes = out_filters,
-                    bias = args.use_bias)
+                    inplanes    = n_filters,
+                    outplanes   = out_filters,
+                    bias        = args.use_bias,
+                    batch_norm  = args.batch_norm)
                 )
                 # outplanes = n_filters + args.n_initial_filters))
             n_filters = out_filters
@@ -104,10 +106,11 @@ class ResNet(torch.nn.Module):
 
 
         self.final_layer = SparseBlockSeries(
-                    inplanes = n_filters,
-                    n_blocks = args.res_blocks_per_layer,
-                    bias = args.use_bias,
-                    residual = True)
+                    inplanes    = n_filters,
+                    n_blocks    = args.res_blocks_per_layer,
+                    bias        = args.use_bias,
+                    batch_norm  = args.batch_norm,
+                    residual    = True)
 
         self.bottleneck  = scn.SubmanifoldConvolution(dimension=3,
                     nIn=n_filters,
@@ -116,19 +119,6 @@ class ResNet(torch.nn.Module):
                     bias=args.use_bias)
 
         self.sparse_to_dense = scn.SparseToDense(dimension=3, nPlanes=2)
-
-
-        # # The rest of the final operations (reshape, softmax) are computed in the forward pass
-
-
-        # # Configure initialization:
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv3d) or isinstance(m, scn.SubmanifoldConvolution):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, scn.BatchNormReLU):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
 
 
     def forward(self, x):

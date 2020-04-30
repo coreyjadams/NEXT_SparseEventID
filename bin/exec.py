@@ -35,7 +35,8 @@ The most commonly used commands are:
    train-cycleGAN        Train a network, either from scratch or restart
    inference-eventID     Run inference with a trained network
    inference-cycleGAN    Run inference with a trained network
-   iotest                Run IO testing without training a network
+   iotest-eventID        Run IO testing without training a network for eventID
+   iotest-cycleGAN       Run IO testing without training a network for cycleGAN
 ''')
         parser.add_argument('command', help='Subcommand to run')
         # parse_args defaults to [1:] for args, but you need to
@@ -160,11 +161,11 @@ The most commonly used commands are:
 
 
 
-    def iotest(self):
+    def iotest_eventID(self):
         self.parser = argparse.ArgumentParser(
             description     = 'Run IO Testing',
             formatter_class = argparse.ArgumentDefaultsHelpFormatter)
-        self.add_io_arguments(self.parser)
+        self.add_io_arguments_eventID(self.parser, training=False)
         self.add_core_configuration(self.parser)
 
         # now that we're inside a subcommand, ignore the first
@@ -172,7 +173,7 @@ The most commonly used commands are:
         self.args = self.parser.parse_args(sys.argv[2:])
         self.args.training = False
 
-        self.make_trainer()
+        self.make_trainer_eventID()
 
         self.trainer.print("Running IO Test")
         self.trainer.print(self.__str__())
@@ -184,16 +185,12 @@ The most commonly used commands are:
         time.sleep(0.1)
         for i in range(self.args.iterations):
             start = time.time()
-            mb = self.trainer.fetch_next_batch()
+            mb = self.trainer.larcv_fetcher.fetch_next_eventID_batch("data")
             # self.trainer.print(mb.keys())
             # label_stats += numpy.sum(mb['label'], axis=0)
 
             end = time.time()
-            if not self.args.distributed:
-                self.trainer.print(i, ": Time to fetch a minibatch of data: {}".format(end - start))
-            else:
-                if self.trainer._rank == 0:
-                    self.trainer.print(i, ": Time to fetch a minibatch of data: {}".format(end - start))
+            self.trainer.print(i, f": Time to fetch a minibatch (B=={self.args.minibatch_size}) of data: {end - start:.2f}")
             # time.sleep(0.5)
         # print(label_stats)
 
@@ -201,7 +198,6 @@ The most commonly used commands are:
 
         if self.args.distributed:
             from src.utils import distributed_eventID
-
             self.trainer = distributed_eventID.distributed_eventID(self.args)
         else:
             from src.utils import trainer_eventID
@@ -292,7 +288,7 @@ The most commonly used commands are:
     def add_io_arguments_eventID(self, parser, training):
 
         # data_directory = "/home/cadams/NEXT/cycleGAN/"
-        data_directory="/gpfs/jlse-fs0/users/cadams/datasets/NEXT/second_dataset/"
+        data_directory="/lus/theta-fs0/projects/datascience/cadams/datasets/NEXT/new_second_simulation/"
 
         # IO PARAMETERS FOR INPUT:
 
@@ -312,13 +308,14 @@ The most commonly used commands are:
 
             parser.add_argument('-f','--sim-file',
                 type    = str,
-                default = data_directory + "next_new_classification_val.h5",
+                default = data_directory + "NEXT_White_Tl_val.h5",
                 help    = "IO Input File")
 
             # IO PARAMETERS FOR AUX INPUT:
             parser.add_argument('--data-file',
                 type    = str,
-                default = data_directory + "nextDATA_RUNS.h5",
+                # default = data_directory + "nextDATA_RUNS.h5",
+                default = data_directory + "NEXT_White_Tl_train.h5",
                 help    = "IO Aux Input File, or output file in inference mode")
 
         parser.add_argument('-mb','--minibatch-size',

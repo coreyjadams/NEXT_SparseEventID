@@ -82,13 +82,14 @@ class IOManagerConfig(object):
         self._params["StoreOnlyType"] =  None
         self._params["ReadOnlyName"] =  None
         self._params["ReadOnlyType"] =  None
+        self._params["UseH5CoreDriver"] = None
 
         self._defaults_set = False
 
     def set_defaults(self):
 
         if self._params['Verbosity'] is None:
-            self._params['Verbosity'] = "0"
+            self._params['Verbosity'] = "5"
         if self._params["IOMode"] is None:
             self._params["IOMode"] = "2"
         # if self._params["OutFileName"] is None:
@@ -105,6 +106,8 @@ class IOManagerConfig(object):
             self._params["ReadOnlyName"] = "[]"
         if self._params["ReadOnlyType"] is None:
             self._params["ReadOnlyType"] = "[]"
+        if self._params["UseH5CoreDriver"] is None:
+            self._params["UseH5CoreDriver"] = "True"
 
 
         self._defaults_set = True
