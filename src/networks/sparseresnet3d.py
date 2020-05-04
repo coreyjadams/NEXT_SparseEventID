@@ -39,10 +39,10 @@ class ResNetFlags(object):
             type    = str2bool,
             default = True)
 
-        parser.add_argument("--leaky-relu",
-            help    = "Run using leaky relu",
-            type    = str2bool,
-            default = False)
+        # parser.add_argument("--leaky-relu",
+        #     help    = "Run using leaky relu",
+        #     type    = str2bool,
+        #     default = False)
 
 
 

@@ -123,6 +123,8 @@ class larcv_fetcher(object):
 
         self._larcv_interface.prepare_next(name)
 
+        time.sleep(0.5)
+
         # Pause to preload the first batch:
         while self._larcv_interface.is_reading(name):
             time.sleep(0.1)
