@@ -63,9 +63,17 @@ def main(args):
 def convert_file(io_manager, next_new_meta, fname, run, subrun, start_entry, end_entry):
 
     evtfile = tb.open_file(str(fname), 'r')
+
+
     events = evtfile.root.Run.events.read()
 
+    tracks = evtfile.root.Tracking.Tracks.read()
+    summary = evtfile.root.Summary.Events.read()
+
+
     event_numbers = events['evt_number']
+    event_energy  = summary['evt_energy']
+
 
     convert_low_th = True
 
@@ -77,10 +85,15 @@ def convert_file(io_manager, next_new_meta, fname, run, subrun, start_entry, end
 
     n_events = len(event_numbers)
 
-
     # Only loop over the needed entries:
     for ievt in range(start_entry, end_entry):
-        event = event_numbers[ievt]
+        if ievt >= len(event_energy): continue
+        
+        event  = event_numbers[ievt]
+        energy = event_energy[ievt]
+
+        if energy < 1.0 or energy > 2.0:
+            continue
 
         if ievt % 10 == 0:
             print(f"Beginning entry {ievt} of {n_events} which is event {event}")
@@ -90,6 +103,13 @@ def convert_file(io_manager, next_new_meta, fname, run, subrun, start_entry, end
 
 
 
+        ################################################################################
+        # Store the particle information:
+        larcv_particle = io_manager.get_data("particle", "label")
+        particle = larcv.Particle()
+        particle.energy_init(energy)
+        larcv_particle.append(particle)
+        ################################################################################
 
         ################################################################################
         # Store the highTh info:
@@ -99,6 +119,7 @@ def convert_file(io_manager, next_new_meta, fname, run, subrun, start_entry, end
 
         voxel_idcs = high_threshold_voxels['event'] == event
         voxels = high_threshold_voxels[voxel_idcs]
+
 
         # Find all the NaNs:
         weights = voxels['Ec']
@@ -111,7 +132,8 @@ def convert_file(io_manager, next_new_meta, fname, run, subrun, start_entry, end
         # get the index array:
         index = [ next_new_meta.position_to_index(p) for p in position_array ]
 
-        _ = [st.emplace(larcv.Voxel(index[i], weights[i]), True) for i in range(len(index)) if not is_nan_array[i]]
+        max_index = next_new_meta.total_voxels()
+        _ = [st.emplace(larcv.Voxel(index[i], weights[i]), True) for i in range(len(index)) if (not is_nan_array[i] and index[i] < max_index) ]
 
         event_sparse3d.set(st)
         ################################################################################
