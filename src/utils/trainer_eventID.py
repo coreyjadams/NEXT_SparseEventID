@@ -204,7 +204,6 @@ class trainer_eventID(trainercore):
         return metrics
 
 
-
     def train_step(self):
 
         # For a train step, we fetch data, run a forward and backward pass, and
@@ -223,6 +222,7 @@ class trainer_eventID(trainercore):
         io_end_time = datetime.datetime.now()
 
         minibatch_data = self.larcv_fetcher.to_torch_eventID(minibatch_data)
+
 
         # Run a forward pass of the model on the input image:
         logits = self._net(minibatch_data['image'])
@@ -293,7 +293,7 @@ class trainer_eventID(trainercore):
         # Validation steps can optionally accumulate over several minibatches, to
         # fit onto a gpu or other accelerator
 
-        # self._net.eval()
+        self._net.eval()
 
         with torch.no_grad():
 
@@ -367,6 +367,10 @@ class trainer_eventID(trainercore):
         n_processed = 0
         print(n_events)
         start = time.time()
+
+        self._net.eval()
+
+
         while n_processed < n_events:
 
 

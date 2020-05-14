@@ -16,7 +16,7 @@ class SparseBlock(nn.Module):
             bias        = bias)
 
         if batch_norm:
-            self.activation = scn.BatchNormReLU(outplanes)
+            self.activation = scn.BatchNormReLU(outplanes,momentum=0.5)
         else:
             self.activation = scn.ReLU()
         # self.relu = scn.ReLU()
@@ -45,7 +45,7 @@ class SparseResidualBlock(nn.Module):
 
 
         if batch_norm:
-            self.activation1 = scn.BatchNormReLU(outplanes)
+            self.activation1 = scn.BatchNormReLU(outplanes,momentum=0.5)
         else:
             self.activation1 = scn.ReLU()
 
@@ -57,7 +57,7 @@ class SparseResidualBlock(nn.Module):
             bias        = bias)
 
         if batch_norm:
-            self.activation2 = scn.BatchNormReLU(outplanes)
+            self.activation2 = scn.BatchNormReLU(outplanes,momentum=0.5)
         else:
             self.activation2 = scn.ReLU()
 
@@ -102,7 +102,7 @@ class SparseConvolutionDownsample(nn.Module):
         )
         # if FLAGS.BATCH_NORM:
         if batch_norm:
-            self.activation = scn.BatchNormReLU(outplanes)
+            self.activation = scn.BatchNormReLU(outplanes,momentum=0.5)
         else:
             self.activation = scn.ReLU()
 

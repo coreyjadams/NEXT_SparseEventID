@@ -121,6 +121,17 @@ class ResNet(torch.nn.Module):
         self.sparse_to_dense = scn.SparseToDense(dimension=3, nPlanes=2)
 
 
+    def normalize(self, x):
+        '''
+        This function takes in a batch of SCN images and normalizes them
+        so that all the voxels sum to 1:
+        '''
+        return x
+        # print(x)
+        # print(scn.SumTable()(x))
+        # return x
+
+
     def forward(self, x):
 
         batch_size = x[2]
@@ -128,6 +139,8 @@ class ResNet(torch.nn.Module):
 
 
         x = self.input_tensor(x)
+
+        x = self.normalize(x)
 
         x = self.initial_convolution(x)
 
