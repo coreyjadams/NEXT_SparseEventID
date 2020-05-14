@@ -44,9 +44,11 @@ def main(args):
 
     file_name = args.input_file.name
 
+    file_name = args.input_file.name
 
     _, run, subrun = file_name.replace("_v1.2.0_trigger2_bg", "").replace(".h5","").split("_")
 
+    _, run, subrun = file_name.replace(".h5","").split("_")
 
     # output_trn = os.path.basename('NextNEW_Tl208_10mm_larcv_noshf_train_200k.h5')
     io_manager = larcv.IOManager(larcv.IOManager.kWRITE)
@@ -88,7 +90,7 @@ def convert_file(io_manager, next_new_meta, fname, run, subrun, start_entry, end
     # Only loop over the needed entries:
     for ievt in range(start_entry, end_entry):
         if ievt >= len(event_energy): continue
-        
+
         event  = event_numbers[ievt]
         energy = event_energy[ievt]
 
