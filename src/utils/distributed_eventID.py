@@ -7,96 +7,15 @@ import uuid
 import numpy
 
 import torch
-import horovod.torch as hvd
-hvd.init()
 
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
+
+
+from larcv.distributed_queue_interface import queue_interface
 
 from .trainer_eventID import trainer_eventID
 
-import tensorboardX
-
-#
-# # max_steps = 5000
-# # base_lr = 0.003
-# peak_lr = 1.5
-# cycle_len = 0.8
-#
-# def constant_lr(step):
-#     return 1.0
-#
-# def decay_after_epoch(step):
-#     if step > FLAGS.ITERATIONS*cycle_len:
-#         return 0.1
-#     else:
-#         return 1.0
-#
-# def lr_increase(step):
-#
-#     # This function actually ignores the input and uses the global step variable
-#     # This allows it to get the learning rate correct after restore.
-#
-#     # For this problem, the dataset size is 1e5.
-#     # So the epoch can be calculated easily:
-#     # epoch = (step * FLAGS.MINIBATCH_SIZE) / (1e5)
-#
-#     base_lr   = FLAGS.LEARNING_RATE
-#     step_size = 5.0
-#
-#     return 1.0 + step*step_size
-#
-#     # # return 1.0 + max_lr
-#
-#     # # Perform 500 warmup steps, gradually ramping the rate:
-#     # if epoch <= flat_warmup:
-#     #     return 1.0
-#     # elif epoch < flat_warmup + linear_warmup:
-#     #     return 1.0 + (target - 1) * (epoch - flat_warmup) / linear_warmup
-#     # elif epoch <= flat_warmup + linear_warmup + full:
-#     #     return target
-#     # else:
-#     #     return target * numpy.exp(-0.001*(epoch-(full+linear_warmup+flat_warmup)))
-#
-#
-# def one_cycle_clr(step):
-#
-#     peak = peak_lr / FLAGS.LEARNING_RATE
-#
-#     cycle_steps  = int(FLAGS.ITERATIONS*cycle_len)
-#     end_steps = FLAGS.ITERATIONS - cycle_steps
-#     # Which cycle are we in?
-#
-#     cycle = int(step / cycle_steps)
-#     intra_step = 1.0 * (step % cycle_steps)
-#
-#     base_multiplier = 1.0
-#
-#     if cycle < 1:
-# #         base_multiplier *= 0.5
-#
-#         if intra_step > cycle_steps*0.5:
-#             intra_step = cycle_steps - intra_step
-#
-#         value = intra_step * (peak) /(0.5*cycle_steps)
-#
-#     else:
-#         value = (intra_step / end_steps)*-1.0
-#
-#
-#     return base_multiplier + value
-#
-#
-# # def triangle_clr(step):
-#
-# #     epoch_steps  = (1e5 / FLAGS.MINIBATCH_SIZE)
-# #     cycle_epochs = 4
-#
-# #     n_cycles_init = 4
-# #     n_cycles_2    = 2
-# #     n_cycles_3    = 2
-#
-# #     # Which cycle are we in?
-#
-# #     cycle = step % (cycle_epochs*epoch_steps)
 
 
 class distributed_eventID(trainer_eventID):
@@ -111,13 +30,54 @@ class distributed_eventID(trainer_eventID):
         # search for parameters relevant for distributed computing here
         trainer_eventID.__init__(self, args)
 
-        # self._iteration       = 0
-        self._rank            = hvd.rank()
-        self._local_rank      = hvd.local_rank()
-        self._size            = hvd.size()
-        self._local_size      = hvd.local_size()
 
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(hvd.local_rank())
+        # Put the IO rank as the last rank in the COMM, since rank 0 does tf saves
+        if self.args.distributed_mode == "horovod":
+
+            import horovod.torch as hvd
+            hvd.init()
+            self._rank            = hvd.rank()
+            if self.args.compute_mode == "GPU":
+                os.environ['CUDA_VISIBLE_DEVICES'] = str(hvd.local_rank())
+
+        else:
+
+            import socket
+            import torch.distributed as dist
+            from torch.nn.parallel import DistributedDataParallel as DDP
+
+            rank = MPI.COMM_WORLD.Get_rank()
+
+
+            # Pytorch will look for these:
+            local_rank = os.environ['OMPI_COMM_WORLD_LOCAL_RANK']
+            size = MPI.COMM_WORLD.Get_size()
+            rank = MPI.COMM_WORLD.Get_rank()
+
+            os.environ["RANK"] = str(rank)
+            os.environ["WORLD_SIZE"] = str(size)
+            os.environ['CUDA_VISIBLE_DEVICES'] = str(local_rank)
+
+            self._rank = rank
+            self._size = size
+
+            # It will want the master address too, which we'll broadcast:
+            if rank == 0:
+                master_addr = socket.gethostname()
+            else:
+                master_addr = None
+
+            master_addr = MPI.COMM_WORLD.bcast(master_addr, root=0)
+            os.environ["MASTER_ADDR"] = master_addr
+            os.environ["MASTER_PORT"] = str(2345)
+
+            # What backend?  nccl on GPU, gloo on CPU
+            if self.args.compute_mode == "GPU": backend = 'nccl'
+            elif self.args.compute_mode == "CPU": backend = 'gloo'
+
+            torch.distributed.init_process_group(
+                backend=backend, init_method='env://')
+
 
     def save_model(self):
 
@@ -132,18 +92,10 @@ class distributed_eventID(trainer_eventID):
 
         trainer_eventID.init_optimizer(self)
 
-        # if FLAGS.LR_SCHEDULE == '1cycle':
-        #     self._lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        #         self._opt, one_cycle_clr, last_epoch=-1)
-        # elif FLAGS.LR_SCHEDULE == 'decay':
-        #     self._lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        #         self._opt, decay_after_epoch, last_epoch=-1)
-        # else:
-        #     self._lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        #         self._opt, constant_lr, last_epoch=-1)
 
 
-        self._opt = hvd.DistributedOptimizer(self._opt, named_parameters=self._net.named_parameters())
+        if self.args.distributed_mode == "horovod":
+            self._opt = hvd.DistributedOptimizer(self._opt, named_parameters=self._net.named_parameters())
 
         hvd.broadcast_optimizer_state(self._opt, root_rank = 0)
 
@@ -158,22 +110,49 @@ class distributed_eventID(trainer_eventID):
             self._saver = None
             self._aux_saver = None
 
-    #
-    # def restore_model(self):
-    #     if hvd.rank() == 0:
-    #         state = trainer_eventID.restore_model(self)
-    #
-    #         if state is not None:
-    #             self.load_state(state)
-    #         else:
-    #             self._global_step = torch.as_tensor(0)
-    #     return
 
     def restore_model(self):
         if self._rank == 0:
             return trainer_eventID.restore_model(self)
         else:
             return None
+
+
+        if self.args.distributed_mode == "horovod":
+
+            # Broadcast the global step:
+            self._global_step = hvd.broadcast_object(self._global_step, root_rank = 0)
+
+            # Broadcast the state of the model:
+            hvd.broadcast_parameters(self._net.state_dict(), root_rank = 0)
+
+            # Broadcast the optimizer state:
+            hvd.broadcast_optimizer_state(self._opt, root_rank = 0)
+
+            # Horovod doesn't actually move the optimizer onto a GPU:
+            if self.args.compute_mode == "GPU":
+                for state in self._opt.state.values():
+                    for k, v in state.items():
+                        if torch.is_tensor(v):
+                            state[k] = v.cuda()
+
+
+
+            # Broadcast the LR Schedule state:
+            state_dict = hvd.broadcast_object(self.lr_scheduler.state_dict(), root_rank = 0)
+
+        elif self.args.distributed_mode == "DDP":
+
+            if self.args.compute_mode == "GPU":
+                self._net.cuda()
+
+            self._net = torch.nn.parallel.DistributedDataParallel(self._net)
+
+
+
+            self._global_step = MPI.COMM_WORLD.bcast(self._global_step, root=0)
+            state_dict = MPI.COMM_WORLD.bcast(self.lr_scheduler.state_dict(), root=0)
+
 
     def print(self, *argv):
         if self._rank == 0:

@@ -50,6 +50,8 @@ class trainercore(object):
         if io_only:
             return
 
+        if self.args.training:
+            self.build_lr_schedule()
 
         self.init_network()
 
@@ -68,6 +70,80 @@ class trainercore(object):
 
         self.set_log_keys()
 
+
+    def build_lr_schedule(self, learning_rate_schedule = None):
+        # Define the learning rate sequence:
+
+        if learning_rate_schedule is None:
+            learning_rate_schedule = {
+                'warm_up' : {
+                    'function'      : 'linear',
+                    'start'         : 0,
+                    'n_epochs'      : 1,
+                    'initial_rate'  : 0.00001,
+                },
+                'flat' : {
+                    'function'      : 'flat',
+                    'start'         : 1,
+                    'n_epochs'      : 20,
+                },
+                'decay' : {
+                    'function'      : 'decay',
+                    'start'         : 21,
+                    'n_epochs'      : 4,
+                    'floor'         : 0.00001,
+                    'decay_rate'    : 0.999
+                },
+            }
+
+
+
+        # We build up the functions we need piecewise:
+        func_list = []
+        cond_list = []
+
+        for i, key in enumerate(learning_rate_schedule):
+
+            # First, create the condition for this stage
+            start    = learning_rate_schedule[key]['start']
+            length   = learning_rate_schedule[key]['n_epochs']
+
+            if i +1 == len(learning_rate_schedule):
+                # Make sure the condition is open ended if this is the last stage
+                condition = lambda x, s=start, l=length: x >= s
+            else:
+                # otherwise bounded
+                condition = lambda x, s=start, l=length: x >= s and x < s + l
+
+
+            if learning_rate_schedule[key]['function'] == 'linear':
+
+                initial_rate = learning_rate_schedule[key]['initial_rate']
+                if 'final_rate' in learning_rate_schedule[key]: final_rate = learning_rate_schedule[key]['final_rate']
+                else: final_rate = self.args.learning_rate
+
+                function = lambda x, s=start, l=length, i=initial_rate, f=final_rate : numpy.interp(x, [s, s + l] ,[i, f] )
+
+            elif learning_rate_schedule[key]['function'] == 'flat':
+                if 'rate' in learning_rate_schedule[key]: rate = learning_rate_schedule[key]['rate']
+                else: rate = self.args.learning_rate
+
+                function = lambda x : rate
+
+            elif learning_rate_schedule[key]['function'] == 'decay':
+                decay    = learning_rate_schedule[key]['decay_rate']
+                floor    = learning_rate_schedule[key]['floor']
+                if 'rate' in learning_rate_schedule[key]: rate = learning_rate_schedule[key]['rate']
+                else: rate = self.args.learning_rate
+
+                function = lambda x, s=start, d=decay, f=floor: (rate-f) * numpy.exp( -(d * (x - s))) + f
+
+            cond_list.append(condition)
+            func_list.append(function)
+
+        self.lr_calculator = lambda x: numpy.piecewise(
+            x * (self.args.minibatch_size / self._epoch_size["train"]),
+            [c(x * (self.args.minibatch_size / self._epoch_size["train"])) for c in cond_list], func_list)
 
 
     def set_log_keys(self):
@@ -259,6 +335,8 @@ class trainercore(object):
                 else:
                     self._saver.add_scalar(metric, metrics[metric], self._global_step)
 
+            if self.args.training:
+                self._saver.add_scalar("learning_rate", self._opt.state_dict()['param_groups'][0]['lr'], self._global_step)
 
             # try to get the learning rate
             # print self._lr_scheduler.get_lr()

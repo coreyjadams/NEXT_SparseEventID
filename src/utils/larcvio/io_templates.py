@@ -58,7 +58,7 @@ def gen_sparse3d_data_filler(name, producer, max_voxels, augment = True):
     proc = larcv_io.ProcessConfig(proc_name=name, proc_type="BatchFillerSparseTensor3D")
 
     proc.set_param("Verbosity",         "3")
-    proc.set_param("Tensor3DProducer",  producer)
+    proc.set_param("TensorProducer",    producer)
     proc.set_param("IncludeValues",     "true")
     proc.set_param("MaxVoxels",         max_voxels)
     proc.set_param("UnfilledVoxelValue","-999")
