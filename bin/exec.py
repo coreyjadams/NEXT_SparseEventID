@@ -80,6 +80,12 @@ The most commonly used commands are:
             type    = float,
             default = 0.0,
             help    = "Weight decay strength")
+        parser.add_argument('--distributed-mode',
+            type    = str,
+            default = 'horovod',
+            choices = ['horovod', 'DDP'],
+            help    = "Toggle between the different methods for distributing the network")
+
 
     def train_cycleGAN(self):
         self.parser = argparse.ArgumentParser(

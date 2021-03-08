@@ -22,6 +22,8 @@ class trainer_eventID(trainercore):
 
         self.inference_results = {}
 
+        print(self.args)
+
     def set_log_keys(self):
         self._log_keys = ['loss', 'accuracy']
 
@@ -80,33 +82,28 @@ class trainer_eventID(trainercore):
         if not self.args.training:
             return
 
+        # get the initial learning_rate:
+        initial_learning_rate = self.lr_calculator(self._global_step)
+
+        # IMPORTANT: the scheduler in torch is a multiplicative factor,
+        # but I've written it as learning rate itself.  So set the LR to 1.0
+
         # Create an optimizer:
         if self.args.optimizer == "SDG":
-            self._opt = torch.optim.SGD(self._net.parameters(), lr=self.args.learning_rate,
+            self._opt = torch.optim.SGD(self._net.parameters(), lr=1.0,
                 weight_decay=self.args.weight_decay)
         else:
-            self._opt = torch.optim.Adam(self._net.parameters(), lr=self.args.learning_rate,
+            self._opt = torch.optim.Adam(self._net.parameters(), lr=1.0,
                 weight_decay=self.args.weight_decay)
 
+
+
+        self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(self._opt, self.lr_calculator, last_epoch=-1)
 
 
 
 
         device = self.get_device()
-        #
-        # if self.args.weight_sig is None or self.args.weight_bkg is None:
-        #     print ('You have requested to balance loss but have not set the weight for signal of background. I will ignore your request.')
-        #     self.args.balance_loss = False
-
-        #
-        # if self.args.balance_loss:
-        #
-        #     weights = [self.args.weight_bkg, self.args.weight_sig]
-        #     class_weights = torch.tensor(weights, device=device)
-        #     self._criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
-        #
-        # else:
-
 
         # For the criterion, get the relative ratios of the classes:
         all_labels = self.larcv_fetcher.eventID_labels('train')
@@ -130,6 +127,7 @@ class trainer_eventID(trainercore):
             'global_step' : self._global_step,
             'state_dict'  : self._net.state_dict(),
             'optimizer'   : self._opt.state_dict(),
+            'scheduler'   : self.lr_scheduler.state_dict(),
         }
 
         return state_dict
@@ -139,6 +137,7 @@ class trainer_eventID(trainercore):
         self._net.load_state_dict(state['state_dict'])
         if self.args.training:
             self._opt.load_state_dict(state['optimizer'])
+            self.lr_scheduler.load_state_dict(state['scheduler'])
             self._global_step = state['global_step']
 
         # If using GPUs, move the model to GPU:
@@ -240,7 +239,6 @@ class trainer_eventID(trainercore):
         metrics = self._compute_metrics(logits, minibatch_data, loss)
 
 
-
         # Add the global step / second to the tensorboard log:
         try:
             metrics['global_step_per_sec'] = 1./self._seconds_per_global_step
@@ -259,6 +257,9 @@ class trainer_eventID(trainercore):
         self._opt.step()
         # print("Updated Weights")
         global_end_time = datetime.datetime.now()
+
+        self.lr_scheduler.step()
+
 
         metrics['step_time'] = (global_end_time - step_start_time).total_seconds()
 
