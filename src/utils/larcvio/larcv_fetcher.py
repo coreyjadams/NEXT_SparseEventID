@@ -84,6 +84,10 @@ class larcv_fetcher(object):
             labeled = True
             self._eventID_labels[name] = f['Data/particle_label_group/particles/']['pdg']
             self._eventID_energies[name] = f['Data/particle_label_group/particles/']['energy_init']
+        elif 'Data/particle_event_group/' in f:
+            labeled = True
+            self._eventID_labels[name] = f['Data/particle_event_group/particles/']['pdg']
+            self._eventID_energies[name] = f['Data/particle_event_group/particles/']['energy_init']
         else:
             labeled = False
             self._eventID_labels[name] = None
@@ -96,6 +100,8 @@ class larcv_fetcher(object):
         # Generate a named temp file:
         main_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
         main_file.write(config.generate_config_str())
+
+
 
         main_file.close()
         self._cleanup.append(main_file)
@@ -164,6 +170,7 @@ class larcv_fetcher(object):
 
         minibatch_data = self._larcv_interface.fetch_minibatch_data(name, pop=True, fetch_meta_data=True)
         minibatch_dims = self._larcv_interface.fetch_minibatch_dims(name)
+
 
         # For the serial mode, call next here:
         self._larcv_interface.prepare_next(name)

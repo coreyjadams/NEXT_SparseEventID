@@ -4,8 +4,8 @@ from . import larcv_io
 # Here, we set up a bunch of template IO formats in the form of callable functions:
 
 def event_id_io(input_file, name, labeled, augment = True):
-    max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels\"", max_voxels=max_voxels, augment=augment)
+    max_voxels = 6500
+    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"lr_hits\"", max_voxels=max_voxels, augment=augment)
 
 
     config = larcv_io.ThreadIOConfig(name=name)
@@ -19,8 +19,8 @@ def event_id_io(input_file, name, labeled, augment = True):
     return config
 
 def cycleGAN_io(input_file, name, augment = True):
-    max_voxels = 1000
-    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"voxels\"", max_voxels=max_voxels, augment=augment)
+    max_voxels = 6500
+    data_proc = gen_sparse3d_data_filler(name=name + "data", producer="\"lr_hits\"", max_voxels=max_voxels, augment=augment)
 
     config = larcv_io.ThreadIOConfig(name=name)
 
@@ -75,7 +75,7 @@ def gen_label_filler(prepend_names):
     proc = larcv_io.ProcessConfig(proc_name=prepend_names + "label", proc_type="BatchFillerPIDLabel")
 
     proc.set_param("Verbosity",         "3")
-    proc.set_param("ParticleProducer",  "label")
+    proc.set_param("ParticleProducer",  "event")
     proc.set_param("PdgClassList",      "[{}]".format(",".join([str(i) for i in range(2)])))
 
     return proc

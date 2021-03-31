@@ -30,10 +30,9 @@ class distributed_eventID(trainer_eventID):
         # search for parameters relevant for distributed computing here
         trainer_eventID.__init__(self, args)
 
-
         # Put the IO rank as the last rank in the COMM, since rank 0 does tf saves
         if self.args.distributed_mode == "horovod":
-
+            global hvd
             import horovod.torch as hvd
             hvd.init()
             self._rank            = hvd.rank()
@@ -81,7 +80,7 @@ class distributed_eventID(trainer_eventID):
 
     def save_model(self):
 
-        if hvd.rank() == 0:
+        if self._rank == 0:
             trainer_eventID.save_model(self)
 
 
@@ -92,19 +91,16 @@ class distributed_eventID(trainer_eventID):
 
         trainer_eventID.init_optimizer(self)
 
-
-
         if self.args.distributed_mode == "horovod":
             self._opt = hvd.DistributedOptimizer(self._opt, named_parameters=self._net.named_parameters())
 
-        hvd.broadcast_optimizer_state(self._opt, root_rank = 0)
-
+            hvd.broadcast_optimizer_state(self._opt, root_rank = 0)
 
 
 
     def init_saver(self):
         self._saver = None
-        if hvd.rank() == 0:
+        if self._rank == 0:
             trainer_eventID.init_saver(self)
         else:
             self._saver = None
@@ -153,85 +149,18 @@ class distributed_eventID(trainer_eventID):
             self._global_step = MPI.COMM_WORLD.bcast(self._global_step, root=0)
             state_dict = MPI.COMM_WORLD.bcast(self.lr_scheduler.state_dict(), root=0)
 
+        # Load the state dict:
+        self.lr_scheduler.load_state_dict(state_dict)
 
     def print(self, *argv):
         if self._rank == 0:
             trainer_eventID.print(self, *argv)
 
 
-    def model_to_device(self):
-
-        # Broadcast from rank 0 to sync weights before Training
-
-        # self._global_step = hvd.broadcast(self._global_step, root_rank = 0)
-
-        # Now broadcast the model to syncronize the optimizer and model:
-        hvd.broadcast_parameters(self._net.state_dict(), root_rank = 0)
-
-        trainer_eventID.model_to_device(self)
-
-        #
-        #
-        # print("Rank ", hvd.rank(), next(self._net.parameters()).device)
-        #
-
-
-
-
-
-        # self.init_optimizer()
-        # # print("Rank {}".format(hvd.rank()) + " Initialized Optimizer")
-        #
-        # self.init_saver()
-        # # print("Rank {}".format(hvd.rank()) + " Initialized Saver")
-        #
-        # # If restoring, this will restore the model on the root node
-        # self.restore_model()
-        # # print("Rank {}".format(hvd.rank()) + " Restored Model if necessary")
-        #
-        #
-        # # This is important to ensure LR continuity after restoring:
-        # # Step the learning rate scheduler up to the right amount
-        # if self._global_step > 0:
-        #     i = 0
-        #     while i < self._global_step:
-        #         self._lr_scheduler.step()
-        #         i += 1
-        #
-
-    #
-    # def get_file_name(self, f_name):
-    #     #from shutil import copyfile
-    #
-    #     # Get the file size of original file
-    #     size = os.path.getsize(f_name)
-    #
-    #     unique_name = str(uuid.uuid4())
-    #
-    #     path_to_file = os.path.dirname(os.path.abspath(f_name)) + '/tmp/'
-    #     original_file_name = os.path.basename(f_name)
-    #
-    #     #path_to_file = '/tmp/'
-    #     new_file = path_to_file + unique_name + '_' + original_file_name
-    #     #copyfile(f_name, new_file)
-    #
-    #     self._files_to_delete.append(new_file)
-    #
-    #     os.system('mkdir -p ' + path_to_file)
-    #     os.system('cp ' + f_name + ' ' + new_file)
-    #
-    #     # Check that the file was fully copied before moving on
-    #     while size != os.path.getsize(new_file):
-    #         print (os.path.getsize(new_file), ' is not ', size)
-    #         time.sleep(0.2)
-    #
-    #     #print ('Returning filename ', new_file)
-    #     #time.sleep(5)
-    #     return new_file
 
 
     def summary(self, metrics, saver=""):
-        if hvd.rank() == 0:
+        if self._rank == 0:
             trainer_eventID.summary(self, metrics, saver)
         return
 
@@ -241,9 +170,13 @@ class distributed_eventID(trainer_eventID):
         metrics = trainer_eventID._compute_metrics(self, logits, minibatch_data, loss)
 
 
-        for key in metrics:
-            # print("All reducing ", key)
-            metrics[key] = hvd.allreduce(metrics[key], name = key)
+        if self.args.distributed_mode == "horovod":
+            for key in metrics:
+                metrics[key] = hvd.allreduce(metrics[key], name = key)
+        elif self.args.distributed_mode == "DDP":
+            for key in metrics:
+                torch.distributed.all_reduce(metrics[key])
+                metrics[key] /= self._size
 
         return metrics
 
@@ -278,5 +211,5 @@ class distributed_eventID(trainer_eventID):
     #     return minibatch_data
 
     def log(self, metrics, saver=""):
-        if hvd.rank() == 0:
+        if self._rank == 0:
             trainer_eventID.log(self, metrics, saver)

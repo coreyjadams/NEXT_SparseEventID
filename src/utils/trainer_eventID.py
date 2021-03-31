@@ -22,7 +22,6 @@ class trainer_eventID(trainercore):
 
         self.inference_results = {}
 
-        print(self.args)
 
     def set_log_keys(self):
         self._log_keys = ['loss', 'accuracy']
@@ -63,7 +62,7 @@ class trainer_eventID(trainercore):
             n_trainable_parameters = 0
             for var in self._net.parameters():
                 n_trainable_parameters += numpy.prod(var.shape)
-            print("Total number of trainable parameters in this network: {}".format(n_trainable_parameters))
+            self.print("Total number of trainable parameters in this network: {}".format(n_trainable_parameters))
 
     def init_saver(self):
 
@@ -111,7 +110,7 @@ class trainer_eventID(trainercore):
         weights = (numpy.sum(counts) - counts) / numpy.sum(counts)
         weights = 2 * torch.tensor(weights, device=device).float()
 
-        print("Computed weights as ", weights)
+        self.print("Computed weights as ", weights)
 
         self._criterion = torch.nn.CrossEntropyLoss(weights)
 
@@ -150,17 +149,12 @@ class trainer_eventID(trainercore):
 
         return True
 
-    def model_to_device(self):
+    def to_device(self):
 
         if self.args.compute_mode == "CPU":
             pass
         if self.args.compute_mode == "GPU":
             self._net.cuda()
-            # for state in self._opt.state.values:
-            #     for k, v in state.items():
-            #         if torch.is_tensor(v):
-            #             state[k] = v.cuda()
-            # This moves the optimizer to the GPU:
 
 
     def _calculate_loss(self, inputs, logits):
@@ -201,7 +195,6 @@ class trainer_eventID(trainercore):
         metrics['accuracy'] = accuracy
 
         return metrics
-
 
     def train_step(self):
 
@@ -351,7 +344,7 @@ class trainer_eventID(trainercore):
 
         if target not in self._epoch_size:
             return
-        print("Starting")
+        self.print("Starting")
         self.inference_results[target] = {
             'energy'  : None,
             'label'   : None,
@@ -366,7 +359,7 @@ class trainer_eventID(trainercore):
         n_events = self._epoch_size[target]
 
         n_processed = 0
-        print(n_events)
+        self.print(n_events)
         start = time.time()
 
         self._net.eval()
@@ -409,7 +402,7 @@ class trainer_eventID(trainercore):
 
             if len(energy) != self.args.minibatch_size:
                 # Found an event that is "too short"
-                print("size mismatch!")
+                self.print("size mismatch!")
 
             for key in keys:
                 if key == "energy":  tensor = energy
@@ -453,7 +446,7 @@ class trainer_eventID(trainercore):
             n_processed += self.args.minibatch_size
 
         end = time.time()
-        print (f"Processed {n_processed} images at {n_processed / (end-start):.2f} Img/s")
+        self.print (f"Processed {n_processed} images at {n_processed / (end-start):.2f} Img/s")
 
 
 
@@ -466,7 +459,7 @@ class trainer_eventID(trainercore):
                 self.inference_results[target][key] = self.inference_results[target][key].cpu().numpy()
             # # If the batch size doesn't divide the dataset, it will get reused a little.
             # # This clips that
-            # print(key, self.inference_results[target][key].shape)
+            # self.print(key, self.inference_results[target][key].shape)
             # self.inference_results[target][key] = self.inference_results[target][key][0:n_events]
             # print(key, self.inference_results[target][key].shape)
 

@@ -75,7 +75,7 @@ class ResNet(torch.nn.Module):
 
         n_filters = args.n_initial_filters
         # Next, build out the convolution steps
-
+        out_filters = args.n_initial_filters
 
 
 
@@ -90,7 +90,7 @@ class ResNet(torch.nn.Module):
                     batch_norm  = args.batch_norm,
                     residual    = True)
                 )
-            out_filters = 2*n_filters
+            out_filters = out_filters + args.n_initial_filters
 
             self.convolutional_layers.append(
                 SparseConvolutionDownsample(
@@ -139,14 +139,27 @@ class ResNet(torch.nn.Module):
 
 
         x = self.input_tensor(x)
-
+        # print("Initial stats: ")
+        # print(f"  torch.sum(x): {torch.sum(x.features)}")
+        # print(f"  torch.max(x): {torch.max(x.features)}")
+        # print(f"  n active: {len(x.features)}")
         x = self.normalize(x)
-
+        # print("Normalize stats: ")
+        # print(f"  torch.sum(x): {torch.sum(x.features)}")
+        # print(f"  torch.max(x): {torch.max(x.features)}")
+        # print(f"  n active: {len(x.features)}")
         x = self.initial_convolution(x)
-
+        # print("initial conv stats: ")
+        # print(f"  torch.sum(x): {torch.sum(x.features)}")
+        # print(f"  torch.max(x): {torch.max(x.features)}")
+        # print(f"  n active: {len(x.features)}")
 
 
         for i in range(len(self.convolutional_layers)):
+            # print(f"Layer {i} stats: ")
+            # print(f"  torch.sum(x): {torch.sum(x.features)}")
+            # print(f"  torch.max(x): {torch.max(x.features)}")
+            # print(f"  n active: {len(x.features)}")
             x = self.convolutional_layers[i](x)
 
         # Apply the final steps to get the right output shape
@@ -159,12 +172,14 @@ class ResNet(torch.nn.Module):
         output = self.bottleneck(output)
 
         output = self.sparse_to_dense(output)
+        #
+        # print(output.shape)
+        # print(output[0])
 
         # Apply global average pooling
         kernel_size = output.shape[2:]
         output = torch.squeeze(nn.AvgPool3d(kernel_size, ceil_mode=False)(output))
         output = output.view([batch_size, output.shape[-1]])
-
 
 
 

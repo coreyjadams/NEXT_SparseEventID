@@ -55,18 +55,13 @@ class trainercore(object):
 
         self.init_network()
 
-        self.model_to_device()
-
         self.init_optimizer()
 
         self.init_saver()
 
-        state = self.restore_model()
+        self.restore_model()
 
-        if state is not None:
-            self.load_state(state)
-        else:
-            self._global_step = 0
+        self.to_device()
 
         self.set_log_keys()
 
@@ -182,11 +177,20 @@ class trainercore(object):
         ''' This function attempts to restore the model from file
         '''
 
+        state = self.load_state_from_file()
+
+        if state is not None:
+            self.restore_state(state)
+
+
+
+    def load_state_from_file(self):
+
         _, checkpoint_file_path = self.get_model_filepath()
 
 
         if not os.path.isfile(checkpoint_file_path):
-            print("Returning none!")
+            self.print("Returning none!")
             return None
 
         # Parse the checkpoint file and use that to get the latest file path
@@ -196,7 +200,7 @@ class trainercore(object):
                 if line.startswith("latest: "):
                     chkp_file = line.replace("latest: ", "").rstrip('\n')
                     chkp_file = os.path.dirname(checkpoint_file_path) + "/" + chkp_file
-                    print("Restoring weights from ", chkp_file)
+                    self.print("Restoring weights from ", chkp_file)
                     break
 
         if self.args.compute_mode == "CPU":
@@ -378,11 +382,11 @@ class trainercore(object):
 
         # This is the 'master' function, so it controls a lot
 
-        print("Batch Process")
+        self.print("Batch Process")
 
         # Run iterations
         if self.args.training:
-            print("Training")
+            self.print("Training")
             for i in range(self.args.iterations):
 
                 if self.args.training and self._iteration >= self.args.iterations:
@@ -395,9 +399,9 @@ class trainercore(object):
                 self.checkpoint()
 
         else:
-            if self.args.sim_file is not "none":
+            if self.args.sim_file != "none":
                 self.ana_epoch('sim')
-            if self.args.data_file is not "none":
+            if self.args.data_file != "none":
                 self.ana_epoch('data')
 
 
