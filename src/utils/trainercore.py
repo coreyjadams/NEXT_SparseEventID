@@ -14,7 +14,7 @@ import datetime
 
 # This uses tensorboardX to save summaries and metrics to tensorboard compatible files.
 
-import tensorboardX
+import torch.utils.tensorboard as tensorboard
 
 class trainercore(object):
     '''
@@ -161,7 +161,7 @@ class trainercore(object):
 
         # This sets up the summary saver:
         if self.args.training:
-            self._saver = tensorboardX.SummaryWriter(self.args.log_directory)
+            self._saver = tensorboard.SummaryWriter(self.args.log_directory)
 
 
     def print(self, *argv):
@@ -181,6 +181,7 @@ class trainercore(object):
 
         if state is not None:
             self.restore_state(state)
+
 
 
 

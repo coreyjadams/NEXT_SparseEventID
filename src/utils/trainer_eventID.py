@@ -2,7 +2,7 @@ import time, datetime, os
 import numpy
 
 import torch
-import tensorboardX
+import torch.utils.tensorboard as tensorboard
 
 from .trainercore import trainercore
 from ..networks import sparseresnet3d
@@ -69,7 +69,7 @@ class trainer_eventID(trainercore):
         trainercore.init_saver(self)
 
         if self.args.training and self.args.test_file is not None:
-            self._aux_saver = tensorboardX.SummaryWriter(self.args.log_directory + "/test/")
+            self._aux_saver = tensorboard.SummaryWriter(self.args.log_directory + "/test/")
 
         else:
             self._aux_saver = None
@@ -131,21 +131,36 @@ class trainer_eventID(trainercore):
 
         return state_dict
 
-    def load_state(self, state):
+
+    def restore_state(self, state):
+
+
+
+        new_state_dict = {}
+        for key in state['state_dict']:
+            if key.startswith("module."):
+                new_key = key.lstrip("module.")
+            else:
+                new_key = key
+            new_state_dict[new_key] = state['state_dict'][key]
+
+        state['state_dict'] = new_state_dict
 
         self._net.load_state_dict(state['state_dict'])
+
         if self.args.training:
             self._opt.load_state_dict(state['optimizer'])
             self.lr_scheduler.load_state_dict(state['scheduler'])
-            self._global_step = state['global_step']
+
+        self._global_step = state['global_step']
+
 
         # If using GPUs, move the model to GPU:
-        if self.args.compute_mode == "GPU":
-            if self.args.training:
-                for state in self._opt.state.values():
-                    for k, v in state.items():
-                        if torch.is_tensor(v):
-                            state[k] = v.cuda()
+        if self.args.compute_mode == "GPU" and self.args.training:
+            for state in self._opt.state.values():
+                for k, v in state.items():
+                    if torch.is_tensor(v):
+                        state[k] = v.cuda()
 
         return True
 
