@@ -19,7 +19,11 @@ sys.path.insert(0,network_dir)
 # from src.networks import dgcnn
 
 if 'OMPI_COMM_WORLD_LOCAL_RANK' in os.environ:
-    os.environ['CUDA_VISIBLE_DEVICES'] = os.environ['OMPI_COMM_WORLD_LOCAL_RANK']
+    if 'RANKS_PER_GPU' in os.environ:
+        selected_gpu = str(int(os.environ['OMPI_COMM_WORLD_LOCAL_RANK']) % 8)
+    else:
+        selected_gpu = os.environ['OMPI_COMM_WORLD_LOCAL_RANK']
+    os.environ['CUDA_VISIBLE_DEVICES'] = selected_gpu
 
 import argparse
 
