@@ -92,11 +92,17 @@ class distributed_eventID(trainer_eventID):
         trainer_eventID.init_optimizer(self)
 
         if self.args.distributed_mode == "horovod":
+
             self._opt = hvd.DistributedOptimizer(self._opt, named_parameters=self._net.named_parameters())
 
             hvd.broadcast_optimizer_state(self._opt, root_rank = 0)
 
-
+            # Horovod doesn't actually move the optimizer onto a GPU:
+            if self.args.compute_mode == "GPU":
+                for state in self._opt.state.values():
+                    for k, v in state.items():
+                        if torch.is_tensor(v):
+                            state[k] = v.cuda()
 
     def init_saver(self):
         self._saver = None
