@@ -18,6 +18,8 @@ sys.path.insert(0,network_dir)
 # from src.networks import gcn
 # from src.networks import dgcnn
 
+if 'OMPI_COMM_WORLD_LOCAL_RANK' in os.environ:
+    os.environ['CUDA_VISIBLE_DEVICES'] = os.environ['OMPI_COMM_WORLD_LOCAL_RANK']
 
 import argparse
 
