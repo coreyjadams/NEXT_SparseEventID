@@ -1,374 +1,290 @@
 #!/usr/bin/env python
 import os,sys,signal
 import time
+import pathlib
 
 import numpy
+
+try:
+    import tensorflow as tf
+    tf.get_logger().setLevel('INFO')
+except:
+    pass
+
+# For configuration:
+from omegaconf import DictConfig, OmegaConf
+import hydra
+from hydra.experimental import compose, initialize
+from hydra.core.hydra_config import HydraConfig
+from hydra.core.utils import configure_log
+
+hydra.output_subdir = None
+
+#############################
 
 # Add the local folder to the import path:
 network_dir = os.path.dirname(os.path.abspath(__file__))
 network_dir = os.path.dirname(network_dir)
 sys.path.insert(0,network_dir)
 
-# # import the necessary
-# # from src.utils import flags
-# from src.networks import resnet
-# from src.networks import sparseresnet
-# from src.networks import sparseresnet3d
-# from src.networks import pointnet
-# from src.networks import gcn
-# from src.networks import dgcnn
+from src.config import Config
+from src.config.mode import ModeKind
 
-if 'OMPI_COMM_WORLD_LOCAL_RANK' in os.environ:
-    if 'RANKS_PER_GPU' in os.environ:
-        selected_gpu = str(int(os.environ['OMPI_COMM_WORLD_LOCAL_RANK']) % 8)
-    else:
-        selected_gpu = os.environ['OMPI_COMM_WORLD_LOCAL_RANK']
-    os.environ['CUDA_VISIBLE_DEVICES'] = selected_gpu
+from src.io import create_larcv_dataset
 
-import argparse
+from src import logging
+
+import atexit
 
 class exec(object):
 
-    def __init__(self):
+    def __init__(self, config):
 
-        # This technique is taken from: https://chase-seibert.github.io/blog/2014/03/21/python-multilevel-argparse.html
-        parser = argparse.ArgumentParser(
-            description='Run neural networks on NEXT Event ID dataset',
-            usage='''exec.py <command> [<args>]
+        self.args = config
 
-The most commonly used commands are:
-   train-eventID         Train a network, either from scratch or restart
-   train-cycleGAN        Train a network, either from scratch or restart
-   inference-eventID     Run inference with a trained network
-   inference-cycleGAN    Run inference with a trained network
-   iotest-eventID        Run IO testing without training a network for eventID
-   iotest-cycleGAN       Run IO testing without training a network for cycleGAN
-''')
-        parser.add_argument('command', help='Subcommand to run')
-        # parse_args defaults to [1:] for args, but you need to
-        # exclude the rest of the args too, or validation will fail
-        args = parser.parse_args(sys.argv[1:2])
-        if not hasattr(self, args.command.replace("-","_")):
-            print(f'Unrecognized command {args.command}')
-            parser.print_help()
-            exit(1)
-        # use dispatch pattern to invoke method with same name
-        getattr(self, args.command.replace("-","_"))()
-
-    def add_shared_training_arguments(self, parser):
-
-        parser.add_argument('-lr','--learning-rate',
-            type    = float,
-            default = 0.003,
-            help    = 'Initial learning rate')
-        parser.add_argument('-ci','--checkpoint-iteration',
-            type    = int,
-            default = 500,
-            help    = 'Period (in steps) to store snapshot of weights')
-        parser.add_argument('-si','--summary-iteration',
-            type    = int,
-            default = 1,
-            help    = 'Period (in steps) to store summary in tensorboard log')
-        parser.add_argument('-li','--logging-iteration',
-            type    = int,
-            default = 1,
-            help    = 'Period (in steps) to print values to log')
-        parser.add_argument('-cd','--checkpoint-directory',
-            type    = str,
-            default = None,
-            help    = 'Directory to store model snapshots')
-        self.parser.add_argument('--optimizer',
-            type    = str,
-            choices = ['adam', 'rmsprop',],
-            default = 'rmsprop',
-            help    = 'Optimizer to use')
-        self.parser.add_argument('--weight-decay',
-            type    = float,
-            default = 0.0,
-            help    = "Weight decay strength")
-        parser.add_argument('--distributed-mode',
-            type    = str,
-            default = 'horovod',
-            choices = ['horovod', 'DDP'],
-            help    = "Toggle between the different methods for distributing the network")
+        rank = self.init_mpi()
 
 
-    def train_cycleGAN(self):
-        self.parser = argparse.ArgumentParser(
-            description     = 'Run Network Training',
-            formatter_class = argparse.ArgumentDefaultsHelpFormatter)
+        # Add to the output dir:
+        # self.args.output_dir += f"/{self.args.network.name}/"
+        self.args.output_dir += f"/{self.args.run.id}/"
 
-        self.add_io_arguments_cycleGAN(self.parser)
-        self.add_core_configuration(self.parser)
-        self.add_shared_training_arguments(self.parser)
+        # Create the output directory if needed:
+        if rank == 0:
+            outpath = pathlib.Path(self.args.output_dir)
+            outpath.mkdir(exist_ok=True, parents=True)
 
-        self.parser.add_argument('--cycle-lambda',
-            type    = float,
-            default = '10',
-            help    = 'Lambda balancing between cycle loss and GAN loss')
+        self.configure_logger(rank)
 
-        self.add_cycleGAN_parsers(self.parser)
+        self.validate_arguments()
 
-        self.args = self.parser.parse_args(sys.argv[2:])
-        self.args.training = True
+        # Print the command line args to the log file:
+        logger = logging.getLogger("NEXT")
+        logger.info("Dumping launch arguments.")
+        logger.info(sys.argv)
+        logger.info(self.__str__())
+
+        logger.info("Configuring Datasets.")
+        self.datasets = self.configure_datasets()
+        logger.info("Data pipeline ready.")
 
 
-        self.make_trainer_cycleGAN()
+    def run(self):
+        if self.args.mode.name == ModeKind.train:
+            self.train()
+        if self.args.mode.name == ModeKind.iotest:
+            self.iotest()
+        if self.args.mode.name == ModeKind.inference:
+            self.inference()
 
-        print("Running Training")
-        print(self.__str__())
+    def exit(self):
+        if hasattr(self, "trainer"):
+            self.trainer.exit()
 
-        self.trainer.initialize()
-        self.trainer.batch_process()
+    def init_mpi(self):
+        if not self.args.run.distributed:
+            return 0
+        else:
+            from src.utils import mpi_init_and_local_rank
+            local_rank = mpi_init_and_local_rank(set_env=True, verbose=False)
 
-    def train_eventID(self):
-        self.parser = argparse.ArgumentParser(
-            description     = 'Run Network Training',
-            formatter_class = argparse.ArgumentDefaultsHelpFormatter)
+            return int(os.environ["RANK"])
 
-        self.add_io_arguments_eventID(self.parser, training=True)
-        self.add_core_configuration(self.parser)
-        self.add_shared_training_arguments(self.parser)
-
-        # Define parameters exclusive to training eventID:
-
-        self.parser.add_argument('--lr-schedule',
-            type    = str,
-            choices = ['flat', '1cycle', 'triangle_clr', 'exp_range_clr', 'decay', 'expincrease'],
-            default = 'flat',
-            help    = 'Apply a learning rate schedule')
+    def configure_lr_schedule(self, epoch_length, max_epochs):
 
 
 
-        self.add_eventID_parsers(self.parser)
+        if self.args.mode.optimizer.lr_schedule.name == "one_cycle":
+            from src.utils.core import OneCycle
+            lr_schedule = OneCycle(self.args.mode.optimizer.lr_schedule)
+        elif self.args.mode.optimizer.lr_schedule.name == "standard":
+            from src.utils.core import WarmupFlatDecay
+            schedule_args = self.args.mode.optimizer.lr_schedule
+            lr_schedule = WarmupFlatDecay(
+                peak_learning_rate = schedule_args.peak_learning_rate,
+                decay_floor  = schedule_args.decay_floor,
+                epoch_length = epoch_length,
+                decay_epochs = schedule_args.decay_epochs,
+                total_epochs = max_epochs
+            )
 
-        self.args = self.parser.parse_args(sys.argv[2:])
-        self.args.training = True
+        return lr_schedule
+
+    def configure_datasets(self):
+        """
+        This function creates the non-framework iterable datasets used in this app.
+
+        They get converted to framework specific tools, if needed, in the
+        framework specific code.
+        """
+
+        batch_keys = ["pmaps", "label"]
+        ds = create_larcv_dataset(self.args.data, 
+            batch_size   = self.args.run.minibatch_size, 
+            input_file   = self.args.data.path, 
+            name         = "tl208",
+            distributed  = self.args.run.distributed,
+            batch_keys   = batch_keys,
+            sparse       = self.args.framework.sparse
+        )
+
+        return {"tl208" : ds}
 
 
-        self.make_trainer_eventID()
+    def configure_logger(self, rank):
 
-        self.trainer.print("Running Training")
-        self.trainer.print(self.__str__())
+        logger = logging.getLogger("NEXT")
+        
 
+    def train(self):
 
-        self.trainer.initialize()
-        self.trainer.batch_process()
+        logger = logging.getLogger("NEXT")
 
-    def add_eventID_parsers(self, parser):
+        logger.info("Running Training")
 
-        # Add the sparse resnet:
-        from src.networks.sparseresnet3d import ResNetFlags
-        ResNetFlags().build_parser(parser)
+        self.make_trainer()
 
-
-    def add_cycleGAN_parsers(self, parser):
-
-        # Add the sparse resnet:
-        from src.networks.generator import GeneratorFlags
-        GeneratorFlags().build_parser(parser)
-        from src.networks.discriminator import DiscriminatorFlags
-        DiscriminatorFlags().build_parser(parser)
-        pass
+        from src.utils.torch.lightning import train
+        train(self.args, self.trainer, self.datasets)
 
 
+    def iotest(self):
 
-    def iotest_eventID(self):
-        self.parser = argparse.ArgumentParser(
-            description     = 'Run IO Testing',
-            formatter_class = argparse.ArgumentDefaultsHelpFormatter)
-        self.add_io_arguments_eventID(self.parser, training=False)
-        self.add_core_configuration(self.parser)
+        logger = logging.getLogger("NEXT")
 
-        # now that we're inside a subcommand, ignore the first
-        # TWO argvs, ie the command (exec.py) and the subcommand (iotest)
-        self.args = self.parser.parse_args(sys.argv[2:])
-        self.args.training = False
+        logger.info("Running IO Test")
 
-        self.make_trainer_eventID()
 
-        self.trainer.print("Running IO Test")
-        self.trainer.print(self.__str__())
+        # self.trainer.initialize(io_only=True)
 
-        self.trainer.initialize(io_only=True)
+        if self.args.run.distributed:
+            from mpi4py import MPI
+            rank = MPI.COMM_WORLD.Get_rank()
+        else:
+            rank = 0
 
-        # label_stats = numpy.zeros((36,))
 
-        time.sleep(0.1)
-        for i in range(self.args.iterations):
+
+
+        for key, dataset in self.datasets.items():
+            logger.info(f"Reading dataset {key}")
+            global_start = time.time()
+            total_reads = 0
+
+
+            # Determine the stopping point:
+            break_i = self.args.run.run_length * len(dataset) / self.args.run.minibatch_size
+
             start = time.time()
-            mb = self.trainer.larcv_fetcher.fetch_next_eventID_batch("data")
-            # self.trainer.print(mb.keys())
-            # label_stats += numpy.sum(mb['label'], axis=0)
+            for i, minibatch in enumerate(dataset):
 
-            end = time.time()
-            self.trainer.print(i, f": Time to fetch a minibatch (B=={self.args.minibatch_size}) of data: {end - start:.2f}")
-            # time.sleep(0.5)
-        # print(label_stats)
+                end = time.time()
+                if i >= break_i: break
+                logger.info(f"{i}: Time to fetch a minibatch of data: {end - start:.2f}s")
+                start = time.time()
+                total_reads += 1
 
-    def make_trainer_eventID(self):
+            total_time = time.time() - global_start
+            images_read = total_reads * self.args.run.minibatch_size
+            logger.info(f"{key} - Total IO Time: {total_time:.2f}s")
+            logger.info(f"{key} - Total images read per batch: {self.args.run.minibatch_size}")
+            logger.info(f"{key} - Average Image IO Throughput: { images_read / total_time:.3f}")
 
-        if self.args.distributed:
-            from src.utils import distributed_eventID
-            self.trainer = distributed_eventID.distributed_eventID(self.args)
+    def make_trainer(self):
+
+        if 'environment_variables' in self.args.framework:
+            for env in self.args.framework.environment_variables.keys():
+                os.environ[env] = self.args.framework.environment_variables[env]
+
+        dataset_length = max([len(ds) for ds in self.datasets.values()])
+
+        self.set_run_length_info(dataset_length)
+
+
+        if self.args.mode.name == ModeKind.train:
+            lr_schedule = self.configure_lr_schedule(self.epoch_length, self.max_epochs)
         else:
-            from src.utils import trainer_eventID
-            self.trainer = trainer_eventID.trainer_eventID(self.args)
+            lr_schedule = None
 
-    def make_trainer_cycleGAN(self):
-
-        if self.args.distributed:
-            from src.utils import distributed_trainer
-
-            self.trainer = distributed_trainer.distributed_trainer(self.args)
-        else:
-            from src.utils import trainer_cycleGAN
-            self.trainer = trainer_cycleGAN.trainer_cycleGAN(self.args)
+        from src.utils.torch import create_lightning_module
+        self.trainer = create_lightning_module(
+            self.args,
+            self.datasets,
+            lr_schedule,
+        )
 
 
-    def inference_cycleGAN(self):
-        pass
+    def inference(self):
 
 
-    def inference_eventID(self):
-        self.parser = argparse.ArgumentParser(
-            description     = 'Run Network Training',
-            formatter_class = argparse.ArgumentDefaultsHelpFormatter)
+        logger = logging.getLogger("NEXT")
 
-        self.add_io_arguments_eventID(self.parser, training=False)
-        self.add_core_configuration(self.parser)
-        self.add_shared_training_arguments(self.parser)
+        logger.info("Running Inference")
+        logger.info(self.__str__())
 
-
-        self.add_eventID_parsers(self.parser)
-
-        self.args = self.parser.parse_args(sys.argv[2:])
-        self.args.training = False
-
-
-        self.make_trainer_eventID()
-
-        self.trainer.print("Running Inference")
-        self.trainer.print(self.__str__())
+        self.make_trainer()
 
         self.trainer.initialize()
         self.trainer.batch_process()
+
+    def dictionary_to_str(self, in_dict, indentation = 0):
+        substr = ""
+        for key in sorted(in_dict.keys()):
+            if type(in_dict[key]) == DictConfig or type(in_dict[key]) == dict:
+                s = "{none:{fill1}{align1}{width1}}{key}: \n".format(
+                        none="", fill1=" ", align1="<", width1=indentation, key=key
+                    )
+                substr += s + self.dictionary_to_str(in_dict[key], indentation=indentation+2)
+            else:
+                if hasattr(in_dict[key], "name"): attr = in_dict[key].name
+                else: attr = in_dict[key]
+                s = '{none:{fill1}{align1}{width1}}{message:{fill2}{align2}{width2}}: {attr}\n'.format(
+                   none= "",
+                   fill1=" ",
+                   align1="<",
+                   width1=indentation,
+                   message=key,
+                   fill2='.',
+                   align2='<',
+                   width2=30-indentation,
+                   attr = attr,
+                )
+                substr += s
+        return substr
 
     def __str__(self):
+
         s = "\n\n-- CONFIG --\n"
-        for name in iter(sorted(vars(self.args))):
-            # if name != name.upper(): continue
-            attribute = getattr(self.args,name)
-            # if type(attribute) == type(self.parser): continue
-            # s += " %s = %r\n" % (name, getattr(self, name))
-            substring = ' {message:{fill}{align}{width}}: {attr}\n'.format(
-                   message=name,
-                   attr = getattr(self.args, name),
-                   fill='.',
-                   align='<',
-                   width=30,
-                )
-            s += substring
-        return s
+        substring = s +  self.dictionary_to_str(self.args)
+
+        return substring
 
 
 
 
-    def add_core_configuration(self, parser):
-        # These are core parameters that are important for all modes:
-        parser.add_argument('-i', '--iterations',
-            type    = int,
-            default = 5000,
-            help    = "Number of iterations to process")
-
-        parser.add_argument('-d','--distributed',
-            action  = 'store_true',
-            default = False,
-            help    = "Run with the MPI compatible mode")
-        parser.add_argument('-m','--compute-mode',
-            type    = str,
-            choices = ['CPU','GPU'],
-            default = 'GPU',
-            help    = "Selection of compute device, CPU or GPU ")
-        parser.add_argument('-ld','--log-directory',
-            default ="log/",
-            help    ="Prefix (directory) for logging information")
+    def validate_arguments(self):
+        pass
 
 
-        return parser
-
-    def add_io_arguments_eventID(self, parser, training):
-
-        # data_directory = "/home/cadams/NEXT/cycleGAN/"
-        data_directory="/lus/theta-fs0/projects/datascience/cadams/datasets/NEXT/new_second_simulation/"
-
-        # IO PARAMETERS FOR INPUT:
-
-        if training:
-            parser.add_argument('-f','--train-file',
-                type    = str,
-                default = data_directory + "NEXT_White_Tl_train.h5",
-                help    = "IO Input File")
-
-            # IO PARAMETERS FOR AUX INPUT:
-            parser.add_argument('--test-file',
-                type    = str,
-                default = data_directory + "NEXT_White_Tl_test.h5",
-                help    = "IO Aux Input File, or output file in inference mode")
-
-        else:
-
-            parser.add_argument('-f','--sim-file',
-                type    = str,
-                default = data_directory + "NEXT_White_Tl_val.h5",
-                help    = "IO Input File")
-
-            # IO PARAMETERS FOR AUX INPUT:
-            parser.add_argument('--data-file',
-                type    = str,
-                # default = data_directory + "nextDATA_RUNS.h5",
-                default = data_directory + "NEXT_White_Tl_train.h5",
-                help    = "IO Aux Input File, or output file in inference mode")
-
-        parser.add_argument('-mb','--minibatch-size',
-            type    = int,
-            default = 2,
-            help    = "Number of images in the minibatch size")
-
-        parser.add_argument('--aux-iteration',
-            type    = int,
-            default = 10,
-            help    = "Iteration to run the aux operations")
-
-        parser.add_argument('--aux-minibatch-size',
-            type    = int,
-            default = 2,
-            help    = "Number of images in the minibatch size")
-
-        return
-
-    def add_io_arguments_cycleGAN(self, parser):
-        data_directory="/gpfs/jlse-fs0/users/cadams/datasets/NEXT/second_dataset/"
-
-        # IO PARAMETERS FOR DATA INPUT:
-        parser.add_argument('--data-file',
-            type    = str,
-            default = data_directory + "nextDATA_RUNS.h5",
-            help    = "Real data file")
-
-        parser.add_argument('-mb','--minibatch-size',
-            type    = int,
-            default = 2,
-            help    = "Number of images in the minibatch size")
-
-        parser.add_argument('--sim-file',
-            type    = str,
-            default = data_directory + "next_new_classification_val.h5",
-            help    = "Simulated data file")
-
-        return
 
 
+@hydra.main(version_base=None, config_path="../src/config/recipes/", config_name="config")
+def main(cfg : OmegaConf) -> None:
+
+    s = exec(cfg)
+    atexit.register(s.exit)
+
+    s.run()
 
 if __name__ == '__main__':
-    s = exec()
+    #  Is this good practice?  No.  But hydra doesn't give a great alternative
+    import sys
+    if "--help" not in sys.argv and "--hydra-help" not in sys.argv:
+        sys.argv += [
+            'hydra/job_logging=disabled',
+            'hydra.output_subdir=null',
+            'hydra.job.chdir=False',
+            'hydra.run.dir=.',
+            'hydra/hydra_logging=disabled',
+        ]
+    main()
