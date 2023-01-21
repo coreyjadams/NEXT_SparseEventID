@@ -2,127 +2,152 @@ import torch
 import torch.nn as nn
 import sparseconvnet as scn
 
-class SparseBlock(nn.Module):
+from src.config.network import  Norm
 
-    def __init__(self, inplanes, outplanes, bias, batch_norm):
+
+class Block(nn.Module):
+
+    def __init__(self, *, nIn, nOut, params, activation=scn.LeakyReLU):
 
         nn.Module.__init__(self)
 
         self.conv1 = scn.SubmanifoldConvolution(
             dimension   = 3,
-            nIn         = inplanes,
-            nOut        = outplanes,
-            filter_size = 3,
-            bias        = bias)
+            nIn         = nIn,
+            nOut        = nOut,
+            filter_size = [3,3,3],
+            bias        = params.bias)
 
-        if batch_norm:
-            self.activation = scn.BatchNormReLU(outplanes,momentum=0.5)
+        if params.normalization == Norm.batch:
+            self._do_normalization = True
+            self.relu = scn.BatchNormLeakyReLU(nOut)
+        elif params.normalization == Norm.layer:
+            raise Exception("Layer norm not supported in SCN")
         else:
-            self.activation = scn.ReLU()
-        # self.relu = scn.ReLU()
+            self.relu = activation()
 
     def forward(self, x):
 
         out = self.conv1(x)
-        out = self.activation(out)
+        out = self.relu(out)
 
         return out
 
 
 
-class SparseResidualBlock(nn.Module):
+class ResidualBlock(nn.Module):
 
-    def __init__(self, inplanes, outplanes, bias, batch_norm):
+    def __init__(self, *, nIn, nOut, params):
         nn.Module.__init__(self)
 
+        self.convolution_1 = Block(
+            nIn         = nIn,
+            nOut        = nOut,
+            params      = params)
 
-        self.conv1 = scn.SubmanifoldConvolution(
-            dimension   = 3,
-            nIn         = inplanes,
-            nOut        = outplanes,
-            filter_size = 3,
-            bias        = bias)
-
-
-        if batch_norm:
-            self.activation1 = scn.BatchNormReLU(outplanes,momentum=0.5)
-        else:
-            self.activation1 = scn.ReLU()
-
-        self.conv2 = scn.SubmanifoldConvolution(
-            dimension   = 3,
-            nIn         = outplanes,
-            nOut        = outplanes,
-            filter_size = 3,
-            bias        = bias)
-
-        if batch_norm:
-            self.activation2 = scn.BatchNormReLU(outplanes,momentum=0.5)
-        else:
-            self.activation2 = scn.ReLU()
-
+        self.convolution_2 = Block(
+            nIn         = nIn,
+            nOut        = nOut,
+            activation  = scn.Identity,
+            params      = params)
 
         self.residual = scn.Identity()
+        self.relu = scn.LeakyReLU()
 
         self.add = scn.AddTable()
 
-    def forward(self, x):
 
-        # This is using the pre-activation variant of resnet
+    def forward(self, x):
 
         residual = self.residual(x)
 
-        out = self.activation1(x)
+        out = self.convolution_1(x)
 
-        out = self.conv1(out)
+        out = self.convolution_2(out)
 
-        out = self.activation2(out)
 
-        out = self.conv2(out)
+        # The addition of sparse tensors is not straightforward, since
 
         out = self.add([out, residual])
+
+        out = self.relu(out)
 
         return out
 
 
+class ConvolutionDownsample(nn.Module):
 
-
-class SparseConvolutionDownsample(nn.Module):
-
-    def __init__(self, inplanes, outplanes, bias, batch_norm):
+    def __init__(self, *, nIn, nOut, params):
         nn.Module.__init__(self)
 
         self.conv = scn.Convolution(
             dimension       = 3,
-            nIn             = inplanes,
-            nOut            = outplanes,
-            filter_size     = 2,
-            filter_stride   = 2,
-            bias            = bias
+            nIn             = nIn,
+            nOut            = nOut,
+            filter_size     = [2,2,2],
+            filter_stride   = [2,2,2],
+            bias            = params.bias
         )
-        # if FLAGS.BATCH_NORM:
-        if batch_norm:
-            self.activation = scn.BatchNormReLU(outplanes,momentum=0.5)
-        else:
-            self.activation = scn.ReLU()
 
+        if params.normalization == Norm.batch:
+            self.relu = scn.BatchNormLeakyReLU(nOut)
+        elif params.normalization == Norm.layer:
+            raise Exception("Layer norm not supported in SCN")
+        else:
+            self.relu = scn.LeakyReLU()
 
     def forward(self, x):
         out = self.conv(x)
-        out = self.activation(out)
+
+        out = self.relu(out)
         return out
 
 
-class SparseBlockSeries(torch.nn.Module):
+class ConvolutionUpsample(nn.Module):
+
+    def __init__(self, *, nIn, nOut, params):
+        nn.Module.__init__(self)
+
+        self.conv = scn.Deconvolution(dimension=3,
+            nIn             = nIn,
+            nOut            = nOut,
+            filter_size     = [2,2,2],
+            filter_stride   = [2,2,2],
+            bias            = params.bias
+        )
+
+        if params.normalization == Norm.batch:
+            self.relu = scn.BatchNormLeakyReLU(nOut)
+        elif params.normalization == Norm.layer:
+            raise Exception("Layer norm not supported in SCN")
+        else:
+            self.relu = scn.LeakyReLU()
+
+    def forward(self, x):
+        out = self.conv(x)
+        out = self.relu(out)
+        return out
+
+class BlockSeries(torch.nn.Module):
 
 
-    def __init__(self, inplanes, n_blocks, bias, batch_norm, residual=False):
+    def __init__(self, *, nIn, n_blocks, params):
         torch.nn.Module.__init__(self)
 
-        if residual:
-            self.blocks = [ SparseResidualBlock(inplanes, inplanes, bias, batch_norm) for i in range(n_blocks) ]
+        if params.residual:
+            self.blocks = [ 
+                ResidualBlock(nIn    = nIn,
+                              nOut   = nIn,
+                              params = params)
+                for i in range(n_blocks)
+            ]
         else:
-            self.blocks = [ SparseBlock(inplanes, inplanes, bias, batch_norm) for i in range(n_blocks)]
+            self.blocks = [ 
+                Block(nIn    = nIn,
+                      nOut   = nIn,
+                      params = params)
+                for i in range(n_blocks)
+            ]
 
         for i, block in enumerate(self.blocks):
             self.add_module('block_{}'.format(i), block)

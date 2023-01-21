@@ -1,8 +1,12 @@
 import torch
 import pytorch_lightning as pl
 
+import datetime
 
+from src.config import OptimizerKind
+from src import logging
 
+logger = logging.getLogger("NEXT")
 
 class lightning_trainer(pl.LightningModule):
     '''
@@ -11,38 +15,81 @@ class lightning_trainer(pl.LightningModule):
     a NotImplemented error.
 
     '''
-    def __init__(self, args, encoder, decoder, loss_calc,
-                 acc_calc, lr_scheduler=None, ):
+    def __init__(self, args, encoder, decoder,
+                 image_key   = "pmaps",
+                 lr_scheduler=None ):
         super().__init__()
 
         self.args         = args
         self.encoder      = encoder
         self.decoder      = decoder
+        self.image_key    = image_key
         self.lr_scheduler = lr_scheduler
-        self.loss_calc    = loss_calc
-        self.acc_calc     = acc_calc
+
+        self.log_keys = ["loss"]
+
 
     def forward(self, batch):
-        encoded = self.encoder(batch)
 
-        return network_dict
+        encoded = self.encoder(batch)
+        decoded = self.decoder(encoded)
+
+        return decoded
 
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
 
+        input_images   = batch[self.image_key]
+        decoded_images = self(input_images)
 
-        network_dict = self(batch["image"])
-        prepped_labels = self.prep_labels(batch)
+        loss = self.calculate_ae_loss(input_images, decoded_images)
 
-        loss, loss_metrics = self.loss_calc(prepped_labels, network_dict)
+        metrics = {'loss' : loss}
+        # self.log()
+        self.print_log(metrics)
+        self.log_dict(metrics)
+        return loss
 
-        acc_metrics = self.calculate_accuracy(network_dict, prepped_labels)
-        
+    def print_log(self, metrics, mode=""):
 
-        self.print_log(acc_metrics, mode="train")
-        self.summary(acc_metrics)
-        self.log_dict(acc_metrics)
+        if self.global_step % self.args.mode.logging_iteration == 0:
+
+            self._current_log_time = datetime.datetime.now()
+
+            # Build up a string for logging:
+            if self.log_keys != []:
+                s = ", ".join(["{0}: {1:.3}".format(key, metrics[key]) for key in self.log_keys])
+            else:
+                s = ", ".join(["{0}: {1:.3}".format(key, metrics[key]) for key in metrics])
+
+            time_string = []
+
+            if hasattr(self, "_previous_log_time"):
+            # try:
+                total_images = self.args.run.minibatch_size
+                images_per_second = total_images / (self._current_log_time - self._previous_log_time).total_seconds()
+                time_string.append("{:.2} Img/s".format(images_per_second))
+
+            if 'io_fetch_time' in metrics.keys():
+                time_string.append("{:.2} IOs".format(metrics['io_fetch_time']))
+
+            if 'step_time' in metrics.keys():
+                time_string.append("{:.2} (Step)(s)".format(metrics['step_time']))
+
+            if len(time_string) > 0:
+                s += " (" + " / ".join(time_string) + ")"
+
+            # except:
+            #     pass
+
+
+            self._previous_log_time = self._current_log_time
+            logger.info("{} Step {} metrics: {}".format(mode, self.global_step, s))
+
+
+    def calculate_ae_loss(self, input_images, decoded_images):
+        loss = torch.nn.functional.mse_loss(input_images, decoded_images)
         return loss
 
     def configure_optimizers(self):
@@ -69,54 +116,56 @@ class lightning_trainer(pl.LightningModule):
 
 def build_networks(args, image_size):
 
-    if
+    from src.networks import autoencoder
+    models = autoencoder.create_models(args, image_size)
 
-        from src.networks.torch.uresnet2D import UResNet
-        net = UResNet(args.network, image_size)
+    return models
 
-    else:
-        if args.framework.sparse and args.mode.name != ModeKind.iotest:
-            from src.networks.torch.sparseuresnet3D import UResNet3D
-        else:
-            from src.networks.torch.uresnet3D       import UResNet3D
+from src.io.data import create_torch_larcv_dataloader
+# from src.networks import create_vertex_meta
 
-        net = UResNet3D(args.network, image_size)
-
-    return net
-
-from . data import create_torch_larcv_dataloader
-from src.networks.torch import create_vertex_meta
-
-def create_lightning_module(args, datasets, lr_scheduler=None, log_keys = [], hparams_keys = []):
+def create_lightning_module(args, datasets, lr_scheduler=None, batch_keys=None):
 
     # Going to build up the lightning module here.
 
     # Take the first dataset:
     example_ds = next(iter(datasets.values()))
 
-    vertex_meta = create_vertex_meta(args, example_ds.image_meta, example_ds.image_size())
+    if 'pmaps' in batch_keys:
+        image_key = 'pmaps'
+    else:
+        image_key = 'lr_hits'
+
+
+    image_shape = example_ds.image_size(image_key)
+
+    # vertex_meta = create_vertex_meta(args, example_ds.image_meta, example_ds.image_size())
 
     # Turn the datasets into dataloaders:
     for key in datasets.keys():
         datasets[key] = create_torch_larcv_dataloader(
             datasets[key], args.run.minibatch_size)
 
+    print(next(iter(datasets['tl208']))['pmaps'])
+
     # Next, create the network:
-    network = build_network(args, example_ds.image_size())
+    encoder, decoder = build_networks(args, image_shape)
 
-    if args.network.classification.active:
-        weight = torch.tensor([0.16, 0.1666, 0.16666, 0.5])
-        loss_calc = LossCalculator(args, weight=weight)
-    else:
-        loss_calc = LossCalculator(args)
-    acc_calc = AccuracyCalculator(args)
+    # if args.network.classification.active:
+    #     weight = torch.tensor([0.16, 0.1666, 0.16666, 0.5])
+    #     loss_calc = LossCalculator(args, weight=weight)
+    # else:
+    #     loss_calc = LossCalculator(args)
+    # acc_calc = AccuracyCalculator(args)
 
 
-    model = lightning_trainer(args, network, loss_calc,
-        acc_calc, lr_scheduler,
-        log_keys     = log_keys,
-        hparams_keys = hparams_keys,
-        vertex_meta  = vertex_meta)
+    model = lightning_trainer(
+        args, 
+        encoder, 
+        decoder,
+        image_key,
+        lr_scheduler
+    )
     return model
 
 def train(args, lightning_model, datasets):
@@ -180,13 +229,15 @@ def train(args, lightning_model, datasets):
         enable_progress_bar     = False,
         replace_sampler_ddp     = True,
         logger                  = tb_logger,
-        max_epochs              = 2,
+        max_epochs              = args.run.length,
         plugins                 = plugins,
         # benchmark               = True,
         accumulate_grad_batches = args.mode.optimizer.gradient_accumulation,
     )
 
+    print(datasets)
+
     trainer.fit(
         lightning_model,
-        train_dataloaders=datasets["train"],
+        train_dataloaders=datasets["tl208"],
     )

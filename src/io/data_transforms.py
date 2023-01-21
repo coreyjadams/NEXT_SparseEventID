@@ -52,7 +52,7 @@ def larcvsparse_to_scnsparse_3d(input_array):
     # And stack this into one numpy array:
     dimension = numpy.stack(dimension_list, axis=-1)
 
-    output_array = (dimension, features, batch_size,)
+    output_array = (dimension.astype("long"), features.astype("float32"), batch_size,)
     return output_array
 
 
@@ -62,11 +62,13 @@ def larcvsparse_to_dense_3d(input_array, dense_shape):
     output_array = numpy.zeros((batch_size, 1, *(dense_shape)) , dtype=numpy.float32)
     # This is the "real" size:
     # output_array = numpy.zeros((batch_size, 1, 45, 45, 275), dtype=numpy.float32)
-
     x_coords   = input_array[:,0,:,0]
     y_coords   = input_array[:,0,:,1]
     z_coords   = input_array[:,0,:,2]
     val_coords = input_array[:,0,:,3]
+    # print(x_coords[0:100])
+    # print(y_coords[0:100])
+    # print(z_coords[0:100])
 
     # Find the non_zero indexes of the input:
     batch_index, voxel_index = numpy.where(val_coords != -999)

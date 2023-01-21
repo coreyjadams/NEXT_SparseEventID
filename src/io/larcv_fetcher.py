@@ -22,8 +22,11 @@ def lr_meta():
 
 def pmaps_meta():
 
+    # The size of the images here are padded and expanded.  This lets me downsample
+    # and upsample in the networks more smoothly
     return numpy.array([
-        ([45, 45, 275], [450., 450., 550.],[-225., -225., 0])],
+        # ([45, 45, 275], [450., 450., 550.],[-225., -225., 0])],
+        ([48, 48, 288], [480., 480., 576.],[-225., -225., 0])],
         dtype=[
             ('n_voxels', "int", (3)),
             ('size', "float", (3)),
@@ -235,6 +238,13 @@ class larcv_dataset(object):
     def __del__(self):
         self.stop = True
 
+    def image_size(self, key):
+        meta = self.image_meta(key)
+        return meta['n_voxels'][0]
+
+    def image_meta(self, key):
+        if key == "pmaps" : return pmaps_meta()
+        else: return lr_meta()
 
     def fetch_next_batch(self, name, force_pop=False):
 
@@ -301,8 +311,11 @@ class larcv_dataset(object):
                     dense_shape = self.pmaps_meta['n_voxels'][0],
                 )        
         else:
-            minibatch_data['image']  = data_transforms.larcvsparse_to_scnsparse_3d(
-                minibatch_data['image'])
-
-
+            if "lr_hits" in self.batch_keys:
+                minibatch_data['lr_hits']  = data_transforms.larcvsparse_to_scnsparse_3d(
+                    minibatch_data['lr_hits'])
+            if "pmaps" in self.batch_keys:
+                minibatch_data['pmaps']  = data_transforms.larcvsparse_to_scnsparse_3d(
+                    minibatch_data['pmaps'])
+            
         return minibatch_data

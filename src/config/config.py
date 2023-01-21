@@ -27,7 +27,7 @@ class Precision(Enum):
 class Run:
     distributed:        bool        = True
     compute_mode:       ComputeMode = ComputeMode.CUDA
-    run_length:         int         = 20
+    length:             int         = 20
     minibatch_size:     int         = 2
     id:                 str         = MISSING
     precision:          Precision   = Precision.float32
@@ -62,8 +62,8 @@ class Config:
     mode:       Mode      = MISSING
     data:       Data      = MISSING
     framework:  Framework = MISSING
-    # encoder:    Network   = Encoder()
-    # decoder:    Network   = Decoder()
+    encoder:    Network   = Encoder()
+    decoder:    Network   = Decoder()
     output_dir: str       = "output/"
 
 

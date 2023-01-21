@@ -4,6 +4,8 @@ import pathlib
 import tables
 import larcv
 import numpy
+import pandas
+# import anytree
 
 pdg_lookup = {
     b'Pb208'           : 30000000,
@@ -31,23 +33,45 @@ def main():
         description     = 'Convert NEXT data files into larcv format',
         formatter_class = argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i", "--input-file",
+    parser.add_argument("-ilr", "--input-lr-file",
         type=pathlib.Path,
-        nargs="+",
         required = True,
-        help="input file[s] to convert"
+        help="input dhits file to convert"
         )
+
+    parser.add_argument("-ipm", "--input-pmaps-file",
+        type=pathlib.Path,
+        required = False,
+        help="input pmaps (maybe with mc) file to convert"
+        )
+
 
     parser.add_argument("-o", "--output-location",
         type=pathlib.Path,
         required=True,
         help="Destination for converted files.  Name of file is preserved with _larcv inserted.")
 
+    parser.add_argument('-db', "--sipm-db-file",
+        type=pathlib.Path,
+        required=False,
+        help="Location of the sipm db file for this input, if pmaps is given.")
+
     args = parser.parse_args()
 
+    if args.input_pmaps_file is not None:
+        sipm_db = pandas.read_pickle(args.sipm_db_file)
+        db_lookup = {
+            "x_lookup" : numpy.asarray(sipm_db['X']),
+            "y_lookup" : numpy.asarray(sipm_db['Y']),
+            "active"   : numpy.asarray(sipm_db['Active']),
+        }
+    else:
+        db_lookup = None
+
+
     print(args)
-    for input_file in args.input_file:
-        convert_file(input_file, args.output_location)
+
+    convert_file(args.input_lr_file, args.input_pmaps_file, args.output_location, db_lookup)
 
 # files = files[0:5]
 
@@ -76,19 +100,18 @@ def get_NEW_LR_meta():
 
 def basic_event_pass(summary):
 
-
     # 1 track:
-    mask = summary['ntrks'] == 1
+    mask = summary['evt_ntrks'] == 1
 
 
     # Z Min:
-    mask = numpy.logical_and(mask, summary['z_min'] > 20.0) # Z = 0 + 2cm
+    mask = numpy.logical_and(mask, summary['evt_z_min'] > 20.0) # Z = 0 + 2cm
 
     # Z Max:
-    mask = numpy.logical_and(mask, summary['z_max'] < 510.0) # Z = 55 - 2 cm
+    mask = numpy.logical_and(mask, summary['evt_z_max'] < 510.0) # Z = 55 - 2 cm
 
     # R Max:
-    mask = numpy.logical_and(mask, summary['r_max'] < 180.0) # R = 180 CM from ander
+    mask = numpy.logical_and(mask, summary['evt_r_max'] < 180.0) # R = 180 CM from ander
 
     return mask
 
@@ -150,10 +173,86 @@ def store_mc_info(io_manager, this_hits, this_particles):
 
     positron = False
 
+    # How to find the vertex?  It's where the gamma interacts.
+    # There can be multiple gammas, so take the one that comes first.
+
+    found_vertex = False
+    vertex = None
+
+
+    vertex_set = io_manager.get_data("bbox3d", "vertex")
+    vertex_collection = larcv.BBoxCollection3D()   
+    vertex_collection.meta(meta) 
+
+    # # Create a tree of particles to help sort out the primary gammas and the vertex.
+    # # On the first pass through, just gathering up the nodes:
+    # nodes = {}
+    # primary = None
+    # for particle in this_particles:
+    #     node = anytree.AnyNode(id=particle['particle_indx'], particle=particle)
+    #     # Tag the primary:
+    #     if particle['primary'] == 1:
+    #         node.parent = None
+    #         primary = node
+    #     else:
+    #         nodes.update({particle['particle_indx'] : node})
+
+    # print(nodes)
+
+    # # Here, sort the list out:
+    # orphans = {}
+    # while len(nodes) > len(orphans):
+    #     # Go through the list assigning nodes to their parent.
+    #     # The primary was never added to the list ofnodes so we shouldn't hit it.
+    #     node_indx, top_node = nodes.popitem()
+    #     target_indx = top_node.particle['mother_indx']
+    #     if target_indx == primary.particle['particle_indx']:
+    #         primary.children = primary.children + (top_node,)
+    #     elif target_indx in nodes.keys():
+    #         nodes[target_indx].children = nodes[target_indx].children + (top_node,)
+    #     else:
+    #         print("Failed to find mother for node ", node)
+    #         orphans[node_indx] = top_node
+    #     # for other_nodes in nodes:
+    #     #     if other_nodes.particle['particle_indx'] == target_indx:
+    #     #         other_nodes
+    #     #         nodes.pop(node)
+    #     #         break
+    #     print("Current length of nodes is: ", len(nodes))
+
+
+    # print(primary.children)
+
     # Now, store the particles:
     for i, particle in enumerate(this_particles):
 
-        if particle['particle_name'] == b'e+' and particle['initial_volume'] == b'ACTIVE': positron = True
+        if particle['particle_name'] == b'e+' and particle['initial_volume'] == b'ACTIVE': 
+            positron = True
+            # print("Positron? ", particle)
+
+        # Criteria to be the 2.6 MeV gamma, the final point of which we use as the vertex:
+        # particle_name == "gamma"
+        # Parent's name == "Pb208[2614.552]" OR kinetic_energy = 2.6145043
+ 
+
+
+        if particle['particle_name'] == b'gamma' \
+            and numpy.abs(particle['kin_energy'] - 2.6145043) < 0.01 \
+            and not found_vertex:
+            vertex = particle['final_vertex']
+
+            # Check that the vertex is in the fiducial volume:
+            if vertex[2] < 510.0 and vertex[2] > 20.0:
+                if numpy.sqrt(vertex[0]**2 + vertex[1]**2) < 180.:
+
+
+                    found_vertex = True
+                    # print("Vertex Candidate: ", particle)
+                    vertex_bbox = larcv.BBox3D(
+                        (vertex[0], vertex[1], vertex[2]),
+                        (0., 0., 0.)
+                    )
+                    vertex_collection.append(vertex_bbox)
 
         if b'Pb208' in particle['particle_name']:
             pdg_code = 30000000
@@ -174,7 +273,126 @@ def store_mc_info(io_manager, this_hits, this_particles):
 
         particle_set.append(p)      
 
+
+    vertex_set.append(vertex_collection)
+
     return positron
+
+
+def slice_into_event(_pmaps, event_number, _keys):
+    # What does this correspond to in the raw file?
+    selection = { key : _pmaps[key]['event'] == event_number for key in _keys }
+    this_pmaps = { key : _pmaps[key][selection[key]] for key in _keys}
+
+    return this_pmaps
+
+def store_pmaps(io_manager, this_pmaps, db_lookup):
+
+    # SiPM locations range from -235 to 235 mm in X and Y (inclusive) every 10mm
+    # That's 47 locations in X and Y.
+
+
+    # First, we note the time of S1, which will tell us Z locations
+
+    s1_peak = numpy.argmax(this_pmaps['S1']['ene'])
+    # This will be in nano seconds
+    s1_t    = this_pmaps['S1']['time'][s1_peak]
+
+
+
+    s2_times = this_pmaps['S2']['time']
+    waveform_length = len(s2_times)
+
+    # This is more sensors than we need, strictly.  Not all of them are filled.
+
+    # For each sensor in the raw waveforms, we need to take the sensor index,
+    # look up the X/Y,
+    # convert to index, and deposit in the dense data
+
+    # We loop over the waveforms in chunks of (s2_times)
+
+
+    # Figure out the total number of sensors:
+    n_sensors = int(len(this_pmaps["S2Si"]) / waveform_length)
+
+    # print(n_sensors)
+
+
+
+    # Get the energy, and use it to select only active hits
+    energy      = this_pmaps["S2Si"]["ene"]
+    # The energy is over all sipms:
+    energy_selection   = energy != 0.0
+
+    # # Make sure we're selecting only active sensors:
+    active_selection   = numpy.take(db_lookup["active"], this_pmaps["S2Si"]["nsipm"]).astype(bool)
+
+
+
+    # # Merge the selections:
+    # selection = numpy.logical_and(energy_selection, active_selection)
+    # selection = active_selection
+
+    # Each sensor has values, some zero, for every tick in the s2_times.
+    # The Z values are constructed from these, so stack this vector up
+    # by the total number of unique sensors
+    # print("s2_times: ", s2_times, len(s2_times))
+    # print("n_sensors: ", n_sensors)
+    # print("selection: ", selection)
+    # ticks       = numpy.tile(s2_times, n_sensors)[selection]
+    ticks       = numpy.tile(s2_times, n_sensors)
+    # print(ticks)
+
+    # x and y are from the sipm lookup tables, and then filter by active sites
+    # x_locations = numpy.take(db_lookup["x_lookup"], this_pmaps["S2Si"]["nsipm"])[selection]
+    # y_locations = numpy.take(db_lookup["y_lookup"], this_pmaps["S2Si"]["nsipm"])[selection]
+
+
+    x_locations = numpy.take(db_lookup["x_lookup"], this_pmaps["S2Si"]["nsipm"])
+    y_locations = numpy.take(db_lookup["y_lookup"], this_pmaps["S2Si"]["nsipm"])
+
+    # unique_sipms = numpy.unique(this_pmaps["S2Si"]["nsipm"])
+    # print("unique: ", unique_sipms)
+    # print(numpy.unique(x_locations))
+    # print(numpy.unique(y_locations))
+    # exit()
+    # Filter the energy to active sites
+    energy      = energy
+    # energy      = energy[selection]
+
+    # Convert to physical coordinates
+    # x_locations = ((x_locations / 10 + 23.5) - 1).astype(numpy.int32)
+    # y_locations = ((y_locations / 10 + 23.5) - 1).astype(numpy.int32)
+    z_locations = ((ticks - s1_t) / 1000).astype(numpy.int32)
+
+
+    # print("x_locations: ", x_locations)
+    # print("y_locations: ", y_locations)
+    # print("z_locations: ", z_locations)
+    # print("energy: ", energy)
+
+    # Put them into larcv:
+    event_sparse3d = io_manager.get_data("sparse3d", "pmaps")
+    
+    meta = get_NEW_meta()
+
+    st = larcv.SparseTensor3D()
+    st.meta(meta)
+
+
+    for x, y, z, e in zip(x_locations, y_locations, z_locations, energy) :
+        if e > 0:
+            index = meta.position_to_index([x, y, z])
+
+            if index >= meta.total_voxels():
+                print(f"Skipping voxel at original coordinates ({x}, {y}, {z}, index {index}) as it is out of bounds")
+                continue
+            st.emplace(larcv.Voxel(index, e), False)
+
+    event_sparse3d.set(st)
+
+    return 
+
 
 
 
@@ -183,27 +401,29 @@ def energy_corrected(energy, z_min, z_max):
 
     return energy/(1. - Z_corr_factor*(z_max-z_min))
 
-def convert_file(input_file, output_directory):
+def convert_file(input_lr_file, input_pmaps_file, output_directory, db_lookup):
     
     # First, open and validate the input file:
-    evtfile = tables.open_file(str(input_file), 'r')
+    evtfile = tables.open_file(str(input_lr_file), 'r')
 
-
+    print(evtfile)
     # No DECO table?  No good, just skip this file
     if not hasattr(evtfile.root, "DECO"): 
         evtfile.close()
         return
 
+    pmaps_file = tables.open_file(str(input_pmaps_file), 'r')
+    print(pmaps_file)
 
     # Read if we have MC or not:
-    if hasattr(evtfile.root, "MC"):
+    if hasattr(pmaps_file.root, "MC"):
         is_mc = True
     else:
         is_mc = False
 
 
     # Format output name:
-    output_name = input_file.name.replace(".h5", "_larcv.h5")
+    output_name = input_lr_file.name.replace(".h5", "_larcv.h5")
     output      = output_directory /  pathlib.Path(output_name)
     
     # Create an output larcv file:
@@ -224,14 +444,14 @@ def convert_file(input_file, output_directory):
     #  - read this for whole-event labels, but also gather out 
 
     if is_mc:
-        mc_extents   = evtfile.root.MC.extents.read()
-        mc_hits      = evtfile.root.MC.hits.read()
-        mc_particles = evtfile.root.MC.particles.read()
+        mc_extents   = pmaps_file.root.MC.extents.read()
+        mc_hits      = pmaps_file.root.MC.hits.read()
+        mc_particles = pmaps_file.root.MC.particles.read()
 
 
     events = evtfile.root.Run.events.read()
     run = evtfile.root.Run.runInfo.read()
-    summary = evtfile.root.SUMMARY.Events.read()
+    summary = evtfile.root.Summary.Events.read()
     # event no is events[i_evt][0]
     # run no is run[i_evt][0]
     # We'll set all subrun info to 0, it doesn't matter.
@@ -244,6 +464,10 @@ def convert_file(input_file, output_directory):
 
     lr_hits = evtfile.root.DECO.Events.read()
     
+    keys = {"S1", "S1Pmt", "S2", "S2Pmt", "S2Si"}
+    pmap_tables = {key : pmaps_file.get_node(f"/PMAPS/{key}/").read() for key in keys}
+
+
     next_new_meta = get_NEW_meta()
 
     mask = basic_event_pass(summary)
@@ -263,6 +487,12 @@ def convert_file(input_file, output_directory):
         # Slice off this summary object:
         this_summary = summary[summary['event'] == event_no]
 
+
+        # Get the pmaps:
+        this_pmaps = slice_into_event(pmap_tables, event_no, keys)
+
+        store_pmaps(io_manager, this_pmaps, db_lookup)
+
         # Parse out the deconv hits:
         this_lr_hits = lr_hits[lr_hits['event'] == event_no]
         store_lr_hits(io_manager, this_lr_hits)
@@ -273,7 +503,6 @@ def convert_file(input_file, output_directory):
 
         if is_mc:
             # Store the mc infomation.  Extract this events hits, particles, etc.
-
             # Slice this extents:
             mc_mask = mc_extents['evt_number'] == event_no
             this_index = numpy.argwhere(mc_mask)[0][0]
@@ -295,6 +524,7 @@ def convert_file(input_file, output_directory):
             this_hits      = mc_hits[hit_start:hit_stop]
 
             positron = store_mc_info(io_manager, this_hits, this_particles)
+            print("Event number: ", event_no, "(positron: ", positron, ")")
 
             # First, we figure out the extents for this event.
 
@@ -310,7 +540,7 @@ def convert_file(input_file, output_directory):
 
         # Calculate the reconstructed energy of the event:
         energy = numpy.sum(this_lr_hits['E'])
-        energy = energy_corrected(energy, this_summary['z_min'][0], this_summary['z_max'][0])
+        energy = energy_corrected(energy, this_summary['evt_z_min'][0], this_summary['evt_z_max'][0])
         particle.energy_deposit(energy)
         # Store the whole measured energy of the event
         event_part   = io_manager.get_data("particle", "event")

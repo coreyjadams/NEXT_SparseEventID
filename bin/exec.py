@@ -95,10 +95,10 @@ class exec(object):
 
 
         if self.args.mode.optimizer.lr_schedule.name == "one_cycle":
-            from src.utils.core import OneCycle
+            from src.utils import OneCycle
             lr_schedule = OneCycle(self.args.mode.optimizer.lr_schedule)
         elif self.args.mode.optimizer.lr_schedule.name == "standard":
-            from src.utils.core import WarmupFlatDecay
+            from src.utils import WarmupFlatDecay
             schedule_args = self.args.mode.optimizer.lr_schedule
             lr_schedule = WarmupFlatDecay(
                 peak_learning_rate = schedule_args.peak_learning_rate,
@@ -118,13 +118,13 @@ class exec(object):
         framework specific code.
         """
 
-        batch_keys = ["pmaps", "label"]
+        self.batch_keys = ["pmaps", "label"]
         ds = create_larcv_dataset(self.args.data, 
             batch_size   = self.args.run.minibatch_size, 
             input_file   = self.args.data.path, 
             name         = "tl208",
             distributed  = self.args.run.distributed,
-            batch_keys   = batch_keys,
+            batch_keys   = self.batch_keys,
             sparse       = self.args.framework.sparse
         )
 
@@ -144,7 +144,7 @@ class exec(object):
 
         self.make_trainer()
 
-        from src.utils.torch.lightning import train
+        from src.utils.lightning import train
         train(self.args, self.trainer, self.datasets)
 
 
@@ -173,7 +173,7 @@ class exec(object):
 
 
             # Determine the stopping point:
-            break_i = self.args.run.run_length * len(dataset) / self.args.run.minibatch_size
+            break_i = self.args.run.length * len(dataset) / self.args.run.minibatch_size
 
             start = time.time()
             for i, minibatch in enumerate(dataset):
@@ -198,19 +198,18 @@ class exec(object):
 
         dataset_length = max([len(ds) for ds in self.datasets.values()])
 
-        self.set_run_length_info(dataset_length)
-
 
         if self.args.mode.name == ModeKind.train:
-            lr_schedule = self.configure_lr_schedule(self.epoch_length, self.max_epochs)
+            lr_schedule = self.configure_lr_schedule(dataset_length, self.args.run.length)
         else:
             lr_schedule = None
 
-        from src.utils.torch import create_lightning_module
+        from src.utils import create_lightning_module
         self.trainer = create_lightning_module(
             self.args,
             self.datasets,
             lr_schedule,
+            self.batch_keys,
         )
 
 

@@ -2,129 +2,173 @@ import torch
 from torch import nn
 
 
+from src.config.network import  Norm
 
 class Block(nn.Module):
 
-    def __init__(self, inplanes, outplanes, bias):
-
+    def __init__(self, *,
+            nIn,
+            nOut,
+            kernel     = [3,3,3],
+            padding    = "same",
+            strides    = [1,1,1],
+            activation = nn.functional.leaky_relu,
+            params):
         nn.Module.__init__(self)
-        
-        self.conv1 = torch.nn.Conv3d(
-            in_channels  = inplanes, 
-            out_channels = outplanes, 
-            kernel_size  = [3, 3, 3], 
-            stride       = [1, 1, 1],
-            padding      = [1, 1, 1],
-            bias         = bias)
-        
-        self.bn1  = torch.nn.BatchNorm3d(outplanes)
-        self.relu = torch.nn.ReLU()
+
+        self.nOut = nOut
+        self.conv = nn.Conv3d(
+            in_channels  = nIn,
+            out_channels = nOut,
+            kernel_size  = kernel,
+            stride       = strides,
+            padding      = padding,
+            bias         = params.bias)
+
+
+        if params.normalization == Norm.batch:
+            self._do_normalization = True
+            self.norm = nn.BatchNorm3d(nOut)
+        elif params.normalization == Norm.layer:
+            self._do_normalization = True
+            self.norm = nn.LayerNorm(nOut)
+        else:
+            self._do_normalization = False
+
+
+        self.activation = activation
 
     def forward(self, x):
-
-        out = self.conv1(x)
-        # if FLAGS.BATCH_NORM:
-        out = self.bn1(out)
-        out = self.relu(out)
-        # else:
-            # out = self.relu(out)
-
+        out = self.conv(x)
+        if self._do_normalization:
+            out = self.norm(out)
+        out = self.activation(out)
         return out
+
 
 
 class ResidualBlock(nn.Module):
 
-    def __init__(self, inplanes, outplanes, bias):
+    def __init__(self, *, 
+            nIn, 
+            nOut, 
+            kernel  = [3,3,3], 
+            padding = "same", 
+            params):
         nn.Module.__init__(self)
-        
-        
-        self.conv1 = torch.nn.Conv3d(
-            in_channels  = inplanes, 
-            out_channels = outplanes, 
-            kernel_size  = [3, 3, 3], 
-            stride       = [1, 1, 1],
-            padding      = [1, 1, 1],
-            bias         = bias)
-        
 
-        # if FLAGS.BATCH_NORM:
-        self.bn1 = torch.nn.BatchNorm3d(outplanes)
 
-        self.conv2 = torch.nn.Conv3d(
-            in_channels  = inplanes, 
-            out_channels = outplanes, 
-            kernel_size  = [3, 3, 3], 
-            stride       = [1, 1, 1],
-            padding      = [1, 1, 1],
-            bias         = bias)
 
-        # if FLAGS.BATCH_NORM:
-        self.bn2 = torch.nn.BatchNorm3d(outplanes)
+        self.convolution_1 = Block(
+            nIn         = nIn,
+            nOut        = nOut,
+            kernel      = kernel,
+            padding     = padding,
+            params      = params)
 
-        self.relu = torch.nn.ReLU()
+        self.convolution_2 = Block(
+            nIn         = nIn,
+            nOut        = nOut,
+            kernel      = kernel,
+            padding     = padding,
+            activation  = torch.nn.Identity(),
+            params      = params)
+
+
 
 
     def forward(self, x):
-
         residual = x
 
-        out = self.conv1(x)
-        # if FLAGS.BATCH_NORM:
-        out = self.bn1(out)
-        # else:
-            # out = self.relu(out)
-        out = self.conv2(out)
+        out = self.convolution_1(x)
 
-        # if FLAGS.BATCH_NORM:
-        out = self.bn2(out)
+        out = self.convolution_2(out)
 
-        # The addition of sparse tensors is not straightforward, since
 
-        out = out + residual
+        out += residual
+        out = nn.functional.leaky_relu(out)
 
-        return self.relu(out)
-
+        return out
 
 
 class ConvolutionDownsample(nn.Module):
 
-    def __init__(self, inplanes, outplanes, bias):
+    def __init__(self, *, nIn, nOut, params):
         nn.Module.__init__(self)
 
-        self.conv = torch.nn.Conv3d(
-            in_channels  = inplanes, 
-            out_channels = outplanes, 
-            kernel_size  = [2, 2, 2], 
+        self.conv = nn.Conv3d(
+            in_channels  = nIn,
+            out_channels = nOut,
+            kernel_size  = [2, 2, 2],
             stride       = [2, 2, 2],
-            padding      = [1, 1, 1],
-            bias         = bias)
+            padding      = "same",
+            bias         = params.bias)
 
-        # if FLAGS.BATCH_NORM:
-        self.bn = torch.nn.BatchNorm3d(outplanes)
-        self.relu = torch.nn.ReLU()
+
+        if params.normalization == Norm.batch:
+            self._do_normalization = True
+            self.norm = nn.BatchNorm3d(nOut)
+        elif params.normalization == Norm.layer:
+            self._do_normalization = True
+            self.norm = nn.LayerNorm(nOut)
+        else:
+            self._do_normalization = False
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         out = self.conv(x)
-
-        # if FLAGS.BATCH_NORM:
-        out = self.bn(out)
+        if self._do_normalization:
+            out = self.norm(out)
 
         out = self.relu(out)
         return out
 
 
+class ConvolutionUpsample(nn.Module):
+
+    def __init__(self, *, nIn, nOut, params):
+        nn.Module.__init__(self)
+
+        self.conv = nn.ConvTranspose3d(
+            in_channels  = nIn,
+            out_channels = nOut,
+            kernel_size  = [2, 2, 2],
+            stride       = [2, 2, 2],
+            padding      = "same",
+            bias         = params.bias)
+
+
+        if params.normalization == Norm.batch:
+            self._do_normalization = True
+            self.norm = nn.BatchNorm3d(nOut)
+        elif params.normalization == Norm.layer:
+            self._do_normalization = True
+            self.norm = nn.LayerNorm(nOut)
+        else:
+            self._do_normalization = False
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+
+        out = self.conv(x)
+        if self._do_normalization:
+            out = self.norm(out)
+        out = self.relu(out)
+        return out
 
 
 class BlockSeries(torch.nn.Module):
 
 
-    def __init__(self, inplanes, n_blocks, bias, residual=True):
+    def __init__(self, *, nIn, n_blocks, params, kernel=[3,3,3], padding="same"):
         torch.nn.Module.__init__(self)
 
-        if residual:
-            self.blocks = [ ResidualBlock(inplanes, inplanes, bias) for i in range(n_blocks) ]
+        if not params.residual:
+            self.blocks = [ Block(nIn = nIn, nOut = nIn,
+                kernel=kernel, padding=padding, params = params) for i in range(n_blocks) ]
         else:
-            self.blocks = [ Block(inplanes, inplanes, bias) for i in range(n_blocks) ]
+            self.blocks = [ ResidualBlock(nIn = nIn, nOut = nIn,
+                kernel=kernel, padding=padding, params = params) for i in range(n_blocks)]
 
         for i, block in enumerate(self.blocks):
             self.add_module('block_{}'.format(i), block)
@@ -133,5 +177,45 @@ class BlockSeries(torch.nn.Module):
     def forward(self, x):
         for i in range(len(self.blocks)):
             x = self.blocks[i](x)
+
         return x
 
+
+class MaxPooling(nn.Module):
+
+    def __init__(self,*, nIn, nOut, params):
+        nn.Module.__init__(self)
+
+
+        self.pool = torch.nn.MaxPool3d(stride=[2,2,2], kernel_size=[2,2,2])
+
+        self.bottleneck = Block(
+            nIn     = nIn,
+            nOut    = nOut,
+            kernel  = [1,1,1],
+            padding = "same",
+            params  = params)
+
+    def forward(self, x):
+        x = self.pool(x)
+
+        return self.bottleneck(x)
+
+class InterpolationUpsample(nn.Module):
+
+    def __init__(self, *, nIn, nOut, params):
+        nn.Module.__init__(self)
+
+
+        self.up = torch.nn.Upsample(scale_factor=(2,2,2), mode="nearest")
+
+        self.bottleneck = Block(
+            nIn     = nIn,
+            nOut    = nOut,
+            kernel  = [1,1,1],
+            padding = "same",
+            params  = params)
+
+    def forward(self, x):
+        x = self.up(x)
+        return self.bottleneck(x)

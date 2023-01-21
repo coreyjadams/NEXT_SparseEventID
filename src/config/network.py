@@ -35,20 +35,19 @@ class Network:
     blocks_per_layer:     int          = 2
     residual:             bool         = True
     weight_decay:         float        = 0.00
-    conv_mode:            ConvMode     = ConvMode.conv_2D
     growth_rate:          GrowthRate   = GrowthRate.additive
-    depth:                int          = 7
-    n_initial_filters:    int          = 16
+    depth:                int          = 4
 
 @dataclass
 class Encoder(Network):
     name:                 str          = "encoder"
-    downsampling:         DownSampling = DownSampling.max_pooling
+    downsampling:         DownSampling = DownSampling.convolutional
+    n_initial_filters:    int          = 16
 
 @dataclass
 class Decoder(Network):
     name:                 str          = "decoder"
-    upsampling:           UpSampling   = UpSampling.interpolation
+    upsampling:           UpSampling   = UpSampling.convolutional
 
 cs = ConfigStore.instance()
 cs.store(group="network", name="encoder",   node=Encoder)

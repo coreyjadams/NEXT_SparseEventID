@@ -24,41 +24,6 @@ The input and the output have the same size.
 
 
 
-class GeneratorFlags(object):
-
-    def __init__(self):
-        self._name = "generator"
-        self._help = "Generator Network for CycleGAN"
-
-    def build_parser(self, parser):
-
-        parser.add_argument("--generator-n-initial-filters",
-            type    = int,
-            default = 16,
-            help    = "Number of filters applied, per plane, for the initial convolution")
-
-        parser.add_argument("--generator-use-bias",
-            help    = "Use a bias unit in layers",
-            type    = str2bool,
-            default = True)
-
-        parser.add_argument("--generator-n-residual-blocks",
-            help    = "Number of residual blocks in the depth of the generator",
-            type    = int,
-            default = 4)
-
-        # parser.add_argument("--batch-norm",
-        #     help    = "Run using batch normalization",
-        #     type    = str2bool,
-        #     default = True)
-
-        # parser.add_argument("--leaky-relu",
-        #     help    = "Run using leaky relu",
-        #     type    = str2bool,
-        #     default = False)
-
-
-
 class ResidualGenerator(nn.Module):
 
     def __init__(self, params):
