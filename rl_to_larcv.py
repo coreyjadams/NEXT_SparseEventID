@@ -26,6 +26,108 @@ pdg_lookup = {
 
 }
 
+def has_table(table, table_name):
+
+    try:
+        table.get_node(table_name)
+        return True
+    except tables.exceptions.NoSuchNodeError:
+        return False
+
+def read_mandatory_tables(input_files):
+
+    # List of tables that must be found:
+    mandatory_tables = [
+        "/DECO/Events/",
+        "/Summary/Events/",
+        "/Run/events/",
+        "/Run/runInfo/",
+        "/PMAPS/S1/",
+        "/PMAPS/S1Pmt/",
+        "/PMAPS/S2/",
+        "/PMAPS/S2Pmt/",
+        "/PMAPS/S2Si/",
+    ]
+
+    optional_mc_tables = [
+        "/MC/extents/",
+        "/MC/hits/",
+        "/MC/particles/",
+    ]
+
+    image_tables = {}
+    mc_tables    = {}
+
+    for _f in input_files:
+        open_file = tables.open_file(str(_f), 'r')
+        # print(open_file)
+        # Look for the mandatory tables in this file:
+        m_found_tables = {}
+        for table_name in mandatory_tables:
+            # print(f"looking for {table_name}")
+            if has_table(open_file, table_name):
+                m_found_tables[table_name] = open_file.get_node(table_name).read()
+
+                # print(f"Found {table_name}")
+            else:
+                # print(f"Didn't find {table_name}")
+                pass
+            # print(m_found_tables.keys())
+            # mandatory_tables.remove(table_name)
+        # image_tables[table_name] = this_table.read()
+
+        # Copy the found tables into the right spot:
+        image_tables.update(m_found_tables)
+
+        # remove everything that's been found:
+        for key in m_found_tables.keys():
+            if key in mandatory_tables: mandatory_tables.remove(key)
+
+
+        # Look for the optional MC tables:
+        o_found_tables = {}
+        for table_name in optional_mc_tables:
+            # print(f"looking for {table_name}")
+            if has_table(open_file, table_name):
+                o_found_tables[table_name] = open_file.get_node(table_name).read()
+                # print(f"Found {table_name}")
+            else:
+                # print(f"Didn't find {table_name}")
+                pass
+            # print(o_found_tables.keys())
+
+        mc_tables.update(o_found_tables)
+        for key in o_found_tables.keys():
+            if key in optional_mc_tables: optional_mc_tables.remove(key)
+
+
+        # Close the file:
+        open_file.close()
+
+    if len(mandatory_tables) != 0:
+        raise Exception(f"Could not find mandatory tables {mandatory_tables}")
+
+    if len(optional_mc_tables) != 0:
+        print("Not all mc tables found, skipping MC")
+        mc_tables = None
+
+
+    return image_tables, mc_tables
+
+def convert_entry_point(input_files, output_file, db_location):
+
+    image_tables, mc_tables = read_mandatory_tables(input_files)
+
+    sipm_db = pandas.read_pickle(db_location)
+    db_lookup = {
+        "x_lookup" : numpy.asarray(sipm_db['X']),
+        "y_lookup" : numpy.asarray(sipm_db['Y']),
+        "active"   : numpy.asarray(sipm_db['Active']),
+    }
+
+
+    convert_to_larcv(image_tables, mc_tables, output_file, db_lookup)
+
 
 def main():
 
@@ -33,45 +135,26 @@ def main():
         description     = 'Convert NEXT data files into larcv format',
         formatter_class = argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-ilr", "--input-lr-file",
-        type=pathlib.Path,
-        required = True,
-        help="input dhits file to convert"
-        )
-
-    parser.add_argument("-ipm", "--input-pmaps-file",
-        type=pathlib.Path,
-        required = False,
-        help="input pmaps (maybe with mc) file to convert"
-        )
-
-
-    parser.add_argument("-o", "--output-location",
+    parser.add_argument("-i", "--input",
         type=pathlib.Path,
         required=True,
-        help="Destination for converted files.  Name of file is preserved with _larcv inserted.")
+        nargs="+",
+        help="Input files.  Will search through files until required tables are found.")
+
+    parser.add_argument("-o", "--output",
+        type=pathlib.Path,
+        required=True,
+        help="Name of output file.")
 
     parser.add_argument('-db', "--sipm-db-file",
         type=pathlib.Path,
-        required=False,
+        required=True,
         help="Location of the sipm db file for this input, if pmaps is given.")
 
     args = parser.parse_args()
 
-    if args.input_pmaps_file is not None:
-        sipm_db = pandas.read_pickle(args.sipm_db_file)
-        db_lookup = {
-            "x_lookup" : numpy.asarray(sipm_db['X']),
-            "y_lookup" : numpy.asarray(sipm_db['Y']),
-            "active"   : numpy.asarray(sipm_db['Active']),
-        }
-    else:
-        db_lookup = None
+    convert_entry_point(args.input, args.output, args.sipm_db_file)
 
-
-    print(args)
-
-    convert_file(args.input_lr_file, args.input_pmaps_file, args.output_location, db_lookup)
 
 # files = files[0:5]
 
@@ -81,10 +164,10 @@ def get_NEW_meta():
     next_new_meta = larcv.ImageMeta3D()
     # set_dimension(size_t axis, double image_size, size_t number_of_voxels, double origin = 0);
 
-    next_new_meta.set_dimension(0, 450, 45, -225)
-    next_new_meta.set_dimension(1, 450, 45, -225)
+    next_new_meta.set_dimension(0, 480, 48, -240)
+    next_new_meta.set_dimension(1, 480, 48, -240)
     next_new_meta.set_dimension(2, 550, int(550/2), 0)
-
+    # print(next_new_meta)
     return next_new_meta
 
 def get_NEW_LR_meta():
@@ -181,8 +264,8 @@ def store_mc_info(io_manager, this_hits, this_particles):
 
 
     vertex_set = io_manager.get_data("bbox3d", "vertex")
-    vertex_collection = larcv.BBoxCollection3D()   
-    vertex_collection.meta(meta) 
+    vertex_collection = larcv.BBoxCollection3D()
+    vertex_collection.meta(meta)
 
     # # Create a tree of particles to help sort out the primary gammas and the vertex.
     # # On the first pass through, just gathering up the nodes:
@@ -226,20 +309,22 @@ def store_mc_info(io_manager, this_hits, this_particles):
     # Now, store the particles:
     for i, particle in enumerate(this_particles):
 
-        if particle['particle_name'] == b'e+' and particle['initial_volume'] == b'ACTIVE': 
+        if particle['particle_name'] == b'e+' and particle['initial_volume'] == b'ACTIVE':
             positron = True
             # print("Positron? ", particle)
 
         # Criteria to be the 2.6 MeV gamma, the final point of which we use as the vertex:
         # particle_name == "gamma"
         # Parent's name == "Pb208[2614.552]" OR kinetic_energy = 2.6145043
- 
+
 
 
         if particle['particle_name'] == b'gamma' \
             and numpy.abs(particle['kin_energy'] - 2.6145043) < 0.01 \
             and not found_vertex:
-            vertex = particle['final_vertex']
+            # print(particle.dtype)
+            vertex = [particle['final_x'], particle['final_x'], particle['final_x']]
+            # vertex = particle['final_vertex']
 
             # Check that the vertex is in the fiducial volume:
             if vertex[2] < 510.0 and vertex[2] > 20.0:
@@ -256,22 +341,42 @@ def store_mc_info(io_manager, this_hits, this_particles):
 
         if b'Pb208' in particle['particle_name']:
             pdg_code = 30000000
-        else:
+        elif particle['particle_name'] in pdg_lookup.keys():
             pdg_code = pdg_lookup[particle['particle_name']]
+        else:
+            pdg_code = -123456789
 
+        # print(particle.dtype)
         p = larcv.Particle()
         p.id(i) # id
-        p.track_id(particle['particle_indx'])
+        p.track_id(particle['particle_id'])
         p.nu_current_type(particle['primary']) # Storing primary info in nu_current_type
         p.pdg_code(pdg_code)
-        p.parent_track_id(particle['mother_indx'])
-        p.position(*particle['initial_vertex'])
-        p.end_position(*particle['final_vertex'])
+        p.parent_track_id(particle['mother_id'])
+        # p.position(*particle['initial_vertex'])
+        p.position(
+            particle['initial_x'],
+            particle['initial_y'],
+            particle['initial_z'],
+            particle['initial_t']
+        )
+        p.end_position(
+            particle['final_x'],
+            particle['final_y'],
+            particle['final_z'],
+            particle['final_t']
+        )
+        # p.end_position(*particle['final_vertex'])
         p.creation_process(particle['creator_proc'])
         p.energy_init(particle['kin_energy'])
-        p.momentum(*particle['momentum'])
+        # p.momentum(*particle['momentum'])
+        p.momentum(
+            particle['initial_momentum_x'],
+            particle['initial_momentum_y'],
+            particle['initial_momentum_z']
+        )
 
-        particle_set.append(p)      
+        particle_set.append(p)
 
 
     vertex_set.append(vertex_collection)
@@ -293,8 +398,9 @@ def store_pmaps(io_manager, this_pmaps, db_lookup):
 
 
     # First, we note the time of S1, which will tell us Z locations
-
-    s1_peak = numpy.argmax(this_pmaps['S1']['ene'])
+    s1_e = this_pmaps["S1"]["ene"]
+    if len(s1_e) == 0: return
+    s1_peak = numpy.argmax(s1_e)
     # This will be in nano seconds
     s1_t    = this_pmaps['S1']['time'][s1_peak]
 
@@ -351,29 +457,17 @@ def store_pmaps(io_manager, this_pmaps, db_lookup):
     x_locations = numpy.take(db_lookup["x_lookup"], this_pmaps["S2Si"]["nsipm"])
     y_locations = numpy.take(db_lookup["y_lookup"], this_pmaps["S2Si"]["nsipm"])
 
-    # unique_sipms = numpy.unique(this_pmaps["S2Si"]["nsipm"])
-    # print("unique: ", unique_sipms)
-    # print(numpy.unique(x_locations))
-    # print(numpy.unique(y_locations))
-    # exit()
     # Filter the energy to active sites
     energy      = energy
     # energy      = energy[selection]
 
     # Convert to physical coordinates
-    # x_locations = ((x_locations / 10 + 23.5) - 1).astype(numpy.int32)
-    # y_locations = ((y_locations / 10 + 23.5) - 1).astype(numpy.int32)
     z_locations = ((ticks - s1_t) / 1000).astype(numpy.int32)
 
 
-    # print("x_locations: ", x_locations)
-    # print("y_locations: ", y_locations)
-    # print("z_locations: ", z_locations)
-    # print("energy: ", energy)
-
     # Put them into larcv:
     event_sparse3d = io_manager.get_data("sparse3d", "pmaps")
-    
+
     meta = get_NEW_meta()
 
     st = larcv.SparseTensor3D()
@@ -391,44 +485,34 @@ def store_pmaps(io_manager, this_pmaps, db_lookup):
 
     event_sparse3d.set(st)
 
-    return 
+    return
 
 
 
 
 def energy_corrected(energy, z_min, z_max):
-    Z_corr_factor = 2.76e-4 
+    Z_corr_factor = 2.76e-4
 
     return energy/(1. - Z_corr_factor*(z_max-z_min))
 
-def convert_file(input_lr_file, input_pmaps_file, output_directory, db_lookup):
-    
-    # First, open and validate the input file:
-    evtfile = tables.open_file(str(input_lr_file), 'r')
+def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
 
-    print(evtfile)
-    # No DECO table?  No good, just skip this file
-    if not hasattr(evtfile.root, "DECO"): 
-        evtfile.close()
-        return
+    # print(image_tables.keys())
+    # print(mc_tables.keys())
 
-    pmaps_file = tables.open_file(str(input_pmaps_file), 'r')
-    print(pmaps_file)
-
-    # Read if we have MC or not:
-    if hasattr(pmaps_file.root, "MC"):
+    if mc_tables is not None:
         is_mc = True
     else:
         is_mc = False
 
 
-    # Format output name:
-    output_name = input_lr_file.name.replace(".h5", "_larcv.h5")
-    output      = output_directory /  pathlib.Path(output_name)
-    
+    # # Format output name:
+    # output_name = input_lr_file.name.replace(".h5", "_larcv.h5")
+    # output      = output_directory /  pathlib.Path(output_name)
+
     # Create an output larcv file:
     io_manager = larcv.IOManager(larcv.IOManager.kWRITE)
-    io_manager.set_out_file(str(output))
+    io_manager.set_out_file(str(output_name))
     io_manager.initialize()
 
     # Now, ready to go.  Read in a couple tables:
@@ -441,17 +525,17 @@ def convert_file(input_lr_file, input_pmaps_file, output_directory, db_lookup):
     # - DECO contains the deconvolved hits.  They are stored by event number, contain x/y/z/E
     #  - read this and get the hits from each event.
     # - (ONLY MC): MC contains mc truth information.
-    #  - read this for whole-event labels, but also gather out 
+    #  - read this for whole-event labels, but also gather out
 
     if is_mc:
-        mc_extents   = pmaps_file.root.MC.extents.read()
-        mc_hits      = pmaps_file.root.MC.hits.read()
-        mc_particles = pmaps_file.root.MC.particles.read()
+        mc_extents   = mc_tables["/MC/extents/"]
+        mc_hits      = mc_tables["/MC/hits/"]
+        mc_particles = mc_tables["/MC/particles/"]
 
+    events  = image_tables["/Run/events/"]
+    run     = image_tables["/Run/runInfo/"]
+    summary = image_tables["/Summary/Events/"]
 
-    events = evtfile.root.Run.events.read()
-    run = evtfile.root.Run.runInfo.read()
-    summary = evtfile.root.Summary.Events.read()
     # event no is events[i_evt][0]
     # run no is run[i_evt][0]
     # We'll set all subrun info to 0, it doesn't matter.
@@ -462,10 +546,11 @@ def convert_file(input_lr_file, input_pmaps_file, output_directory, db_lookup):
     event_numbers = events['evt_number']
     # event_energy  = summary['evt_energy']
 
-    lr_hits = evtfile.root.DECO.Events.read()
-    
+    # lr_hits = evtfile.root.DECO.Events.read()
+    lr_hits = image_tables["/DECO/Events/"]
+
     keys = {"S1", "S1Pmt", "S2", "S2Pmt", "S2Si"}
-    pmap_tables = {key : pmaps_file.get_node(f"/PMAPS/{key}/").read() for key in keys}
+    pmap_tables = {key : image_tables["/PMAPS/" + key + "/"] for key in keys}
 
 
     next_new_meta = get_NEW_meta()
@@ -524,7 +609,7 @@ def convert_file(input_lr_file, input_pmaps_file, output_directory, db_lookup):
             this_hits      = mc_hits[hit_start:hit_stop]
 
             positron = store_mc_info(io_manager, this_hits, this_particles)
-            print("Event number: ", event_no, "(positron: ", positron, ")")
+            # print("Event number: ", event_no, "(positron: ", positron, ")")
 
             # First, we figure out the extents for this event.
 
@@ -567,7 +652,7 @@ def convert_file(input_lr_file, input_pmaps_file, output_directory, db_lookup):
     #     ################################################################################
 
 
-      
+
 
         io_manager.save_entry()
         # if i_evt > 50:
@@ -577,7 +662,7 @@ def convert_file(input_lr_file, input_pmaps_file, output_directory, db_lookup):
     io_manager.finalize()
 
     # Close tables:
-    evtfile.close()
+    # evtfile.close()
 
     return
 
