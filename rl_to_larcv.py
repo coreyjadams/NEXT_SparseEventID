@@ -588,7 +588,7 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
 
         found_pmaps = store_pmaps(io_manager, this_pmaps, db_lookup)
         found_all_images = found_pmaps and found_all_images
-        print(event_no, found_pmaps)
+        # print(event_no, found_pmaps)
         # Parse out the deconv hits:
         this_lr_hits = lr_hits[lr_hits['event'] == event_no]
         if len(this_lr_hits) > 0:
@@ -623,7 +623,7 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
             this_particles = mc_particles[particle_start:particle_stop]
             this_hits      = mc_hits[hit_start:hit_stop]
 
-            print(len(this_hits))
+            # print(len(this_hits))
 
             positron = store_mc_info(io_manager, this_hits, this_particles)
             # print("Event number: ", event_no, "(positron: ", positron, ")")
