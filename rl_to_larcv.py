@@ -60,7 +60,6 @@ def read_mandatory_tables(input_files):
 
     for _f in input_files:
         open_file = tables.open_file(str(_f), 'r')
-        # print(open_file)
         # Look for the mandatory tables in this file:
         m_found_tables = {}
         for table_name in mandatory_tables:
@@ -68,13 +67,8 @@ def read_mandatory_tables(input_files):
             if has_table(open_file, table_name):
                 m_found_tables[table_name] = open_file.get_node(table_name).read()
 
-                # print(f"Found {table_name}")
             else:
-                # print(f"Didn't find {table_name}")
                 pass
-            # print(m_found_tables.keys())
-            # mandatory_tables.remove(table_name)
-        # image_tables[table_name] = this_table.read()
 
         # Copy the found tables into the right spot:
         image_tables.update(m_found_tables)
@@ -87,14 +81,10 @@ def read_mandatory_tables(input_files):
         # Look for the optional MC tables:
         o_found_tables = {}
         for table_name in optional_mc_tables:
-            # print(f"looking for {table_name}")
             if has_table(open_file, table_name):
                 o_found_tables[table_name] = open_file.get_node(table_name).read()
-                # print(f"Found {table_name}")
             else:
-                # print(f"Didn't find {table_name}")
                 pass
-            # print(o_found_tables.keys())
 
         mc_tables.update(o_found_tables)
         for key in o_found_tables.keys():
@@ -175,8 +165,8 @@ def get_NEW_LR_meta():
     next_new_meta = larcv.ImageMeta3D()
     # set_dimension(size_t axis, double image_size, size_t number_of_voxels, double origin = 0);
 
-    next_new_meta.set_dimension(0, 450, 450, -225)
-    next_new_meta.set_dimension(1, 450, 450, -225)
+    next_new_meta.set_dimension(0, 480, 480, -240)
+    next_new_meta.set_dimension(1, 480, 480, -240)
     next_new_meta.set_dimension(2, 549, 305, 0)
 
     return next_new_meta
@@ -222,8 +212,13 @@ def store_lr_hits(io_manager, this_lr_hits):
 
 def store_mc_info(io_manager, this_hits, this_particles):
     event_cluster3d = io_manager.get_data("cluster3d", "mc_hits")
+    event_cluster3d.clear()
 
-    cluster_indexes = numpy.unique(this_hits['particle_indx'])
+
+    if 'particle_indx' in this_hits.dtype.names:
+        cluster_indexes = numpy.unique(this_hits['particle_indx'])
+    else:
+        cluster_indexes = numpy.unique(this_hits['particle_id'])
 
     meta = get_NEW_LR_meta()
 
@@ -240,9 +235,14 @@ def store_mc_info(io_manager, this_hits, this_particles):
     # Add all the hits to the right cluster:
     for hit in this_hits:
         # Get the index from the meta
-        index = meta.position_to_index(hit['hit_position'])
-        # Create a voxel on the fly with the energy
-        vs[cluster_lookup[hit['particle_indx']]].add(larcv.Voxel(index, hit['hit_energy']))
+        if 'hit_position' in hit.dtype.names:
+            index = meta.position_to_index(hit['hit_position'])
+            # Create a voxel on the fly with the energy
+            vs[cluster_lookup[hit['particle_indx']]].add(larcv.Voxel(index, hit['hit_energy']))
+        else:
+            index = meta.position_to_index((hit['x'], hit['y'], hit['z']))
+            # Create a voxel on the fly with the energy
+            vs[cluster_lookup[hit['particle_id']]].add(larcv.Voxel(index, hit['energy']))
 
     # Add the voxel sets into the cluster set
     for i, v in enumerate(vs):
@@ -253,6 +253,7 @@ def store_mc_info(io_manager, this_hits, this_particles):
     event_cluster3d.set(sc)
 
     particle_set = io_manager.get_data("particle", "all_particles")
+    particle_set.clear()
 
     positron = False
 
@@ -323,8 +324,10 @@ def store_mc_info(io_manager, this_hits, this_particles):
             and numpy.abs(particle['kin_energy'] - 2.6145043) < 0.01 \
             and not found_vertex:
             # print(particle.dtype)
-            vertex = [particle['final_x'], particle['final_x'], particle['final_x']]
-            # vertex = particle['final_vertex']
+            if 'final_vertex' in particle.dtype.names:
+                vertex = particle['final_vertex']
+            else:
+                vertex = [particle['final_x'], particle['final_x'], particle['final_x']]
 
             # Check that the vertex is in the fiducial volume:
             if vertex[2] < 510.0 and vertex[2] > 20.0:
@@ -346,35 +349,40 @@ def store_mc_info(io_manager, this_hits, this_particles):
         else:
             pdg_code = -123456789
 
-        # print(particle.dtype)
         p = larcv.Particle()
         p.id(i) # id
-        p.track_id(particle['particle_id'])
+        if 'particle_indx' in particle.dtype.names:
+            p.track_id(particle['particle_indx'])
+            p.parent_track_id(particle['mother_indx'])
+            p.end_position(*particle['final_vertex'])
+            p.position(*particle['initial_vertex'])
+            p.momentum(*particle['momentum'])
+        else:
+            p.track_id(particle['particle_id'])
+            p.parent_track_id(particle['mother_id'])
+            p.position(
+                particle['initial_x'],
+                particle['initial_y'],
+                particle['initial_z'],
+                particle['initial_t']
+            )
+            p.end_position(
+                particle['final_x'],
+                particle['final_y'],
+                particle['final_z'],
+                particle['final_t']
+            )
+            p.momentum(
+                particle['initial_momentum_x'],
+                particle['initial_momentum_y'],
+                particle['initial_momentum_z']
+            )
+         
         p.nu_current_type(particle['primary']) # Storing primary info in nu_current_type
         p.pdg_code(pdg_code)
-        p.parent_track_id(particle['mother_id'])
-        # p.position(*particle['initial_vertex'])
-        p.position(
-            particle['initial_x'],
-            particle['initial_y'],
-            particle['initial_z'],
-            particle['initial_t']
-        )
-        p.end_position(
-            particle['final_x'],
-            particle['final_y'],
-            particle['final_z'],
-            particle['final_t']
-        )
-        # p.end_position(*particle['final_vertex'])
+
         p.creation_process(particle['creator_proc'])
         p.energy_init(particle['kin_energy'])
-        # p.momentum(*particle['momentum'])
-        p.momentum(
-            particle['initial_momentum_x'],
-            particle['initial_momentum_y'],
-            particle['initial_momentum_z']
-        )
 
         particle_set.append(p)
 
@@ -399,7 +407,7 @@ def store_pmaps(io_manager, this_pmaps, db_lookup):
 
     # First, we note the time of S1, which will tell us Z locations
     s1_e = this_pmaps["S1"]["ene"]
-    if len(s1_e) == 0: return
+    if len(s1_e) == 0: return False
     s1_peak = numpy.argmax(s1_e)
     # This will be in nano seconds
     s1_t    = this_pmaps['S1']['time'][s1_peak]
@@ -485,7 +493,7 @@ def store_pmaps(io_manager, this_pmaps, db_lookup):
 
     event_sparse3d.set(st)
 
-    return
+    return True
 
 
 
@@ -564,6 +572,8 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
 
     for i_evt, event_no in enumerate(event_numbers):
 
+        found_all_images = True
+
         # Did this event pass the basic event cuts?
         if event_no not in passed_events: continue
 
@@ -576,11 +586,16 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
         # Get the pmaps:
         this_pmaps = slice_into_event(pmap_tables, event_no, keys)
 
-        store_pmaps(io_manager, this_pmaps, db_lookup)
-
+        found_pmaps = store_pmaps(io_manager, this_pmaps, db_lookup)
+        found_all_images = found_pmaps and found_all_images
+        print(event_no, found_pmaps)
         # Parse out the deconv hits:
         this_lr_hits = lr_hits[lr_hits['event'] == event_no]
-        store_lr_hits(io_manager, this_lr_hits)
+        if len(this_lr_hits) > 0:
+            store_lr_hits(io_manager, this_lr_hits)
+        else:
+            found_all_images = False
+            print("no deco hits found")
 
         # We store the measured energy, correct, in 'energy_deposit'
         # We store the mc energy, if we have it, in 'energy_init'
@@ -608,6 +623,8 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
             this_particles = mc_particles[particle_start:particle_stop]
             this_hits      = mc_hits[hit_start:hit_stop]
 
+            print(len(this_hits))
+
             positron = store_mc_info(io_manager, this_hits, this_particles)
             # print("Event number: ", event_no, "(positron: ", positron, ")")
 
@@ -620,7 +637,10 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
                 particle.pdg_code(1)
 
             # Calculate the true energy of the event:
-            true_e = numpy.sum(this_hits['hit_energy'])
+            if 'hit_energy' in this_hits.dtype.names:
+                true_e = numpy.sum(this_hits['hit_energy'])
+            else:
+                true_e = numpy.sum(this_hits['energy'])
             particle.energy_init(true_e)
 
         # Calculate the reconstructed energy of the event:
@@ -653,13 +673,14 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
 
 
 
-
-        io_manager.save_entry()
-        # if i_evt > 50:
-        #     break
+        if found_all_images:
+            io_manager.save_entry()
+        # if i_evt > 65:
+            # break
 
     # Close Larcv:
-    io_manager.finalize()
+    if found_pmaps:
+        io_manager.finalize()
 
     # Close tables:
     # evtfile.close()
