@@ -118,23 +118,31 @@ class exec(object):
         framework specific code.
         """
 
-        self.batch_keys = ["pmaps", "label"]
-        ds = create_larcv_dataset(self.args.data, 
-            batch_size   = self.args.run.minibatch_size, 
-            input_file   = self.args.data.path, 
-            name         = "tl208",
-            distributed  = self.args.run.distributed,
-            batch_keys   = self.batch_keys,
-            sparse       = self.args.framework.sparse
-        )
+        from src.io import create_torch_larcv_dataloader
 
-        return {"tl208" : ds}
+        self.batch_keys = ["pmaps", "label"]
+        ds = {}
+        for active in self.args.data.active:
+            larcv_ds = create_larcv_dataset(self.args.data,
+                batch_size   = self.args.run.minibatch_size,
+                input_file   = getattr(self.args.data, active),
+                name         = active,
+                distributed  = self.args.run.distributed,
+                batch_keys   = self.batch_keys,
+                sparse       = self.args.framework.sparse
+            )
+
+            ds.update({
+                active :  create_torch_larcv_dataloader(larcv_ds, self.args.run.minibatch_size)
+            })
+
+        return ds
 
 
     def configure_logger(self, rank):
 
         logger = logging.getLogger("NEXT")
-        
+
 
     def train(self):
 
@@ -173,7 +181,7 @@ class exec(object):
 
 
             # Determine the stopping point:
-            break_i = self.args.run.length * len(dataset) / self.args.run.minibatch_size
+            break_i = self.args.run.length * len(dataset)
 
             start = time.time()
             for i, minibatch in enumerate(dataset):

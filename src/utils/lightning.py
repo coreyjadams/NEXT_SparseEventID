@@ -87,7 +87,9 @@ class lightning_trainer(pl.LightningModule):
             self._previous_log_time = self._current_log_time
             logger.info("{} Step {} metrics: {}".format(mode, self.global_step, s))
 
-
+    def exit(self):
+        pass
+        
     def calculate_ae_loss(self, input_images, decoded_images):
         loss = torch.nn.functional.mse_loss(input_images, decoded_images)
         return loss
@@ -124,6 +126,8 @@ def build_networks(args, image_size):
 from src.io.data import create_torch_larcv_dataloader
 # from src.networks import create_vertex_meta
 
+from lightning_fabric.plugins.environments import MPIEnvironment
+
 def create_lightning_module(args, datasets, lr_scheduler=None, batch_keys=None):
 
     # Going to build up the lightning module here.
@@ -137,31 +141,22 @@ def create_lightning_module(args, datasets, lr_scheduler=None, batch_keys=None):
         image_key = 'lr_hits'
 
 
-    image_shape = example_ds.image_size(image_key)
+    image_shape = example_ds.dataset.image_size(image_key)
 
     # vertex_meta = create_vertex_meta(args, example_ds.image_meta, example_ds.image_size())
-
-    # Turn the datasets into dataloaders:
-    for key in datasets.keys():
-        datasets[key] = create_torch_larcv_dataloader(
-            datasets[key], args.run.minibatch_size)
-
-    print(next(iter(datasets['tl208']))['pmaps'])
+    #
+    # # Turn the datasets into dataloaders:
+    # for key in datasets.keys():
+    #     datasets[key] = create_torch_larcv_dataloader(
+    #         datasets[key], args.run.minibatch_size)
 
     # Next, create the network:
     encoder, decoder = build_networks(args, image_shape)
 
-    # if args.network.classification.active:
-    #     weight = torch.tensor([0.16, 0.1666, 0.16666, 0.5])
-    #     loss_calc = LossCalculator(args, weight=weight)
-    # else:
-    #     loss_calc = LossCalculator(args)
-    # acc_calc = AccuracyCalculator(args)
-
 
     model = lightning_trainer(
-        args, 
-        encoder, 
+        args,
+        encoder,
         decoder,
         image_key,
         lr_scheduler
@@ -194,13 +189,13 @@ def train(args, lightning_model, datasets):
         elif args.framework.distributed_mode == DistributedMode.DDP:
             from pytorch_lightning.strategies import DDPStrategy
             strategy = DDPStrategy(
-                cluster_environment = MPIClusterEnvironment()
+                cluster_environment = MPIEnvironment()
             )
         elif args.framework.distributed_mode == DistributedMode.deepspeed:
             strategy = "deepspeed"
 
-        devices   = int(os.environ['LOCAL_SIZE'])
-        num_nodes = int(os.environ['N_NODES'])
+        # devices   = int(os.environ['LOCAL_SIZE'])
+        # num_nodes = int(os.environ['N_NODES'])
         plugins   = []
         # if args.run.compute_mode == ComputeMode.CUDA:
         #     os.environ['CUDA_VISIBLE_DEVICES'] = os.environ['LOCAL_RANK']
@@ -219,9 +214,7 @@ def train(args, lightning_model, datasets):
 
     trainer = pl.Trainer(
         accelerator             = args.run.compute_mode.name.lower(),
-        devices                 = devices,
-        num_nodes               = num_nodes,
-        auto_select_gpus        = True,
+        # num_nodes               = num_nodes,
         default_root_dir        = args.output_dir,
         precision               = precision,
         profiler                = profiler,
@@ -231,13 +224,11 @@ def train(args, lightning_model, datasets):
         logger                  = tb_logger,
         max_epochs              = args.run.length,
         plugins                 = plugins,
-        # benchmark               = True,
         accumulate_grad_batches = args.mode.optimizer.gradient_accumulation,
     )
 
-    print(datasets)
-
     trainer.fit(
         lightning_model,
-        train_dataloaders=datasets["tl208"],
+        train_dataloaders=datasets["train"],
+        val_dataloaders = datasets["val"]
     )

@@ -49,11 +49,11 @@ class Block(nn.Module):
 
 class ResidualBlock(nn.Module):
 
-    def __init__(self, *, 
-            nIn, 
-            nOut, 
-            kernel  = [3,3,3], 
-            padding = "same", 
+    def __init__(self, *,
+            nIn,
+            nOut,
+            kernel  = [3,3,3],
+            padding = "same",
             params):
         nn.Module.__init__(self)
 
@@ -101,7 +101,7 @@ class ConvolutionDownsample(nn.Module):
             out_channels = nOut,
             kernel_size  = [2, 2, 2],
             stride       = [2, 2, 2],
-            padding      = "same",
+            padding      = "valid",
             bias         = params.bias)
 
 
@@ -134,7 +134,7 @@ class ConvolutionUpsample(nn.Module):
             out_channels = nOut,
             kernel_size  = [2, 2, 2],
             stride       = [2, 2, 2],
-            padding      = "same",
+            padding      = [0, 0, 0],
             bias         = params.bias)
 
 
