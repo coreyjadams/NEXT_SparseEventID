@@ -15,12 +15,13 @@ class lightning_trainer(pl.LightningModule):
     a NotImplemented error.
 
     '''
-    def __init__(self, args, encoder, decoder,
+    def __init__(self, args, input_layer, encoder, decoder,
                  image_key   = "pmaps",
                  lr_scheduler=None ):
         super().__init__()
 
         self.args         = args
+        self.input_layer  = input_layer
         self.encoder      = encoder
         self.decoder      = decoder
         self.image_key    = image_key
@@ -30,7 +31,7 @@ class lightning_trainer(pl.LightningModule):
 
 
     def forward(self, batch):
-
+        print(batch)
         encoded = self.encoder(batch)
         decoded = self.decoder(encoded)
 
@@ -40,12 +41,18 @@ class lightning_trainer(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
 
-        input_images   = batch[self.image_key]
+        print(batch[self.image_key])
+        input_images   = self.input_layer(batch[self.image_key])
+        print(input_images)
         decoded_images = self(input_images)
 
         loss = self.calculate_ae_loss(input_images, decoded_images)
 
-        metrics = {'loss' : loss}
+        metrics = {
+            'loss' : loss,
+            'lr' : self.optimizers().state_dict()['param_groups'][0]['lr']
+        }
+
         # self.log()
         self.print_log(metrics)
         self.log_dict(metrics)
@@ -89,8 +96,10 @@ class lightning_trainer(pl.LightningModule):
 
     def exit(self):
         pass
-        
+
     def calculate_ae_loss(self, input_images, decoded_images):
+        print(input_images)
+        print(decoded_images)
         loss = torch.nn.functional.mse_loss(input_images, decoded_images)
         return loss
 
@@ -151,13 +160,13 @@ def create_lightning_module(args, datasets, lr_scheduler=None, batch_keys=None):
     #         datasets[key], args.run.minibatch_size)
 
     # Next, create the network:
-    encoder, decoder = build_networks(args, image_shape)
-
+    input_layer, encoder, decoder = build_networks(args, image_shape)
 
     model = lightning_trainer(
         args,
         encoder,
         decoder,
+        input_layer,
         image_key,
         lr_scheduler
     )
@@ -222,6 +231,7 @@ def train(args, lightning_model, datasets):
         enable_progress_bar     = False,
         replace_sampler_ddp     = True,
         logger                  = tb_logger,
+        log_every_n_steps       = 1,
         max_epochs              = args.run.length,
         plugins                 = plugins,
         accumulate_grad_batches = args.mode.optimizer.gradient_accumulation,

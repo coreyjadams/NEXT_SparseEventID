@@ -37,9 +37,10 @@ def create_models(params, image_size):
     encoder = torch.nn.Sequential()
 
     if params.framework.sparse:
-        encoder.append(
-            scn.InputLayer(dimension=3, spatial_size=image_size)
-        )
+        input_layer = scn.InputLayer(dimension=3, spatial_size=torch.tensor(image_size))
+    else:
+        input_layer = torch.nn.Identity()
+
 
     encoder.append(
         Block(
@@ -77,7 +78,7 @@ def create_models(params, image_size):
     # Now build the decoder:
 
     decoder = torch.nn.Sequential()
-    
+
 
     if params.decoder.upsampling == UpSampling.convolutional:
         upsampler = ConvolutionUpsample
@@ -110,4 +111,7 @@ def create_models(params, image_size):
             params = params.decoder
         ),
     )
-    return encoder, decoder
+
+    # In sparse mode, spit out the final
+
+    return input_layer, encoder, decoder
