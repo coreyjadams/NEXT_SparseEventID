@@ -64,7 +64,6 @@ class LRSchedule:
 
         self.segments = segments
 
-
     def __len__(self):
         l = 0
         for segment in self.segments: l += len(segment)
@@ -86,7 +85,7 @@ class LRSchedule:
 
         # Default return value:
         return 0.0
-        
+
     def __call__(self, idx):
         return self.__getitem__(idx)
 
@@ -103,6 +102,8 @@ class WarmupFlatDecay(LRSchedule):
             self.total_epochs       = total_epochs
 
         flat_epochs = self.total_epochs - self.decay_epochs - 1
+
+
 
         segments = [
             Linear(

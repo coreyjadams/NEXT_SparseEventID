@@ -5,6 +5,7 @@ import pathlib
 
 import numpy
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 try:
     import tensorflow as tf
     tf.get_logger().setLevel('INFO')
@@ -138,10 +139,14 @@ class exec(object):
 
         return ds
 
-
     def configure_logger(self, rank):
 
         logger = logging.getLogger("NEXT")
+        if rank == 0:
+            logger.setFile(self.args.output_dir + "/process.log")
+            logger.setLevel(logging.INFO)
+        else:
+            logger.setLevel(999)
 
 
     def train(self):

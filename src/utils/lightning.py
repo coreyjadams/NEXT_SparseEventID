@@ -31,22 +31,21 @@ class lightning_trainer(pl.LightningModule):
 
 
     def forward(self, batch):
-        print(batch)
         encoded = self.encoder(batch)
         decoded = self.decoder(encoded)
-
         return decoded
 
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
 
-        print(batch[self.image_key])
         input_images   = self.input_layer(batch[self.image_key])
-        print(input_images)
         decoded_images = self(input_images)
 
-        loss = self.calculate_ae_loss(input_images, decoded_images)
+        if self.args.framework.sparse:
+            loss = self.calculate_ae_loss(input_images.features, decoded_images.features)
+        else:
+            loss = self.calculate_ae_loss(input_images, decoded_images)
 
         metrics = {
             'loss' : loss,
@@ -98,8 +97,6 @@ class lightning_trainer(pl.LightningModule):
         pass
 
     def calculate_ae_loss(self, input_images, decoded_images):
-        print(input_images)
-        print(decoded_images)
         loss = torch.nn.functional.mse_loss(input_images, decoded_images)
         return loss
 
@@ -164,9 +161,9 @@ def create_lightning_module(args, datasets, lr_scheduler=None, batch_keys=None):
 
     model = lightning_trainer(
         args,
+        input_layer,
         encoder,
         decoder,
-        input_layer,
         image_key,
         lr_scheduler
     )
@@ -210,8 +207,9 @@ def train(args, lightning_model, datasets):
         #     os.environ['CUDA_VISIBLE_DEVICES'] = os.environ['LOCAL_RANK']
         #     devices=1
     else:
+        from pytorch_lightning.strategies import SingleDeviceStrategy
         plugins   = []
-        strategy  = None
+        strategy  = SingleDeviceStrategy("cuda:0")
         devices   = 1
         num_nodes = 1
 
@@ -223,17 +221,15 @@ def train(args, lightning_model, datasets):
 
     trainer = pl.Trainer(
         accelerator             = args.run.compute_mode.name.lower(),
-        # num_nodes               = num_nodes,
         default_root_dir        = args.output_dir,
         precision               = precision,
         profiler                = profiler,
         strategy                = strategy,
         enable_progress_bar     = False,
-        replace_sampler_ddp     = True,
         logger                  = tb_logger,
         log_every_n_steps       = 1,
         max_epochs              = args.run.length,
-        plugins                 = plugins,
+        # plugins                 = plugins,
         accumulate_grad_batches = args.mode.optimizer.gradient_accumulation,
     )
 
