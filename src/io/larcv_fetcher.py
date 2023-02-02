@@ -67,9 +67,9 @@ def prepare_next_config(batch_size, input_file, data_args, name,
     from larcv.config_builder import ConfigBuilder
     cb = ConfigBuilder()
     cb.set_parameter([str(input_file)], "InputFiles")
-    cb.set_parameter(5, "ProcessDriver", "IOManager", "Verbosity")
-    cb.set_parameter(5, "ProcessDriver", "Verbosity")
-    cb.set_parameter(5, "Verbosity")
+    cb.set_parameter(6, "ProcessDriver", "IOManager", "Verbosity")
+    cb.set_parameter(6, "ProcessDriver", "Verbosity")
+    cb.set_parameter(6, "Verbosity")
 
 
 

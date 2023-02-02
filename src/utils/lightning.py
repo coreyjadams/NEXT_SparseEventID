@@ -1,6 +1,9 @@
 import torch
 import pytorch_lightning as pl
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
 import datetime
 
 from src.config import OptimizerKind
@@ -75,7 +78,7 @@ class lightning_trainer(pl.LightningModule):
             # try:
                 total_images = self.args.run.minibatch_size
                 images_per_second = total_images / (self._current_log_time - self._previous_log_time).total_seconds()
-                time_string.append("{:.2} Img/s".format(images_per_second))
+                time_string.append("{:.3} Img/s".format(images_per_second))
 
             if 'io_fetch_time' in metrics.keys():
                 time_string.append("{:.2} IOs".format(metrics['io_fetch_time']))
@@ -134,6 +137,17 @@ from src.io.data import create_torch_larcv_dataloader
 
 from lightning_fabric.plugins.environments import MPIEnvironment
 
+class OversubscribeMPIEnv(MPIEnvironment):
+
+    def __init__(self, oversubscribe=None, **kwargs):
+        super().__init__(**kwargs)
+        self.o = oversubscribe
+
+    def local_rank(self):
+        lr = super().local_rank()
+        if self.o is None: return lr
+        return lr // self.o
+
 def create_lightning_module(args, datasets, lr_scheduler=None, batch_keys=None):
 
     # Going to build up the lightning module here.
@@ -187,6 +201,8 @@ def train(args, lightning_model, datasets):
     else:
         profiler  = None
 
+    oversubscribe = args.framework.oversubscribe
+
     # Distributed strategy:
     if args.run.distributed:
         from src.config import DistributedMode
@@ -194,8 +210,13 @@ def train(args, lightning_model, datasets):
             strategy = "horovod"
         elif args.framework.distributed_mode == DistributedMode.DDP:
             from pytorch_lightning.strategies import DDPStrategy
+            backend = "nccl"
+            if oversubscribe > 1:
+                backend = "gloo"
             strategy = DDPStrategy(
-                cluster_environment = MPIEnvironment()
+                cluster_environment = OversubscribeMPIEnv(
+                    oversubscribe),
+                process_group_backend=backend
             )
         elif args.framework.distributed_mode == DistributedMode.deepspeed:
             strategy = "deepspeed"
