@@ -5,7 +5,10 @@ from hydra.core.config_store import ConfigStore
 from typing import Tuple, Any
 from omegaconf import MISSING
 
-dataset_top   = "/lus/grand/projects/datascience/cadams/datasets/NEXT/officialProduction/"
+# from . transforms import Transform
+
+dataset_top   = "/data/datasets/NEXT/officialProduction/"
+# dataset_top   = "/lus/grand/projects/datascience/cadams/datasets/NEXT/officialProduction/"
 mc_bkg_dir    = dataset_top + "Background/NEXT_v1_05_02_NEXUS_v5_07_10_bkg_v9/larcv/merged_final/"
 mc_tl_208_dir = dataset_top + "Calibration/NEXT_v1_05_02_NEXUS_v5_07_10_bkg_v9/larcv/merged/"
 
@@ -23,8 +26,9 @@ class Data:
     train:       str = ""
     test:        str = ""
     val:         str = ""
-    active: Tuple[str] =  field(default_factory=list)
-
+    active: Tuple[str] = field(default_factory=list)
+    # transform1: Tuple[Transform] = field(default_factory=list)
+    # transform2: Tuple[Transform] = field(default_factory=list)
 
 @dataclass
 class MCTl208(Data):

@@ -5,10 +5,11 @@ from hydra.core.config_store import ConfigStore
 from typing import List, Any, Tuple
 from omegaconf import MISSING
 
-from .network   import Network, Encoder, Decoder
+from .network   import Representation, ClassificationHead
 from .mode      import Mode
 from .framework import Framework
 from .data      import Data
+
 
 class ComputeMode(Enum):
     CPU   = 0
@@ -49,8 +50,6 @@ defaults = [
     {"mode"      : "train"},
     {"data"      : "mc_tl208"},
     {"framework" : "lightning"},
-    # {"encoder"   : "encoder"},
-    # {"decoder"   : "decoder"},
 ]
 
 @dataclass
@@ -62,8 +61,8 @@ class Config:
     mode:       Mode      = MISSING
     data:       Data      = MISSING
     framework:  Framework = MISSING
-    encoder:    Network   = Encoder()
-    decoder:    Network   = Decoder()
+    encoder:    Representation = Representation()
+    head:       ClassificationHead = ClassificationHead()
     output_dir: str       = "output/"
 
 

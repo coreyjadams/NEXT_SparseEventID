@@ -1,0 +1,13 @@
+defaults:
+  - base_config
+  - _self_
+
+data:
+  active:
+    - train
+
+# data:
+#   transform1:
+#     - flip:
+#       axes: [0,1]
+#       random: False

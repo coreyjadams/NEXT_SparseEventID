@@ -135,18 +135,18 @@ def build_networks(args, image_size):
 from src.io.data import create_torch_larcv_dataloader
 # from src.networks import create_vertex_meta
 
-from lightning_fabric.plugins.environments import MPIEnvironment
+# from lightning_fabric.plugins.environments import MPIEnvironment
 
-class OversubscribeMPIEnv(MPIEnvironment):
+# class OversubscribeMPIEnv(MPIEnvironment):
 
-    def __init__(self, oversubscribe=None, **kwargs):
-        super().__init__(**kwargs)
-        self.o = oversubscribe
+#     def __init__(self, oversubscribe=None, **kwargs):
+#         super().__init__(**kwargs)
+#         self.o = oversubscribe
 
-    def local_rank(self):
-        lr = super().local_rank()
-        if self.o is None: return lr
-        return lr // self.o
+#     def local_rank(self):
+#         lr = super().local_rank()
+#         if self.o is None: return lr
+#         return lr // self.o
 
 def create_lightning_module(args, datasets, lr_scheduler=None, batch_keys=None):
 
