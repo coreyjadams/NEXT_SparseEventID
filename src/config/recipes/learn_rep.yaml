@@ -1,13 +1,12 @@
 defaults:
-  - base_config
+  - learn_representation
   - _self_
 
 data:
   active:
     - train
 
-# data:
-#   transform1:
-#     - flip:
-#       axes: [0,1]
-#       random: False
+head:
+  layers: 
+    - 2048
+    - 256

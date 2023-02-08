@@ -5,7 +5,7 @@ from hydra.core.config_store import ConfigStore
 from typing import Tuple, Any
 from omegaconf import MISSING
 
-# from . transforms import Transform
+# from . transforms import TransformChain
 
 dataset_top   = "/data/datasets/NEXT/officialProduction/"
 # dataset_top   = "/lus/grand/projects/datascience/cadams/datasets/NEXT/officialProduction/"
@@ -26,9 +26,10 @@ class Data:
     train:       str = ""
     test:        str = ""
     val:         str = ""
+    image_key:   str = "pmaps"
     active: Tuple[str] = field(default_factory=list)
-    # transform1: Tuple[Transform] = field(default_factory=list)
-    # transform2: Tuple[Transform] = field(default_factory=list)
+    transform1: bool = True
+    transform2: bool = True
 
 @dataclass
 class MCTl208(Data):

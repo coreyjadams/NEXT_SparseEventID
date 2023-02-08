@@ -28,7 +28,7 @@ network_dir = os.path.dirname(os.path.abspath(__file__))
 network_dir = os.path.dirname(network_dir)
 sys.path.insert(0,network_dir)
 
-from src.config import Config
+# from src.config import Config
 from src.config.mode import ModeKind
 
 from src.io import create_larcv_dataset
@@ -66,7 +66,7 @@ class exec(object):
         logger.info(self.__str__())
 
         logger.info("Configuring Datasets.")
-        self.datasets = self.configure_datasets()
+        self.datasets, self.transforms = self.configure_datasets()
         logger.info("Data pipeline ready.")
 
 
@@ -77,6 +77,8 @@ class exec(object):
             self.iotest()
         if self.args.mode.name == ModeKind.inference:
             self.inference()
+        if self.args.mode.name == ModeKind.visualize:
+            self.visualize()
 
     def exit(self):
         if hasattr(self, "trainer"):
@@ -86,10 +88,8 @@ class exec(object):
         if not self.args.run.distributed:
             return 0
         else:
-            from src.utils import mpi_init_and_local_rank
-            local_rank = mpi_init_and_local_rank(set_env=True, verbose=False)
-
-            return int(os.environ["RANK"])
+            from mpi4py import MPI
+            return MPI.COMM_WORLD.Get_rank()
 
     def configure_lr_schedule(self, epoch_length, max_epochs):
 
@@ -121,7 +121,10 @@ class exec(object):
 
         from src.io import create_torch_larcv_dataloader
 
-        self.batch_keys = ["pmaps", "label"]
+        batch_keys = [self.args.data.image_key]
+        if self.args.name == "yolo":
+            batch_keys.append("vertex")
+
         ds = {}
         for active in self.args.data.active:
             larcv_ds = create_larcv_dataset(self.args.data,
@@ -129,15 +132,21 @@ class exec(object):
                 input_file   = getattr(self.args.data, active),
                 name         = active,
                 distributed  = self.args.run.distributed,
-                batch_keys   = self.batch_keys,
-                sparse       = self.args.framework.sparse
+                batch_keys   = batch_keys,
+                sparse       = self.args.framework.sparse,
             )
 
             ds.update({
-                active :  create_torch_larcv_dataloader(larcv_ds, self.args.run.minibatch_size)
+                active :  create_torch_larcv_dataloader(larcv_ds, 
+                    self.args.run.minibatch_size)
             })
+            # Get the image size:
+            spatial_size = larcv_ds.image_size(self.args.data.image_key)
 
-        return ds
+        from src.transforms import build_transforms
+        augmentation = build_transforms(self.args, spatial_size)
+
+        return ds, augmentation
 
     def configure_logger(self, rank):
 
@@ -157,7 +166,7 @@ class exec(object):
 
         self.make_trainer()
 
-        from src.utils.lightning import train
+        from src.utils.create_trainer import train
         train(self.args, self.trainer, self.datasets)
 
 
@@ -205,10 +214,6 @@ class exec(object):
 
     def make_trainer(self):
 
-        if 'environment_variables' in self.args.framework:
-            for env in self.args.framework.environment_variables.keys():
-                os.environ[env] = self.args.framework.environment_variables[env]
-
         dataset_length = max([len(ds) for ds in self.datasets.values()])
 
 
@@ -217,14 +222,24 @@ class exec(object):
         else:
             lr_schedule = None
 
-        from src.utils import create_lightning_module
+        if self.args.name == "simclr":
+            from src.utils.representation_learning import create_lightning_module
+
+        elif self.args.name == "yolo":
+            from src.utils.vertex_finding import create_lightning_module
+            # self.trainer = create_lightning_module(
+            #     self.args,
+            #     self.datasets,
+            #     self.transforms,
+            #     lr_schedule,
+            # )
+
         self.trainer = create_lightning_module(
             self.args,
             self.datasets,
+            self.transforms,
             lr_schedule,
-            self.batch_keys,
         )
-
 
     def inference(self):
 
@@ -238,6 +253,27 @@ class exec(object):
 
         self.trainer.initialize()
         self.trainer.batch_process()
+
+    def visualize(self):
+
+
+
+        for key, dataset in self.datasets.items():
+
+            for i, minibatch in enumerate(dataset):
+
+
+                original = minibatch['pmaps']
+                transformed = [
+                    t(original) for t in self.transforms
+                ]
+
+                if i > 5: 
+                    break
+
+
+        pass
+
 
     def dictionary_to_str(self, in_dict, indentation = 0):
         substr = ""

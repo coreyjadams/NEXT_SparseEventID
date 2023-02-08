@@ -274,28 +274,31 @@ class larcv_dataset(object):
 
             minibatch_data[key] = numpy.reshape(minibatch_data[key], minibatch_dims[key])
 
-        # Purge unneeded keys:
-        minibatch_data = {
-            key : minibatch_data[key] for key in minibatch_data if key in self.batch_keys
-        }
-
-
-        # # We need the event id for vertex classification, even if it's not used.
+        # We need the event id for vertex classification, even if it's not used.
         # if self.event_id or self.vertex_depth is not None:
         if 'label' in minibatch_data.keys():
             label_particle = minibatch_data['label'][0]
             minibatch_data['label'] = label_particle['_pdg']
 
-        # if self.vertex_depth is not None:
-        #     downsample_level = 2**self.data_args.downsample
 
-        #     # Put together the YOLO labels:
-        #     minibatch_data["vertex"]  = data_transforms.form_yolo_targets(self.vertex_depth,
-        #         minibatch_data["vertex"], minibatch_data["particle"],
-        #         minibatch_data["event_label"],
-        #         self.data_args.data_format,
-        #         self.image_meta,
-        #         downsample_level)
+
+        if "vertex" in minibatch_data.keys():
+        #     downsample_level = 2**self.data_args.downsample
+            batch_size = minibatch_data['vertex'].shape[0]
+            minibatch_data['vertex'] = minibatch_data['vertex'].reshape([batch_size, 6])
+            # # Put together the YOLO labels:
+            # minibatch_data["vertex"]  = data_transforms.form_yolo_targets(
+            #     self.encoder.depth,
+            #     minibatch_data["vertex"], 
+            #     minibatch_data["particle"],
+            #     minibatch_data["label"],
+            #     self.image_meta,
+            #     downsample_level)
+
+        # Purge unneeded keys:
+        minibatch_data = {
+            key : minibatch_data[key] for key in minibatch_data if key in self.batch_keys
+        }
 
         # Shape the images:
 

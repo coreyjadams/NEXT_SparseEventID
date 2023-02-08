@@ -5,7 +5,7 @@ from hydra.core.config_store import ConfigStore
 from typing import List, Any, Tuple
 from omegaconf import MISSING
 
-from .network   import Representation, ClassificationHead
+from .network   import Representation, ClassificationHead, YoloHead
 from .mode      import Mode
 from .framework import Framework
 from .data      import Data
@@ -14,7 +14,6 @@ from .data      import Data
 class ComputeMode(Enum):
     CPU   = 0
     CUDA  = 1
-    DPCPP = 2
     XPU   = 3
 
 class Precision(Enum):
@@ -53,7 +52,7 @@ defaults = [
 ]
 
 @dataclass
-class Config:
+class LearnRepresentation:
     defaults: List[Any] = field(default_factory=lambda: defaults)
 
 
@@ -64,6 +63,23 @@ class Config:
     encoder:    Representation = Representation()
     head:       ClassificationHead = ClassificationHead()
     output_dir: str       = "output/"
+    name:       str       = "simclr"
+
+cs.store(name="representation", node=LearnRepresentation)
+
+@dataclass
+class DetectVertex:
+    defaults: List[Any] = field(default_factory=lambda: defaults)
 
 
-cs.store(name="base_config", node=Config)
+    run:        Run       = MISSING
+    mode:       Mode      = MISSING
+    data:       Data      = MISSING
+    framework:  Framework = MISSING
+    encoder:    Representation = Representation()
+    head:       YoloHead = YoloHead()
+    output_dir: str       = "output/"
+    name:       str       = "yolo"
+
+cs.store(name="detect_vertex", node=DetectVertex)
+

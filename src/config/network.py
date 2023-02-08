@@ -1,7 +1,8 @@
 from enum import Enum
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from hydra.core.config_store import ConfigStore
+from typing import Tuple, Any
 from omegaconf import MISSING
 
 
@@ -33,10 +34,13 @@ class Representation:
 
 @dataclass
 class ClassificationHead:
-    n_layers:     int = 2
-    output_space: int = 256
+    layers: Tuple[int] = field(default_factory=list)
 
+@dataclass 
+class YoloHead:
+    layers: Tuple[int] = field(default_factory=list)
 
 cs = ConfigStore.instance()
-cs.store(group="network", name="representation",   node=Representation)
-cs.store(group="network", name="classification",   node=ClassificationHead)
+cs.store(group="network", name="representation", node=Representation)
+cs.store(group="network", name="classification", node=ClassificationHead)
+cs.store(group="network", name="yolo",           node=YoloHead)

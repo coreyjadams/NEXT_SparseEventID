@@ -1,0 +1,14 @@
+defaults:
+  - detect_vertex
+  - _self_
+
+data:
+  active:
+    - train
+  transform1: False
+  transform2: False
+
+head:
+  layers: 
+    - 64
+    - 4
