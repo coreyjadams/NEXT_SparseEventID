@@ -124,6 +124,7 @@ class exec(object):
         batch_keys = [self.args.data.image_key]
         if self.args.name == "yolo":
             batch_keys.append("vertex")
+            batch_keys.append("label")
 
         ds = {}
         for active in self.args.data.active:

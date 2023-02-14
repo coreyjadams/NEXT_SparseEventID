@@ -71,10 +71,12 @@ def train(args, lightning_model, datasets):
         max_epochs              = args.run.length,
         # plugins                 = plugins,
         accumulate_grad_batches = args.mode.optimizer.gradient_accumulation,
+        val_check_interval      = 10,
+        check_val_every_n_epoch = None
     )
 
     trainer.fit(
         lightning_model,
         train_dataloaders=datasets["train"],
-        # val_dataloaders = datasets["val"]
+        val_dataloaders = datasets["val"]
     )

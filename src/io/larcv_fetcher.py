@@ -11,7 +11,7 @@ import numpy
 def lr_meta():
 
     return numpy.array([
-        ([450, 450, 305], [450., 450., 549.],[-225., -225., 0])],
+        ([450, 450, 305], [450., 450., 549.],[-240., -240., 0])],
         dtype=[
             ('n_voxels', "int", (3)),
             ('size', "float", (3)),
@@ -25,8 +25,7 @@ def pmaps_meta():
     # The size of the images here are padded and expanded.  This lets me downsample
     # and upsample in the networks more smoothly
     return numpy.array([
-        # ([45, 45, 275], [450., 450., 550.],[-225., -225., 0])],
-        ([48, 48, 288], [480., 480., 576.],[-225., -225., 0])],
+        ([48, 48, 288], [480., 480., 576.],[-240., -240., 0])],
         dtype=[
             ('n_voxels', "int", (3)),
             ('size', "float", (3)),
@@ -277,15 +276,15 @@ class larcv_dataset(object):
         # We need the event id for vertex classification, even if it's not used.
         # if self.event_id or self.vertex_depth is not None:
         if 'label' in minibatch_data.keys():
-            label_particle = minibatch_data['label'][0]
+            label_particle = minibatch_data['label'][:,0]
             minibatch_data['label'] = label_particle['_pdg']
-
 
 
         if "vertex" in minibatch_data.keys():
         #     downsample_level = 2**self.data_args.downsample
             batch_size = minibatch_data['vertex'].shape[0]
             minibatch_data['vertex'] = minibatch_data['vertex'].reshape([batch_size, 6])
+            minibatch_data['vertex'] = minibatch_data['vertex'][:,0:3]
             # # Put together the YOLO labels:
             # minibatch_data["vertex"]  = data_transforms.form_yolo_targets(
             #     self.encoder.depth,

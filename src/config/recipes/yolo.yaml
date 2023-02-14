@@ -5,10 +5,12 @@ defaults:
 data:
   active:
     - train
+    - val
   transform1: False
   transform2: False
 
 head:
   layers: 
+    - 64
     - 64
     - 4
