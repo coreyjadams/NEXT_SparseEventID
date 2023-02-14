@@ -72,6 +72,7 @@ def train(args, lightning_model, datasets):
         # plugins                 = plugins,
         accumulate_grad_batches = args.mode.optimizer.gradient_accumulation,
         val_check_interval      = 10,
+        limit_val_batches       = 1,
         check_val_every_n_epoch = None
     )
 

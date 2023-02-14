@@ -65,7 +65,7 @@ class lightning_trainer(pl.LightningModule):
 
         anchor_loss, regression_loss = self.vertex_loss(vertex_labels, prediction)
 
-        loss = anchor_loss # + 0.1*regression_loss
+        loss = anchor_loss + 0.1*regression_loss
 
         prediction_dict = self.predict_event(prediction)
 
@@ -82,9 +82,43 @@ class lightning_trainer(pl.LightningModule):
         metrics.update(accuracy_dict)
 
         # self.log()
-        self.print_log(metrics)
+        self.print_log(metrics, mode="train")
         self.log_dict(metrics)
         return loss
+
+    def validation_step(self, batch, batch_idx):
+
+        image = batch[self.image_key]
+
+        prediction = self(image)
+
+        reference_shape = prediction.shape[2:]
+        vertex_labels = self.compute_vertex_labels(batch, reference_shape)
+
+        anchor_loss, regression_loss = self.vertex_loss(vertex_labels, prediction)
+
+        loss = anchor_loss + 0.1*regression_loss
+
+        prediction_dict = self.predict_event(prediction)
+
+        accuracy_dict = self.calculate_accuracy(prediction_dict, batch, vertex_labels)
+
+        metrics = {
+            'loss/loss' : loss,
+            'loss/anchor_loss' : anchor_loss,
+            'loss/regression_loss' : regression_loss,
+            'opt/lr' : self.optimizers().state_dict()['param_groups'][0]['lr']
+        }
+
+
+        metrics.update(accuracy_dict)
+
+        # self.log()
+        self.print_log(metrics, mode="val")
+        self.log_dict(metrics)
+        return
+
+
 
     def print_log(self, metrics, mode=""):
 
@@ -148,17 +182,9 @@ class lightning_trainer(pl.LightningModule):
 
     def calculate_accuracy(self, prediction, batch, vertex_labels):
 
-        # print("batch['label']: ", batch['label'])
-        # print("batch['label'].shape: ", batch['label'].shape)
-
-
         label_prediction = (prediction['label'] < 0.5).to(torch.float32)
 
         event_accuracy = (label_prediction == batch['label']).to(torch.float32)
-
-
-        # print("batch['label']: ", batch['label'])
-        # print("event_accuracy: ", event_accuracy)
 
         # Compute the label false positive rate:
         # label prediction has 1 == positive vertex
@@ -193,10 +219,10 @@ class lightning_trainer(pl.LightningModule):
         return {
             "acc/label"  : event_accuracy,
             "acc/vertex_decection" : vertex_anchor_acc,
-            # "acc/vertex_x" : vertex_resolution[0] ,
-            # "acc/vertex_y" : vertex_resolution[1] ,
-            # "acc/vertex_z" : vertex_resolution[2] ,
-            # "acc/vertex"   : torch.sqrt(torch.sum(vertex_resolution**2)),
+            "acc/vertex_x" : vertex_resolution[0] ,
+            "acc/vertex_y" : vertex_resolution[1] ,
+            "acc/vertex_z" : vertex_resolution[2] ,
+            "acc/vertex"   : torch.sqrt(torch.sum(vertex_resolution**2)),
             "acc/false_pos": false_postive,
             "acc/false_neg": false_negative,
         }
@@ -212,16 +238,10 @@ class lightning_trainer(pl.LightningModule):
         self.image_size   = self.image_size.to(target_device, dtype=torch.float32)
         self.image_origin = self.image_origin.to(target_device, dtype=torch.float32)
 
-        # print("vertex label: ", vertex_label)
-        # print("image size: ", self.image_size)
-        # print("image origin: ", self.image_origin)
-
         # the size of each anchor box can be found first:
         if not hasattr(self, "anchor_size"):
             labels_spatial_size = torch.tensor(reference_shape).to(target_device)
             self.anchor_size = torch.tensor(self.image_size / labels_spatial_size)
-
-        # print("anchor size: ", self.anchor_size)
 
         class_shape = (batch_size,) + reference_shape
         regression_shape = (batch_size, 3,) + reference_shape
@@ -236,23 +256,17 @@ class lightning_trainer(pl.LightningModule):
         # Identify where the vertex is with the 0,0,0 index at 0,0,0 coordinate::
         relative_vertex = regression_labels - self.image_origin
 
-        # print("relative_vertex: ", relative_vertex)
 
         # Map the relative location onto the anchor grid
         anchor_index = (relative_vertex // self.anchor_size).to(torch.int64)
-        # print("anchor_index: ", anchor_index)
 
         active_anchors = vertex_label[:,2] != 0.0
-
-        # print(active_anchors)
-        # print(vertex_label)
 
         # Select the target anchor indexes:
         target_anchors = anchor_index[active_anchors]
 
         # Set the class labels
         class_labels[active_anchors,target_anchors[:,0],target_anchors[:,1],target_anchors[:,2]] = 1.
-        # print(class_labels)
 
         # We need to map the regression label to a relative point in the anchor window.
         anchor_start_point = self.anchor_size * anchor_index + self.image_origin
