@@ -36,25 +36,11 @@ class lightning_trainer(pl.LightningModule):
 
     def forward(self, batch):
 
-        # print(batch)
-        # print(self.transforms)
-
-
-        # batch = (
-        #     batch[0].cpu().long(),
-        #     batch[1],
-        #     batch[2]
-        # )
-
-        augmented_data = [ t(batch) for t in self.transforms]
-
-        # print(augmented_data)
+        augmented_data = [ t(batch) for t in self.transforms] 
 
         representation = [ self.encoder(ad) for ad in augmented_data ]
 
         logits = [ self.head(r) for r in representation]
-
-        # print(representation)
 
         return logits
 
@@ -66,10 +52,7 @@ class lightning_trainer(pl.LightningModule):
 
         decoded_images = self(image)
 
-        if self.args.framework.sparse:
-            loss = self.calculate_ae_loss(batch.features, decoded_images.features)
-        else:
-            loss = self.calculate_ae_loss(batch, decoded_images)
+        loss = self.calculate_loss(decoded_images[1], decoded_images[2])
 
         metrics = {
             'loss' : loss,
@@ -88,8 +71,8 @@ class lightning_trainer(pl.LightningModule):
             message = format_log_message(
                 self.log_keys, 
                 metrics, 
-                self.run.minibatch_size, 
-                self.global_step(), 
+                self.args.run.minibatch_size, 
+                self.global_step, 
                 mode
             )
 
@@ -98,8 +81,65 @@ class lightning_trainer(pl.LightningModule):
     def exit(self):
         pass
 
-    def calculate_ae_loss(self, input_images, decoded_images):
-        loss = torch.nn.functional.mse_loss(input_images, decoded_images)
+    def calculate_loss(self, first_images, second_images, temperature=1.0):
+        # Each image is represented with k parameters, 
+        # Assume the batch size is N, so the
+        # inputs have shape (N, k)
+
+        N = first_images.shape[0]
+        k = first_images.shape[1]
+
+        # First, normalize the tensors so that ||v|| = 1 for every one
+        first_images = first_images / torch.norm(first_images,dim=1).reshape((-1,1))
+        second_images = second_images / torch.norm(second_images,dim=1).reshape((-1,1))
+
+        # Take the two tuples, and concatenate them.
+        # Then, reshape into Y = (1, 2N, k) and Z = (2N, 1, k)
+
+        c = torch.concat([first_images, second_images], dim=0)
+
+        Y = c.reshape((1, c.shape[0], c.shape[1]))
+        Z = c.reshape((c.shape[0], 1, c.shape[1]))
+
+
+
+        # Compute the product of these tensors, which gives shape
+        # (2N, 2N, k)
+        mat =  Y*Z
+
+
+
+        # We need to compute the function (sim(x,y)) for each element in the 2N sequent.
+        # Since the are normalized, we're computing x^T . Y / (||x||*||y||),
+        # but the norms are equal to 1.
+        # So, summing the matrix over the dim = 0 and dim = 1 computes this for each pair.
+
+        sim = torch.sum(mat, dim=-1)
+        # This yields a symmetric matrix, diagonal entries equal 1.  Off diagonal are symmetrics and < 1.
+
+
+        sim = torch.exp(sim / temperature)
+        # Now, for every entry i in C (concat of both batches), the sum of sim[i] - sim[i][i] is the denominator
+
+        device = sim.device
+
+        positive = torch.tile(torch.eye(N, device=device), (2,2))
+        negative = - (positive - 1)
+
+        # Unsure if this line is needed?
+        positive = positive - torch.eye(2*N, device=device)
+
+        negative_examples = sim * negative
+        positive_examples = sim * positive
+
+
+        numerator = torch.sum(positive_examples, dim=0)
+
+        denominator = torch.sum(negative_examples, dim=0)
+
+        ratio = numerator / denominator
+        loss = torch.mean( - torch.log(ratio))
+
         return loss
 
     def configure_optimizers(self):
@@ -142,8 +182,8 @@ def create_lightning_module(args, datasets, transforms, lr_scheduler=None, batch
     # vertex_meta = create_vertex_meta(args, example_ds.image_meta, example_ds.image_size())
 
     # Next, create the network:
-    from src.networks import autoencoder
-    encoder, classification_head = autoencoder.create_models(args, image_shape)
+    from src.networks import classification_head
+    encoder, classification_head = classification_head.build_networks(args, image_shape)
 
     model = lightning_trainer(
         args,

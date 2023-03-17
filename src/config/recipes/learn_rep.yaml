@@ -1,11 +1,12 @@
 defaults:
-  - learn_representation
+  - representation
   - _self_
 
 data:
   active:
     - train
-
+    - val
+    
 head:
   layers: 
     - 2048
