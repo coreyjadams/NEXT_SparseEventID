@@ -16,7 +16,7 @@ def build_transforms(args, image_size=None, include_identity=True):
     # If it's sparse, we include the input layer:
     if args.framework.sparse:
         input_layer = scn.InputLayer(
-            dimension    = 3, 
+            dimension    = 3,
             spatial_size = torch.tensor(image_size)
         )
     else:

@@ -197,10 +197,12 @@ class exec(object):
 
             # Determine the stopping point:
             break_i = self.args.run.length * len(dataset)
-
+            break_i = 5
+            
             start = time.time()
             for i, minibatch in enumerate(dataset):
-
+                image = minibatch[self.args.data.image_key]
+                transformed_data  = [ t(image) for t in self.transforms]
                 end = time.time()
                 if i >= break_i: break
                 logger.info(f"{i}: Time to fetch a minibatch of data: {end - start:.2f}s")
