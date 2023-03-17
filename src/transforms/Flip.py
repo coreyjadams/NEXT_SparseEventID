@@ -41,7 +41,7 @@ class Flip(nn.Module):
         flip_xyz = torch.randint(0,2,size=(3,)).to(dtype=torch.bool)
 
         # Convert this to axes:
-        return torch.where(flip_xyz)
+        return [int(t) for t in torch.where(flip_xyz)[0] ]
 
     def forward(self, inputs):
         '''

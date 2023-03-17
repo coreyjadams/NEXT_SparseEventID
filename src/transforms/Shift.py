@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy
 
 # Import SCN if available
 try:    import sparseconvnet as scn
@@ -56,6 +57,7 @@ class Shift(nn.Module):
                 ))
 
             else:
-                shifts = torch.randint(
+                shifts = numpy.random.randint(
                     low=-self.max_shift, high=self.max_shift, size=(3,) )
-                return torch.roll(inputs, shifts, torch.arange(3))
+                shifts = [ s for s in shifts ]
+                return torch.roll(inputs, shifts, (0,1,2))

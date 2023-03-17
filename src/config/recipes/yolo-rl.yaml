@@ -1,0 +1,19 @@
+defaults:
+  - detect_vertex
+  - _self_
+
+data:
+  active:
+    - train
+    - val
+  transform1: False
+  transform2: False
+
+encoder:
+  depth: 5
+
+head:
+  layers:
+    - 64
+    - 64
+    - 4

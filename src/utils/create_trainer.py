@@ -1,6 +1,16 @@
 import torch
 import pytorch_lightning as pl
 
+from lightning_fabric.plugins.environments import MPIEnvironment
+
+class OversubscribeMPI(MPIEnvironment):
+
+    def __init__(self, oversubscribe=1):
+        super().__init__()
+        self.os = oversubscribe
+    def local_rank(self):
+        lr = super().local_rank()
+        return lr // self.os
 
 def train(args, lightning_model, datasets):
 
@@ -21,6 +31,10 @@ def train(args, lightning_model, datasets):
         profiler  = None
 
     oversubscribe = args.framework.oversubscribe
+    if oversubscribe == 1:
+        environment = MPIEnvironment()
+    else:
+        environment = OversubscribeMPI(oversubscribe)
 
     # Distributed strategy:
     if args.run.distributed:
@@ -33,8 +47,7 @@ def train(args, lightning_model, datasets):
             if oversubscribe > 1:
                 backend = "gloo"
             strategy = DDPStrategy(
-                cluster_environment = OversubscribeMPIEnv(
-                    oversubscribe),
+                cluster_environment = environment,
                 process_group_backend=backend
             )
         elif args.framework.distributed_mode == DistributedMode.deepspeed:
@@ -56,8 +69,7 @@ def train(args, lightning_model, datasets):
     # Configure the logger:
     from pytorch_lightning.loggers import TensorBoardLogger
 
-    tb_logger = TensorBoardLogger(args.output_dir + "/train/")
-
+    tb_logger = TensorBoardLogger(args.output_dir)
 
     trainer = pl.Trainer(
         accelerator             = args.run.compute_mode.name.lower(),

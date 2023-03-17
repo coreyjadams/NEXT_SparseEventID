@@ -11,7 +11,7 @@ import numpy
 def lr_meta():
 
     return numpy.array([
-        ([450, 450, 305], [450., 450., 549.],[-240., -240., 0])],
+        ([480, 480, 320], [480., 480., 576.],[-240., -240., 0])],
         dtype=[
             ('n_voxels', "int", (3)),
             ('size', "float", (3)),
@@ -288,7 +288,7 @@ class larcv_dataset(object):
             # # Put together the YOLO labels:
             # minibatch_data["vertex"]  = data_transforms.form_yolo_targets(
             #     self.encoder.depth,
-            #     minibatch_data["vertex"], 
+            #     minibatch_data["vertex"],
             #     minibatch_data["particle"],
             #     minibatch_data["label"],
             #     self.image_meta,

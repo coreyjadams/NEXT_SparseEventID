@@ -35,26 +35,14 @@ class lightning_trainer(pl.LightningModule):
 
 
     def forward(self, batch):
+        print("Going forward")
+        augmented_data = [ t(batch) for t in self.transforms ]
 
-        # print(batch)
-        # print(self.transforms)
-
-
-        # batch = (
-        #     batch[0].cpu().long(),
-        #     batch[1],
-        #     batch[2]
-        # )
-
-        augmented_data = [ t(batch) for t in self.transforms]
-
-        # print(augmented_data)
 
         representation = [ self.encoder(ad) for ad in augmented_data ]
 
-        logits = [ self.head(r) for r in representation]
 
-        # print(representation)
+        logits = [ self.head(r) for r in representation]
 
         return logits
 
@@ -64,16 +52,13 @@ class lightning_trainer(pl.LightningModule):
 
         image = batch[self.image_key]
 
-        decoded_images = self(image)
+        encoded_images = self(image)
 
-        if self.args.framework.sparse:
-            loss = self.calculate_ae_loss(batch.features, decoded_images.features)
-        else:
-            loss = self.calculate_ae_loss(batch, decoded_images)
+        loss = self.compute_loss(encoded_images)
 
         metrics = {
-            'loss' : loss,
-            'lr' : self.optimizers().state_dict()['param_groups'][0]['lr']
+            'opt/loss' : loss,
+            'opt/lr' : self.optimizers().state_dict()['param_groups'][0]['lr']
         }
 
         # self.log()
@@ -84,12 +69,12 @@ class lightning_trainer(pl.LightningModule):
     def print_log(self, metrics, mode=""):
 
         if self.global_step % self.args.mode.logging_iteration == 0:
-        
+
             message = format_log_message(
-                self.log_keys, 
-                metrics, 
-                self.run.minibatch_size, 
-                self.global_step(), 
+                self.log_keys,
+                metrics,
+                self.run.minibatch_size,
+                self.global_step(),
                 mode
             )
 
@@ -98,8 +83,14 @@ class lightning_trainer(pl.LightningModule):
     def exit(self):
         pass
 
-    def calculate_ae_loss(self, input_images, decoded_images):
-        loss = torch.nn.functional.mse_loss(input_images, decoded_images)
+    def compute_loss(self, encoded_images, temperature = 1.0):
+
+        set1 = torch.nn.functional.normalize(encoded_images[0])
+        set2 = torch.nn.functional.normalize(encoded_images[1])
+
+        print(set1.shape)
+        print(set2.shape)
+
         return loss
 
     def configure_optimizers(self):
@@ -112,22 +103,6 @@ class lightning_trainer(pl.LightningModule):
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_fn, last_epoch=-1)
 
         return [opt],[{"scheduler" : lr_scheduler, "interval": "step"}]
-
-
-# from src.networks import create_vertex_meta
-
-# from lightning_fabric.plugins.environments import MPIEnvironment
-
-# class OversubscribeMPIEnv(MPIEnvironment):
-
-#     def __init__(self, oversubscribe=None, **kwargs):
-#         super().__init__(**kwargs)
-#         self.o = oversubscribe
-
-#     def local_rank(self):
-#         lr = super().local_rank()
-#         if self.o is None: return lr
-#         return lr // self.o
 
 def create_lightning_module(args, datasets, transforms, lr_scheduler=None, batch_keys=None):
 
@@ -142,13 +117,13 @@ def create_lightning_module(args, datasets, transforms, lr_scheduler=None, batch
     # vertex_meta = create_vertex_meta(args, example_ds.image_meta, example_ds.image_size())
 
     # Next, create the network:
-    from src.networks import autoencoder
-    encoder, classification_head = autoencoder.create_models(args, image_shape)
+    from src.networks.classification_head import build_networks
+    encoder, class_head = build_networks(args, image_shape)
 
     model = lightning_trainer(
         args,
         encoder,
-        classification_head,
+        class_head,
         transforms,
         args.data.image_key,
         lr_scheduler

@@ -8,6 +8,8 @@ def build_networks(params, input_shape):
 
     yolo_head = torch.nn.Sequential()
 
+    print("Output shape: ", output_shape)
+
     if params.framework.sparse:
         import sparseconvnet as scn
         from . sparse_building_blocks import Block, ResidualBlock

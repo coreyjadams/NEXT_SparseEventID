@@ -24,7 +24,7 @@ class lightning_trainer(pl.LightningModule):
     def __init__(self, args, encoder, head, transforms,
                  image_meta,
                  image_key   = "pmaps",
-                 lr_scheduler=None): 
+                 lr_scheduler=None):
         super().__init__()
 
         self.args         = args
@@ -83,6 +83,7 @@ class lightning_trainer(pl.LightningModule):
 
         # self.log()
         self.print_log(metrics, mode="train")
+        metrics = { "/train/" + key : metrics[key] for key in metrics}
         self.log_dict(metrics)
         return loss
 
@@ -115,7 +116,8 @@ class lightning_trainer(pl.LightningModule):
 
         # self.log()
         self.print_log(metrics, mode="val")
-        self.log_dict(metrics)
+        metrics = { "/val/" + key : metrics[key] for key in metrics}
+        self.log_dict(metrics, logger)
         return
 
 
@@ -125,10 +127,10 @@ class lightning_trainer(pl.LightningModule):
         if self.global_step % self.args.mode.logging_iteration == 0:
 
             message = format_log_message(
-                log_keys = self.log_keys, 
-                metrics  = metrics, 
-                batch_size = self.args.run.minibatch_size, 
-                global_step = self.global_step, 
+                log_keys = self.log_keys,
+                metrics  = metrics,
+                batch_size = self.args.run.minibatch_size,
+                global_step = self.global_step,
                 mode = mode
             )
 
@@ -145,7 +147,7 @@ class lightning_trainer(pl.LightningModule):
         return tuple(reversed(out))
 
     def predict_event(self, prediction):
-        
+
         batch_size = prediction.shape[0]
         image_size = prediction.shape[2:]
 
@@ -174,7 +176,7 @@ class lightning_trainer(pl.LightningModule):
 
         # Convert the selected anchors + regression coordinates into a vertex in 3D:
         vertex_anchor = torch.stack(vertex_anchor,dim=1)
-        vertex = self.image_origin + (vertex_anchor+selected_boxes)*self.anchor_size 
+        vertex = self.image_origin + (vertex_anchor+selected_boxes)*self.anchor_size
 
         prediction_dict['vertex'] = vertex
 
@@ -211,7 +213,7 @@ class lightning_trainer(pl.LightningModule):
         _, pred_vertex_loc = torch.max(prediction   ["class"].reshape((batch_size,-1)), dim=1)
 
         vertex_anchor_acc = true_vertex_loc == pred_vertex_loc
-        vertex_anchor_acc = torch.sum(has_vertex * vertex_anchor_acc.to(torch.float32)) 
+        vertex_anchor_acc = torch.sum(has_vertex * vertex_anchor_acc.to(torch.float32))
         vertex_anchor_acc = vertex_anchor_acc / (torch.sum(has_vertex) + 0.0001)
 
 

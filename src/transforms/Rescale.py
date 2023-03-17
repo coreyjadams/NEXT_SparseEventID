@@ -54,14 +54,14 @@ class Rescale(nn.Module):
 
                 # This average includes all of the zeros.
                 # So, it has essentially been divide by the spatial size.
-                # if we multiple by the size of the space, 
+                # if we multiple by the size of the space,
                 # we get back to the summed value
                 pooled.features *= n_voxels
 
-                # Now, the pooled features contains the sum of all pixels in the 
+                # Now, the pooled features contains the sum of all pixels in the
                 # event.  We'll fix this, but we want to scale up and down
                 # all the events randomly, by +/- 25%.  So, draw from a gaussian
-                # with the same shape as the pooled features, 
+                # with the same shape as the pooled features,
                 # scale the pooled features, and go from there.
 
 
@@ -86,5 +86,7 @@ class Rescale(nn.Module):
 
 
             else:
-                raise NotImplemented("Not yet implemented")
-                pass
+
+                # Create a random number for every voxel:
+                rand_scale = (1.0 - 0.5*self.shift_max) + self.shift_max * torch.rand_like(inputs)
+                return inputs * rand_scale
