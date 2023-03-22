@@ -1,7 +1,7 @@
 import numpy
 import torch
 
-from . resnet import create_resnet
+from . resnet import Encoder
 
 
 
@@ -19,7 +19,11 @@ def build_networks(params, input_shape):
         from . building_blocks import MaxPooling
 
 
-    resnet, output_shape = create_resnet(params, input_shape)
+    resnet = Encoder(params, input_shape)
+
+    output_shape = resnet.output_shape
+
+    # resnet, output_shape = create_resnet(params, input_shape)
 
     classification_head = torch.nn.Sequential()
     current_number_of_filters = output_shape[0]

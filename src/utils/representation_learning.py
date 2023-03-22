@@ -12,7 +12,7 @@ from src import logging
 
 logger = logging.getLogger("NEXT")
 
-class lightning_trainer(pl.LightningModule):
+class rep_trainer(pl.LightningModule):
     '''
     This class is the core interface for training.  Each function to
     be overridden for a particular interface is marked and raises
@@ -33,7 +33,8 @@ class lightning_trainer(pl.LightningModule):
 
         self.log_keys = ["loss"]
 
-
+        self.save_hyperparameters()
+        
     def forward(self, batch):
 
         augmented_data = [ t(batch) for t in self.transforms ]
@@ -62,9 +63,28 @@ class lightning_trainer(pl.LightningModule):
         }
 
         # self.log()
-        self.print_log(metrics)
+        self.print_log(metrics, mode="train")
         self.log_dict(metrics)
         return loss
+
+    def validation_step(self, batch, batch_idx):
+
+        image = batch[self.image_key]
+
+        encoded_images = self(image)
+
+        loss = self.calculate_loss(encoded_images[1], encoded_images[2])
+
+        metrics = {
+            'opt/loss' : loss,
+            # 'opt/lr' : self.optimizers().state_dict()['param_groups'][0]['lr']
+        }
+
+        # self.log()
+        self.print_log(metrics, mode="val")
+        # self.log_dict(metrics)
+        return loss
+
 
     def print_log(self, metrics, mode=""):
 
@@ -171,7 +191,7 @@ def create_lightning_module(args, datasets, transforms, lr_scheduler=None, batch
     from src.networks import classification_head
     encoder, classification_head = classification_head.build_networks(args, image_shape)
 
-    model = lightning_trainer(
+    model = rep_trainer(
         args,
         encoder,
         classification_head,

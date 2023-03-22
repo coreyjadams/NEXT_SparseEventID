@@ -14,7 +14,7 @@ from src import logging
 
 logger = logging.getLogger("NEXT")
 
-class lightning_trainer(pl.LightningModule):
+class vertex_learning(pl.LightningModule):
     '''
     This class is the core interface for training.  Each function to
     be overridden for a particular interface is marked and raises
@@ -360,7 +360,7 @@ def create_lightning_module(args, datasets, transforms=None, lr_scheduler=None, 
     from src.networks.yolo_head import build_networks
     encoder, yolo_head = build_networks(args, image_shape)
 
-    model = lightning_trainer(
+    model = vertex_learning(
         args,
         encoder,
         yolo_head,

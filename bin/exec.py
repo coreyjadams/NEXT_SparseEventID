@@ -244,18 +244,18 @@ class exec(object):
             lr_schedule,
         )
 
-    def inference(self):
+    # def inference(self):
 
 
-        logger = logging.getLogger("NEXT")
+    #     logger = logging.getLogger("NEXT")
 
-        logger.info("Running Inference")
-        logger.info(self.__str__())
+    #     logger.info("Running Inference")
+    #     logger.info(self.__str__())
 
-        self.make_trainer()
+    #     self.make_trainer()
 
-        self.trainer.initialize()
-        self.trainer.batch_process()
+    #     self.trainer.initialize()
+    #     self.trainer.batch_process()
 
     def visualize(self):
 

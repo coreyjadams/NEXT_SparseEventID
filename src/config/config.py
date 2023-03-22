@@ -81,5 +81,20 @@ class DetectVertex:
     output_dir: str       = "output/"
     name:       str       = "yolo"
 
+
+# @dataclass
+# class Classify:
+#     defaults: List[Any] = field(default_factory=lambda: defaults)
+
+
+#     run:        Run       = MISSING
+#     mode:       Mode      = MISSING
+#     data:       Data      = MISSING
+#     framework:  Framework = MISSING
+#     encoder:    Representation = Representation()
+#     head:       YoloHead = YoloHead()
+#     output_dir: str       = "output/"
+#     name:       str       = "yolo"
+
 cs.store(name="detect_vertex", node=DetectVertex)
 

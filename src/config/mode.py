@@ -14,9 +14,10 @@ class ModeKind(Enum):
 
 @dataclass
 class Mode:
-    name:          ModeKind = ModeKind.train
-    no_summary_images: bool = True
-    weights_location:  str  = ""
+    name:             ModeKind = ModeKind.train
+    no_summary_images:    bool = True
+    weights_location:     str  = ""
+    restore_encoder_only: bool = True
 
 @dataclass
 class Train(Mode):

@@ -22,19 +22,19 @@ class OptimizerKind(Enum):
 @dataclass
 class LRScheduleConfig:
     name:                 str = ""
-    peak_learning_rate: float = 1e-3
+    peak_learning_rate: float = 1e-4
 
 @dataclass
 class OneCycleConfig(LRScheduleConfig):
     name:                 str = "one_cycle"
-    min_learning_rate:  float = 1e-3
-    decay_floor:        float = 1e-4
+    min_learning_rate:  float = 1e-5
+    decay_floor:        float = 1e-5
     decay_epochs:         int = 5
 
 @dataclass
 class WarmupFlatDecayConfig(LRScheduleConfig):
     name:                 str = "standard"
-    decay_floor:        float = 1e-4
+    decay_floor:        float = 1e-5
     decay_epochs:         int = 5
 
 @dataclass

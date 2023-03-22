@@ -1,10 +1,12 @@
 import torch
 import numpy
-from . resnet import create_resnet
+
+from . resnet import Encoder
 
 def build_networks(params, input_shape):
 
-    resnet, output_shape = create_resnet(params, input_shape)
+    resnet = Encoder(params, input_shape)
+    output_shape = resnet.output_shape
 
     yolo_head = torch.nn.Sequential()
 

@@ -1,7 +1,9 @@
 import torch
 import pytorch_lightning as pl
 
-from lightning_fabric.plugins.environments import MPIEnvironment
+from lightning_fabric.plugins.environments import MPIEnvironment, LightningEnvironment
+from pytorch_lightning.callbacks           import ModelCheckpoint
+
 
 class OversubscribeMPI(MPIEnvironment):
 
@@ -31,10 +33,14 @@ def train(args, lightning_model, datasets):
         profiler  = None
 
     oversubscribe = args.framework.oversubscribe
-    if oversubscribe == 1:
-        environment = MPIEnvironment()
+    if args.run.distributed:
+        if oversubscribe == 1:
+            environment = MPIEnvironment()
+        else:
+            environment = OversubscribeMPI(oversubscribe)
     else:
-        environment = OversubscribeMPI(oversubscribe)
+        environment = LightningEnvironment()
+
 
     # Distributed strategy:
     if args.run.distributed:
@@ -69,7 +75,50 @@ def train(args, lightning_model, datasets):
     # Configure the logger:
     from pytorch_lightning.loggers import TensorBoardLogger
 
-    tb_logger = TensorBoardLogger(args.output_dir)
+    tb_logger = TensorBoardLogger(
+        save_dir = args.output_dir,
+        version  = 0, 
+    )
+
+    checkpoint_dir = args.output_dir + "/checkpoints/"
+    model_checkpoint = ModelCheckpoint(
+        dirpath = checkpoint_dir,
+        every_n_train_steps = 50,
+    )
+
+    # Checkpoint loading.  First, do we have a path specified?
+    if args.mode.weights_location != "":
+        if args.mode.restore_encoder_only:
+            # IN this situation, we only load the encoder
+            state_dict = torch.load(args.mode.weights_location)
+
+            encoder_dict = {
+                key.replace("encoder.","") : state_dict["state_dict"][key]
+                for key in state_dict["state_dict"] if "encoder" in key
+            } 
+
+            lightning_model.encoder.load_state_dict(encoder_dict)
+        else:
+            lightning_model.load_from_checkpoint(args.mode.weights_location)
+    else:
+        import glob
+        # Check to see if there are already checkpoints present:
+        checkpoint_options = glob.glob(checkpoint_dir + "*.ckpt")
+        if len(checkpoint_options) > 0:
+            # state_dict = torch.load(checkpoint_options[0])
+            # try:
+            # lightning_model.load_state_dict(state_dict["state_dict"])
+
+            # except:
+            #     print("Direct dict loading failed!")
+
+            # for key in state_dict.keys():
+            #     if key == "state_dict":
+            #         print(state_dict[key].keys())
+            #         continue
+
+            lightning_model.load_from_checkpoint(checkpoint_options[0])
+
 
     trainer = pl.Trainer(
         accelerator             = args.run.compute_mode.name.lower(),
@@ -84,9 +133,18 @@ def train(args, lightning_model, datasets):
         # plugins                 = plugins,
         accumulate_grad_batches = args.mode.optimizer.gradient_accumulation,
         val_check_interval      = 10,
+        check_val_every_n_epoch = None,
         limit_val_batches       = 1,
-        check_val_every_n_epoch = None
+        callbacks               = [model_checkpoint]
     )
+
+    # Try to load the model from a checkpoint:
+
+
+
+    # model_checkpoint.format_checkpoint_name()
+
+    # lightning_model.load_from_checkpoint(args.output_dir + "/checkpoints/")
 
     trainer.fit(
         lightning_model,
