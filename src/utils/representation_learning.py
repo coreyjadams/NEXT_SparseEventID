@@ -56,11 +56,13 @@ class rep_trainer(pl.LightningModule):
 
         encoded_images = self(image)
 
-        loss = self.calculate_loss(encoded_images[1], encoded_images[2])
+        loss, loss_metrics = self.calculate_loss(encoded_images[1], encoded_images[2])
 
         metrics = {
             'opt/loss' : loss,
-            'opt/lr' : self.optimizers().state_dict()['param_groups'][0]['lr']
+            'opt/lr' : self.optimizers().state_dict()['param_groups'][0]['lr'],
+            'opt/alignment' : loss_metrics["alignment"],
+            'opt/log_sum_exp' : loss_metrics["log_sum_exp"]
         }
 
         # self.log()
@@ -74,11 +76,10 @@ class rep_trainer(pl.LightningModule):
 
         encoded_images = self(image)
 
-        loss = self.calculate_loss(encoded_images[1], encoded_images[2])
+        loss, loss_metrics = self.calculate_loss(encoded_images[1], encoded_images[2])
 
         metrics = {
             'opt/loss' : loss,
-            # 'opt/lr' : self.optimizers().state_dict()['param_groups'][0]['lr']
         }
 
         # self.log()
@@ -130,6 +131,7 @@ class rep_trainer(pl.LightningModule):
         # (2N, 2N, k)
         mat =  Y*Z
 
+        print("Computing loss", flush=True)
 
 
         # We need to compute the function (sim(x,y)) for each element in the 2N sequent.
@@ -163,15 +165,23 @@ class rep_trainer(pl.LightningModule):
         numerator = torch.sum(positive_examples, dim=0)
         # print(f"numerator: {numerator}")
 
-        denominator = torch.sum(negative_examples, dim=0)
-        # print(f"denominator: {denominator}")
-        ratio = numerator / denominator
-        # print(f"ratio: {ratio}")
-        batch_size = ratio.shape[0] / 2.
-        batch_size = torch.as_tensor(batch_size, device=ratio.device)
-        loss = torch.mean( - torch.log(ratio)) - torch.log(batch_size) + 1.
+        alignment = torch.log(numerator)
 
-        return loss
+        denominator = torch.mean(negative_examples, dim=0)
+
+        log_sum_exp = torch.log(torch.sum(negative_examples, dim=0))
+
+        loss_metrics = {
+            "alignment"   : torch.mean(alignment),
+            "log_sum_exp" : torch.mean(log_sum_exp)
+        }
+
+        loss = torch.mean( - alignment + log_sum_exp)
+
+        # loss = torch.mean( - torch.log(ratio))
+        # loss = torch.mean( - torch.log(ratio)) - torch.log(batch_size) + 1.
+
+        return loss, loss_metrics
 
     def configure_optimizers(self):
         learning_rate = 1.0
