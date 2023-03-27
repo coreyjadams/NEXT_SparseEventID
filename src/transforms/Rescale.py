@@ -22,6 +22,7 @@ class Rescale(nn.Module):
 
         self.pool   = None
         self.unpool = None
+
     def forward(self, inputs):
         '''
         Inputs is assumed to be a Sparse Tensor from SCN.

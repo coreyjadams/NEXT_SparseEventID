@@ -26,7 +26,6 @@ class Shift(nn.Module):
         self.sparse = sparse
         self.max_shift = max_shift
 
-
     def forward(self, inputs):
         '''
         Inputs is assumed to be a Sparse Tensor from SCN.

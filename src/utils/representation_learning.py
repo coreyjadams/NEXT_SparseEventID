@@ -34,7 +34,8 @@ class rep_trainer(pl.LightningModule):
         self.log_keys = ["loss"]
 
         self.save_hyperparameters()
-        
+
+    # @profile
     def forward(self, batch):
 
         augmented_data = [ t(batch) for t in self.transforms ]
@@ -47,7 +48,7 @@ class rep_trainer(pl.LightningModule):
 
         return logits
 
-
+    # @profile
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
 
@@ -146,21 +147,29 @@ class rep_trainer(pl.LightningModule):
         device = sim.device
 
         positive = torch.tile(torch.eye(N, device=device), (2,2))
-        negative = - (positive - 1)
-
         # Unsure if this line is needed?
         positive = positive - torch.eye(2*N, device=device)
+
+        negative = - (torch.eye(2*N, device=device) - 1)
 
         negative_examples = sim * negative
         positive_examples = sim * positive
 
 
+        # negative_factor = torch.sum(negative)
+
+        # Include a corrective factor that accounts for the fact that the loss has a floor > 0:
+
         numerator = torch.sum(positive_examples, dim=0)
+        # print(f"numerator: {numerator}")
 
         denominator = torch.sum(negative_examples, dim=0)
-
+        # print(f"denominator: {denominator}")
         ratio = numerator / denominator
-        loss = torch.mean( - torch.log(ratio))
+        # print(f"ratio: {ratio}")
+        batch_size = ratio.shape[0] / 2.
+        batch_size = torch.as_tensor(batch_size, device=ratio.device)
+        loss = torch.mean( - torch.log(ratio)) - torch.log(batch_size) + 1.
 
         return loss
 

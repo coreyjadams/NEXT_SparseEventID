@@ -32,6 +32,7 @@ def train(args, lightning_model, datasets):
     else:
         profiler  = None
 
+
     oversubscribe = args.framework.oversubscribe
     if args.run.distributed:
         if oversubscribe == 1:
@@ -77,7 +78,7 @@ def train(args, lightning_model, datasets):
 
     tb_logger = TensorBoardLogger(
         save_dir = args.output_dir,
-        version  = 0, 
+        version  = 0,
     )
 
     checkpoint_dir = args.output_dir + "/checkpoints/"
@@ -95,7 +96,7 @@ def train(args, lightning_model, datasets):
             encoder_dict = {
                 key.replace("encoder.","") : state_dict["state_dict"][key]
                 for key in state_dict["state_dict"] if "encoder" in key
-            } 
+            }
 
             lightning_model.encoder.load_state_dict(encoder_dict)
         else:

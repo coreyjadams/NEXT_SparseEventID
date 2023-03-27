@@ -22,7 +22,7 @@ class OptimizerKind(Enum):
 @dataclass
 class LRScheduleConfig:
     name:                 str = ""
-    peak_learning_rate: float = 1e-4
+    peak_learning_rate: float = 1e-3
 
 @dataclass
 class OneCycleConfig(LRScheduleConfig):
