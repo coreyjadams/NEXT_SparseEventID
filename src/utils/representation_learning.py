@@ -113,6 +113,11 @@ class rep_trainer(pl.LightningModule):
         N = first_images.shape[0]
         k = first_images.shape[1]
 
+        # print("Min first_images: ", torch.min(first_images))
+        # print("Max first_images: ", torch.max(first_images))
+        # print("Min second_images: ", torch.min(second_images))
+        # print("Max second_images: ", torch.max(second_images))
+
         # First, normalize the tensors so that ||v|| = 1 for every one
         first_images = first_images / torch.norm(first_images,dim=1).reshape((-1,1))
         second_images = second_images / torch.norm(second_images,dim=1).reshape((-1,1))
@@ -131,8 +136,6 @@ class rep_trainer(pl.LightningModule):
         # (2N, 2N, k)
         mat =  Y*Z
 
-        print("Computing loss", flush=True)
-
 
         # We need to compute the function (sim(x,y)) for each element in the 2N sequent.
         # Since the are normalized, we're computing x^T . Y / (||x||*||y||),
@@ -140,10 +143,11 @@ class rep_trainer(pl.LightningModule):
         # So, summing the matrix over the dim = 0 and dim = 1 computes this for each pair.
 
         sim = torch.sum(mat, dim=-1)
+
+
         # This yields a symmetric matrix, diagonal entries equal 1.  Off diagonal are symmetrics and < 1.
 
-
-        sim = torch.exp(sim / temperature)
+        # sim = torch.exp(sim / temperature)
         # Now, for every entry i in C (concat of both batches), the sum of sim[i] - sim[i][i] is the denominator
 
         device = sim.device
@@ -154,22 +158,35 @@ class rep_trainer(pl.LightningModule):
 
         negative = - (torch.eye(2*N, device=device) - 1)
 
+
+
+
         negative_examples = sim * negative
         positive_examples = sim * positive
+
 
 
         # negative_factor = torch.sum(negative)
 
         # Include a corrective factor that accounts for the fact that the loss has a floor > 0:
+        #
+        # print("Min positive: ", torch.min(positive_examples))
+        # print("Max positive: ", torch.max(positive_examples))
+        #
+        #
+        # print("Min negative: ", torch.min(negative_examples))
+        # print("Max negative: ", torch.max(negative_examples))
 
-        numerator = torch.sum(positive_examples, dim=0)
-        # print(f"numerator: {numerator}")
 
-        alignment = torch.log(numerator)
+        alignment = torch.sum(positive_examples, dim=0)
+        # print(f"alignment: {alignment}")
 
-        denominator = torch.mean(negative_examples, dim=0)
+        exp = torch.sum(torch.exp(negative_examples), dim=0)
 
-        log_sum_exp = torch.log(torch.sum(negative_examples, dim=0))
+        # print(exp)
+
+
+        log_sum_exp = torch.log(exp + 1e-8)
 
         loss_metrics = {
             "alignment"   : torch.mean(alignment),

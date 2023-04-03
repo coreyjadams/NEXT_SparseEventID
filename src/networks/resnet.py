@@ -17,7 +17,7 @@ class Encoder(torch.nn.Module):
 
         # How many filters did we start with?
         current_number_of_filters = params.encoder.n_initial_filters
-        
+
         self.first_block = Block(
             nIn    = 1,
             nOut   = params.encoder.n_initial_filters,
@@ -49,6 +49,11 @@ class Encoder(torch.nn.Module):
             )
             current_number_of_filters = next_filters
 
+        if params.framework.sparse:
+            self.final_activation = scn.Tanh()
+        else:
+            self.final_activation = torch.nn.Tanh()
+
 
         final_shape = [i // 2**params.encoder.depth for i in image_size]
         self.output_shape = [current_number_of_filters,] +  final_shape
@@ -60,7 +65,7 @@ class Encoder(torch.nn.Module):
         for l in self.network_layers:
             output = l(output)
 
-        return output
+        return self.final_activation(output)
 
 
     def increase_filters(self, current_filters, params):

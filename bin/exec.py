@@ -138,7 +138,7 @@ class exec(object):
             )
 
             ds.update({
-                active :  create_torch_larcv_dataloader(larcv_ds, 
+                active :  create_torch_larcv_dataloader(larcv_ds,
                     self.args.run.minibatch_size)
             })
             # Get the image size:
@@ -170,7 +170,6 @@ class exec(object):
         from src.utils.create_trainer import train
         train(self.args, self.trainer, self.datasets)
 
-
     def iotest(self):
 
         logger = logging.getLogger("NEXT")
@@ -197,8 +196,8 @@ class exec(object):
 
             # Determine the stopping point:
             break_i = self.args.run.length * len(dataset)
-            break_i = 5
-            
+            break_i = 25
+
             start = time.time()
             for i, minibatch in enumerate(dataset):
                 image = minibatch[self.args.data.image_key]
@@ -271,7 +270,7 @@ class exec(object):
                     t(original) for t in self.transforms
                 ]
 
-                if i > 5: 
+                if i > 5:
                     break
 
 
