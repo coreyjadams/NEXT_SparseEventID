@@ -57,7 +57,6 @@ def build_transforms(args, image_size=None, include_identity=True):
                 max_shift= 5,
                 sparse=args.framework.sparse
             )
-
         )
         transforms.append(t)
 

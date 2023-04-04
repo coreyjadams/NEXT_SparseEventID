@@ -46,7 +46,7 @@ def build_networks(params, input_shape):
 
     classification_head.append(torch.nn.Flatten())
 
-    for layer in params.head.layers:
+    for i, layer in enumerate(params.head.layers):
         classification_head.append(torch.nn.Linear(
             in_features  = current_number_of_filters,
             out_features = layer))
@@ -54,6 +54,7 @@ def build_networks(params, input_shape):
             classification_head.append(torch.nn.ReLU())
         current_number_of_filters = layer
 
+    classification_head.append(torch.nn.Tanh())
     #
     # if params.framework.sparse:
     #     yolo_head.append(scn.ReLU())
