@@ -42,7 +42,6 @@ class supervised_eventID(pl.LightningModule):
 
     def forward(self, batch):
 
-
         t = self.transforms[0](batch)
 
         representation = self.encoder(t)
@@ -55,14 +54,16 @@ class supervised_eventID(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
 
+
+
         image = batch[self.image_key]
 
         logits = self(image)
 
 
-        loss = self.calculate_loss(batch, logits)
-
         prediction = self.predict_event(logits)
+        loss = self.calculate_loss(batch, logits, prediction)
+
         accuracy_dict = self.calculate_accuracy(prediction, batch['label'])
 
 
@@ -88,9 +89,9 @@ class supervised_eventID(pl.LightningModule):
         logits = self(image)
 
 
-        loss = self.calculate_loss(batch, logits)
-
         prediction = self.predict_event(logits)
+        loss = self.calculate_loss(batch, logits, prediction)
+
         accuracy_dict = self.calculate_accuracy(prediction, batch['label'])
 
 
@@ -148,18 +149,41 @@ class supervised_eventID(pl.LightningModule):
 
 
         accuracy = prediction == labels
-        accuracy = torch.mean(accuracy.to(torch.float32))
+
+        is_signal     = labels == 0
+        is_background = labels == 1
+        print(accuracy[is_signal])
+        print(accuracy[is_background])
         
+        sig_acc  = torch.mean(accuracy[is_signal].to(torch.float32))
+        bkg_acc = torch.mean(accuracy[torch.logical_not(is_signal)].to(torch.float32))
+        accuracy = torch.mean(accuracy.to(torch.float32))
+
+
         return {
-            "accuracy" : accuracy
+            "acc/accuracy" : accuracy,
+            "acc/sig_acc": sig_acc,
+            "acc/bkg_acc": bkg_acc,
         }
 
 
-    def calculate_loss(self, batch, logits):
+    def calculate_loss(self, batch, logits, prediction=None):
 
-        loss = torch.nn.functional.cross_entropy(logits, batch['label'])
+        loss = torch.nn.functional.cross_entropy(
+            logits, 
+            batch['label'],
+            reduction = "none"
+        )
         
-        return loss
+        # print(loss.shape)
+        if prediction is not None:
+            focus = (prediction - batch['label'])**2
+            loss = loss*focus
+
+        # focus = (batch['label'] - logits)**2
+        # print(focus)
+
+        return torch.mean(loss)
 
 
     def configure_optimizers(self):

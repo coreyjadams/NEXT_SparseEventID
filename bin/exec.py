@@ -128,17 +128,31 @@ class exec(object):
 
         elif self.args.name == "supervised_eventID":
             batch_keys.append("label")
-            
+        elif self.args.name == "unsupervised_eventID":
+            batch_keys.append("energy")
+        
         ds = {}
         for active in self.args.data.active:
+
+            f_name = getattr(self.args.data, active)
             larcv_ds = create_larcv_dataset(self.args.data,
                 batch_size   = self.args.run.minibatch_size,
-                input_file   = getattr(self.args.data, active),
+                input_file   = f_name,
                 name         = active,
                 distributed  = self.args.run.distributed,
                 batch_keys   = batch_keys,
                 sparse       = self.args.framework.sparse,
             )
+            # # We pull out the energy and labels for this dataset:
+            # import h5py
+            # h5_file = h5py.File(f_name, 'r')
+            # particles = h5_file["Data/particle_event_group/particles"]
+            # labels = particles['pdg']
+            # energy = particles['energy_init']
+            # h5_file.close()
+
+            # print(energy)
+            # print(labels)
 
             ds.update({
                 active :  create_torch_larcv_dataloader(larcv_ds,
@@ -150,7 +164,9 @@ class exec(object):
         from src.transforms import build_transforms
         augmentation = build_transforms(self.args, spatial_size)
 
+
         return ds, augmentation
+
 
     def configure_logger(self, rank):
 
@@ -171,6 +187,7 @@ class exec(object):
         self.make_trainer()
 
         from src.utils.create_trainer import train
+
         train(self.args, self.trainer, self.datasets)
 
     def iotest(self):
@@ -232,13 +249,6 @@ class exec(object):
 
         elif self.args.name == "yolo":
             from src.utils.vertex_finding import create_lightning_module
-            # self.trainer = create_lightning_module(
-            #     self.args,
-            #     self.datasets,
-            #     self.transforms,
-            #     lr_schedule,
-            # )
-
         elif self.args.name == "supervised_eventID":
             from src.utils.supervised_eventID import create_lightning_module
 

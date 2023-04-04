@@ -38,6 +38,10 @@ class WarmupFlatDecayConfig(LRScheduleConfig):
     decay_epochs:         int = 5
 
 @dataclass
+class FlatLR(LRScheduleConfig):
+    name:                 str = "flat"
+
+@dataclass
 class Optimizer:
     lr_schedule:          LRScheduleConfig = WarmupFlatDecayConfig()
     loss_balance_scheme: LossBalanceScheme = LossBalanceScheme.focal
@@ -46,6 +50,7 @@ class Optimizer:
 
 cs = ConfigStore.instance()
 
+cs.store(group="lr_schedule", name="flat",      node=FlatLR)
 cs.store(group="lr_schedule", name="one_cycle", node=OneCycleConfig)
 cs.store(group="lr_schedule", name="standard",  node=WarmupFlatDecayConfig)
 cs.store(name="optimizer", node=Optimizer)

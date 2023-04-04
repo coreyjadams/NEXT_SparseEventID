@@ -279,6 +279,9 @@ class larcv_dataset(object):
             minibatch_data['label'] = label_particle['_pdg'].astype("int64")
 
 
+        if 'energy' in self.batch_keys:
+            minibatch_data['energy'] = label_particle['energy_init']
+
         if "vertex" in minibatch_data.keys():
         #     downsample_level = 2**self.data_args.downsample
             batch_size = minibatch_data['vertex'].shape[0]
