@@ -126,6 +126,9 @@ class exec(object):
             batch_keys.append("vertex")
             batch_keys.append("label")
 
+        elif self.args.name == "supervised_eventID":
+            batch_keys.append("label")
+            
         ds = {}
         for active in self.args.data.active:
             larcv_ds = create_larcv_dataset(self.args.data,
@@ -236,6 +239,9 @@ class exec(object):
             #     self.transforms,
             #     lr_schedule,
             # )
+
+        elif self.args.name == "supervised_eventID":
+            from src.utils.supervised_eventID import create_lightning_module
 
         self.trainer = create_lightning_module(
             self.args,
