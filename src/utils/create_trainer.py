@@ -90,7 +90,7 @@ def train(args, lightning_model, datasets):
     # Checkpoint loading.  First, do we have a path specified?
     if args.mode.weights_location != "":
         if args.mode.restore_encoder_only:
-            # IN this situation, we only load the encoder
+            # In this situation, we only load the encoder
             state_dict = torch.load(args.mode.weights_location)
 
             encoder_dict = {
@@ -99,6 +99,9 @@ def train(args, lightning_model, datasets):
             }
 
             lightning_model.encoder.load_state_dict(encoder_dict)
+            # We also FREEZE the encoder:
+            for param in lightning_model.encoder.parameters():
+                param.requires_grad = False
         else:
             lightning_model.load_from_checkpoint(args.mode.weights_location)
     else:
@@ -106,18 +109,6 @@ def train(args, lightning_model, datasets):
         # Check to see if there are already checkpoints present:
         checkpoint_options = glob.glob(checkpoint_dir + "*.ckpt")
         if len(checkpoint_options) > 0:
-            # state_dict = torch.load(checkpoint_options[0])
-            # try:
-            # lightning_model.load_state_dict(state_dict["state_dict"])
-
-            # except:
-            #     print("Direct dict loading failed!")
-
-            # for key in state_dict.keys():
-            #     if key == "state_dict":
-            #         print(state_dict[key].keys())
-            #         continue
-
             lightning_model.load_from_checkpoint(checkpoint_options[0])
 
 

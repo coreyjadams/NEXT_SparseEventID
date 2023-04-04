@@ -50,7 +50,8 @@ def build_networks(params, input_shape):
         classification_head.append(torch.nn.Linear(
             in_features  = current_number_of_filters,
             out_features = layer))
-        classification_head.append(torch.nn.ReLU())
+        if layer != params.head.layers[-1]:
+            classification_head.append(torch.nn.ReLU())
         current_number_of_filters = layer
 
     #

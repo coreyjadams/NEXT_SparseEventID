@@ -258,7 +258,6 @@ class larcv_dataset(object):
             pop=pop,fetch_meta_data=metadata)
         minibatch_dims = self.larcv_interface.fetch_minibatch_dims(self.storage_name)
 
-
         # If the returned data is None, return none and don't load more:
         if minibatch_data is None:
             return minibatch_data
@@ -277,7 +276,7 @@ class larcv_dataset(object):
         # if self.event_id or self.vertex_depth is not None:
         if 'label' in minibatch_data.keys():
             label_particle = minibatch_data['label'][:,0]
-            minibatch_data['label'] = label_particle['_pdg']
+            minibatch_data['label'] = label_particle['_pdg'].astype("int64")
 
 
         if "vertex" in minibatch_data.keys():

@@ -82,19 +82,35 @@ class DetectVertex:
     name:       str       = "yolo"
 
 
-# @dataclass
-# class Classify:
-#     defaults: List[Any] = field(default_factory=lambda: defaults)
+@dataclass
+class SupervisedClassification:
+    defaults: List[Any] = field(default_factory=lambda: defaults)
 
 
-#     run:        Run       = MISSING
-#     mode:       Mode      = MISSING
-#     data:       Data      = MISSING
-#     framework:  Framework = MISSING
-#     encoder:    Representation = Representation()
-#     head:       YoloHead = YoloHead()
-#     output_dir: str       = "output/"
-#     name:       str       = "yolo"
+    run:        Run       = MISSING
+    mode:       Mode      = MISSING
+    data:       Data      = MISSING
+    framework:  Framework = MISSING
+    encoder:    Representation = Representation()
+    head:       ClassificationHead = ClassificationHead()
+    output_dir: str       = "output/"
+    name:       str       = "supervised_eventID"
 
-cs.store(name="detect_vertex", node=DetectVertex)
+@dataclass
+class UnsupervisedClassification:
+    defaults: List[Any] = field(default_factory=lambda: defaults)
+
+
+    run:        Run       = MISSING
+    mode:       Mode      = MISSING
+    data:       Data      = MISSING
+    framework:  Framework = MISSING
+    encoder:    Representation = Representation()
+    head:       ClassificationHead = ClassificationHead()
+    output_dir: str       = "output/"
+    name:       str       = "unsupervised_eventID"
+
+
+cs.store(name="supervised_classification",   node=SupervisedClassification)
+cs.store(name="unsupervised_classification", node=UnsupervisedClassification)
 
