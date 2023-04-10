@@ -143,18 +143,19 @@ class supervised_eventID(pl.LightningModule):
         class_prediction = torch.argmax(prediction, dim=-1)
 
         return class_prediction
-        
+
 
     def calculate_accuracy(self, prediction, labels):
-
+        SIGNAL = 0
+        BACKGROUND = 1
 
         accuracy = prediction == labels
 
-        is_signal     = labels == 0
-        is_background = labels == 1
-        print(accuracy[is_signal])
-        print(accuracy[is_background])
-        
+        is_signal     = labels == SIGNAL
+        is_background = labels == BACKGROUND
+        # print(accuracy[is_signal])
+        # print(accuracy[is_background])
+
         sig_acc  = torch.mean(accuracy[is_signal].to(torch.float32))
         bkg_acc = torch.mean(accuracy[torch.logical_not(is_signal)].to(torch.float32))
         accuracy = torch.mean(accuracy.to(torch.float32))
@@ -170,15 +171,16 @@ class supervised_eventID(pl.LightningModule):
     def calculate_loss(self, batch, logits, prediction=None):
 
         loss = torch.nn.functional.cross_entropy(
-            logits, 
-            batch['label'],
+            input  = logits,
+            target = batch['label'],
+            weight = torch.tensor([3.96109349, 0.57223151], device=logits.device),
             reduction = "none"
         )
-        
+
         # print(loss.shape)
-        if prediction is not None:
-            focus = (prediction - batch['label'])**2
-            loss = loss*focus
+        # if prediction is not None:
+        #     focus = (prediction - batch['label'])**2
+        #     loss = loss*focus
 
         # focus = (batch['label'] - logits)**2
         # print(focus)
