@@ -87,6 +87,9 @@ def train(args, lightning_model, datasets):
         every_n_train_steps = 50,
     )
 
+
+    checkpoint_path = None
+
     # Checkpoint loading.  First, do we have a path specified?
     if args.mode.weights_location != "":
         if args.mode.restore_encoder_only:
@@ -109,7 +112,10 @@ def train(args, lightning_model, datasets):
         # Check to see if there are already checkpoints present:
         checkpoint_options = glob.glob(checkpoint_dir + "*.ckpt")
         if len(checkpoint_options) > 0:
-            lightning_model.load_from_checkpoint(checkpoint_options[0])
+            checkpoint_path = checkpoint_options[0]
+            # print(f"checkpoint_options: {checkpoint_options}")
+            # state_dict = lightning_model.load_from_checkpoint(checkpoint_options[0])
+            # print("Loaded model from checkpoint")
 
 
     trainer = pl.Trainer(
@@ -127,11 +133,13 @@ def train(args, lightning_model, datasets):
         val_check_interval      = 10,
         check_val_every_n_epoch = None,
         limit_val_batches       = 1,
-        callbacks               = [model_checkpoint]
+        callbacks               = [model_checkpoint],
     )
 
     # Try to load the model from a checkpoint:
 
+    # print(trainer.global_step)
+    # exit()
 
 
     # model_checkpoint.format_checkpoint_name()
@@ -141,5 +149,7 @@ def train(args, lightning_model, datasets):
     trainer.fit(
         lightning_model,
         train_dataloaders=datasets["train"],
-        val_dataloaders = datasets["val"]
+        val_dataloaders  = datasets["val"],
+        ckpt_path        = checkpoint_path
+
     )
