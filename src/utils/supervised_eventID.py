@@ -39,6 +39,8 @@ class supervised_eventID(pl.LightningModule):
 
         self.log_keys = ["loss"]
 
+    def on_train_start(self):
+        self.optimizers().param_groups = self.optimizers()._optimizer.param_groups
 
     def forward(self, batch):
 
@@ -152,8 +154,6 @@ class supervised_eventID(pl.LightningModule):
 
         is_signal     = labels == 0
         is_background = labels == 1
-        print(accuracy[is_signal])
-        print(accuracy[is_background])
         
         sig_acc  = torch.mean(accuracy[is_signal].to(torch.float32))
         bkg_acc = torch.mean(accuracy[torch.logical_not(is_signal)].to(torch.float32))
