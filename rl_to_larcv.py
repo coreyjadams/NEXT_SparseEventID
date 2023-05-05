@@ -38,9 +38,10 @@ def read_mandatory_tables(input_files):
 
     # List of tables that must be found:
     mandatory_tables = [
-        "/DECO/Events/",
+        # "/DECO/Events/",
         "/Summary/Events/",
         "/Run/events/",
+        "/Run/eventMap/",
         "/Run/runInfo/",
         "/PMAPS/S1/",
         "/PMAPS/S1Pmt/",
@@ -50,7 +51,7 @@ def read_mandatory_tables(input_files):
     ]
 
     optional_mc_tables = [
-        "/MC/extents/",
+        # "/MC/extents/",
         "/MC/hits/",
         "/MC/particles/",
     ]
@@ -65,6 +66,7 @@ def read_mandatory_tables(input_files):
         for table_name in mandatory_tables:
             # print(f"looking for {table_name}")
             if has_table(open_file, table_name):
+                print(f"Found table {table_name} in file {input_files}")
                 m_found_tables[table_name] = open_file.get_node(table_name).read()
 
             else:
@@ -99,6 +101,7 @@ def read_mandatory_tables(input_files):
 
     if len(optional_mc_tables) != 0:
         print("Not all mc tables found, skipping MC")
+        print(f"  Missing: {optional_mc_tables}")
         mc_tables = None
 
 
@@ -267,45 +270,6 @@ def store_mc_info(io_manager, this_hits, this_particles):
     vertex_set = io_manager.get_data("bbox3d", "vertex")
     vertex_collection = larcv.BBoxCollection3D()
     vertex_collection.meta(meta)
-
-    # # Create a tree of particles to help sort out the primary gammas and the vertex.
-    # # On the first pass through, just gathering up the nodes:
-    # nodes = {}
-    # primary = None
-    # for particle in this_particles:
-    #     node = anytree.AnyNode(id=particle['particle_indx'], particle=particle)
-    #     # Tag the primary:
-    #     if particle['primary'] == 1:
-    #         node.parent = None
-    #         primary = node
-    #     else:
-    #         nodes.update({particle['particle_indx'] : node})
-
-    # print(nodes)
-
-    # # Here, sort the list out:
-    # orphans = {}
-    # while len(nodes) > len(orphans):
-    #     # Go through the list assigning nodes to their parent.
-    #     # The primary was never added to the list ofnodes so we shouldn't hit it.
-    #     node_indx, top_node = nodes.popitem()
-    #     target_indx = top_node.particle['mother_indx']
-    #     if target_indx == primary.particle['particle_indx']:
-    #         primary.children = primary.children + (top_node,)
-    #     elif target_indx in nodes.keys():
-    #         nodes[target_indx].children = nodes[target_indx].children + (top_node,)
-    #     else:
-    #         print("Failed to find mother for node ", node)
-    #         orphans[node_indx] = top_node
-    #     # for other_nodes in nodes:
-    #     #     if other_nodes.particle['particle_indx'] == target_indx:
-    #     #         other_nodes
-    #     #         nodes.pop(node)
-    #     #         break
-    #     print("Current length of nodes is: ", len(nodes))
-
-
-    # print(primary.children)
 
     # Now, store the particles:
     for i, particle in enumerate(this_particles):
@@ -503,7 +467,7 @@ def energy_corrected(energy, z_min, z_max):
 
     return energy/(1. - Z_corr_factor*(z_max-z_min))
 
-def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
+def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr_hits=False):
 
     # print(image_tables.keys())
     # print(mc_tables.keys())
@@ -514,14 +478,21 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
         is_mc = False
 
 
-    # # Format output name:
-    # output_name = input_lr_file.name.replace(".h5", "_larcv.h5")
+    # writing 3 output files: everything, lr, and cuts:
+    io_dict = {}
+    keys = ["all", "cuts"]
+    if process_lr_hits: keys.append("lr")
+    for key in keys:
+        this_output_name = str(output_name) + f"_{key}.h5"
+        print(this_output_name)
+        # Create an output larcv file:
+        _io_manager = larcv.IOManager(larcv.IOManager.kWRITE)
+        _io_manager.set_out_file(str(this_output_name))
+        _io_manager.initialize()
+        io_dict[key] = _io_manager
+
     # output      = output_directory /  pathlib.Path(output_name)
 
-    # Create an output larcv file:
-    io_manager = larcv.IOManager(larcv.IOManager.kWRITE)
-    io_manager.set_out_file(str(output_name))
-    io_manager.initialize()
 
     # Now, ready to go.  Read in a couple tables:
 
@@ -536,13 +507,15 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
     #  - read this for whole-event labels, but also gather out
 
     if is_mc:
-        mc_extents   = mc_tables["/MC/extents/"]
+        # mc_extents   = mc_tables["/MC/extents/"]
         mc_hits      = mc_tables["/MC/hits/"]
         mc_particles = mc_tables["/MC/particles/"]
 
+    eventMap = image_tables["/Run/eventMap/"]
     events  = image_tables["/Run/events/"]
     run     = image_tables["/Run/runInfo/"]
     summary = image_tables["/Summary/Events/"]
+
 
     # event no is events[i_evt][0]
     # run no is run[i_evt][0]
@@ -552,10 +525,11 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
 
 
     event_numbers = events['evt_number']
+    print(event_numbers)
     # event_energy  = summary['evt_energy']
 
-    # lr_hits = evtfile.root.DECO.Events.read()
-    lr_hits = image_tables["/DECO/Events/"]
+    if process_lr_hits:
+        lr_hits = image_tables["/DECO/Events/"]
 
     keys = {"S1", "S1Pmt", "S2", "S2Pmt", "S2Si"}
     pmap_tables = {key : image_tables["/PMAPS/" + key + "/"] for key in keys}
@@ -574,28 +548,29 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
 
         found_all_images = True
 
-        # Did this event pass the basic event cuts?
-        if event_no not in passed_events: continue
-
-        io_manager.set_id(this_run, 0, event_no)
 
         # Slice off this summary object:
         this_summary = summary[summary['event'] == event_no]
 
+        if len(this_summary) == 0:continue
 
         # Get the pmaps:
         this_pmaps = slice_into_event(pmap_tables, event_no, keys)
 
-        found_pmaps = store_pmaps(io_manager, this_pmaps, db_lookup)
+        for _, io_manager in io_dict.items():
+            found_pmaps = store_pmaps(io_manager, this_pmaps, db_lookup)
+        
         found_all_images = found_pmaps and found_all_images
         # print(event_no, found_pmaps)
         # Parse out the deconv hits:
-        this_lr_hits = lr_hits[lr_hits['event'] == event_no]
-        if len(this_lr_hits) > 0:
-            store_lr_hits(io_manager, this_lr_hits)
-        else:
-            found_all_images = False
-            print("no deco hits found")
+        if process_lr_hits:
+            this_lr_hits = lr_hits[lr_hits['event'] == event_no]
+            if len(this_lr_hits) > 0:
+                for _, io_manager in io_dict.items():
+                    store_lr_hits(io_manager, this_lr_hits)
+            else:
+                found_all_images = False
+                print("no deco hits found")
 
         # We store the measured energy, correct, in 'energy_deposit'
         # We store the mc energy, if we have it, in 'energy_init'
@@ -604,28 +579,39 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
         if is_mc:
             # Store the mc infomation.  Extract this events hits, particles, etc.
             # Slice this extents:
-            mc_mask = mc_extents['evt_number'] == event_no
-            this_index = numpy.argwhere(mc_mask)[0][0]
 
-            this_mc_extents = mc_extents[this_index]
-            particle_stop = int(this_mc_extents['last_particle'] + 1) # Particle index is not inclusive in the last index, add one
-            hit_stop      = int(this_mc_extents['last_hit'] + 1)      # Particle index is not inclusive in the last index, add one
+            # Use the event_no and eventMap to map the IC event to nexus Event
 
-            if this_index != 0:
-                previous_mc_extents = mc_extents[this_index - 1]
-                particle_start = int(previous_mc_extents['last_particle'] + 1)
-                hit_start      = int(previous_mc_extents['last_hit'] + 1)
-            else:
-                particle_start = 0
-                hit_start      = 0
+            rowMask = eventMap['evt_number'] == event_no
+            nexus_event = eventMap[rowMask]['nexus_evt']
+
+            this_particles = mc_particles[mc_particles['event_id'] == nexus_event]
+            this_hits      = mc_hits[mc_hits['event_id'] == nexus_event]
+
+            # mc_mask = mc_extents['evt_number'] == event_no
+            # this_index = numpy.argwhere(mc_mask)[0][0]
+
+            # this_mc_extents = mc_extents[this_index]
+            # particle_stop = int(this_mc_extents['last_particle'] + 1) # Particle index is not inclusive in the last index, add one
+            # hit_stop      = int(this_mc_extents['last_hit'] + 1)      # Particle index is not inclusive in the last index, add one
+
+            # if this_index != 0:
+            #     previous_mc_extents = mc_extents[this_index - 1]
+            #     particle_start = int(previous_mc_extents['last_particle'] + 1)
+            #     hit_start      = int(previous_mc_extents['last_hit'] + 1)
+            # else:
+            #     particle_start = 0
+            #     hit_start      = 0
 
 
-            this_particles = mc_particles[particle_start:particle_stop]
-            this_hits      = mc_hits[hit_start:hit_stop]
+            # this_particles = mc_particles[particle_start:particle_stop]
+            # this_hits      = mc_hits[hit_start:hit_stop]
 
-            # print(len(this_hits))
+            # # print(len(this_hits))
 
-            positron = store_mc_info(io_manager, this_hits, this_particles)
+            for _, io_manager in io_dict.items():
+                positron = store_mc_info(io_manager, this_hits, this_particles)
+            
             # print("Event number: ", event_no, "(positron: ", positron, ")")
 
             # First, we figure out the extents for this event.
@@ -643,40 +629,31 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup):
                 true_e = numpy.sum(this_hits['energy'])
             particle.energy_init(true_e)
 
-        # Calculate the reconstructed energy of the event:
-        energy = numpy.sum(this_lr_hits['E'])
-        energy = energy_corrected(energy, this_summary['evt_z_min'][0], this_summary['evt_z_max'][0])
-        particle.energy_deposit(energy)
         # Store the whole measured energy of the event
-        event_part   = io_manager.get_data("particle", "event")
-        event_part.append(particle)
+        # if process_lr_hits:
+        for _, io_manager in io_dict.items():
+            # Calculate the reconstructed energy of the event:
+            energy = this_summary['evt_energy']
+            energy = energy_corrected(energy, this_summary['evt_z_min'][0], this_summary['evt_z_max'][0])
+            particle.energy_deposit(energy)
 
-    # for event in numpy.unique(df.event):
-    #     sub_df = df.query("event == {}".format(event))
-    #     Run=sub_df.Run.iloc[0]
-    #     if is_mc:
-    #         sub_run = sub_df.file_int.iloc[0]
-    #     else:
-    #         sub_run = 0
+            event_part   = io_manager.get_data("particle", "event")
+            event_part.append(particle)
 
-    #     io_manager.set_id(int(Run), int(sub_run), int(event))
+        # Set the event ID for all managers:
+        for key, val in io_dict.items():
+            val.set_id(this_run, 0, event_no)
 
-    #     ################################################################################
-    #     # Store the particle information:
-    #     if is_mc:
-    #         larcv_particle = larcv.EventParticle.to_particle(io_manager.get_data("particle", "label"))
-    #         particle = larcv.Particle()
-    #         particle.energy_init(sub_df.true_energy.iloc[0])
-    #         particle.pdg_code(int(sub_df.label.iloc[0]))
-    #         larcv_particle.emplace_back(particle)
-    #     ################################################################################
+        io_dict['all'].save_entry()
 
+        if process_lr_hits and found_all_images:
+            io_dict['lr'].save_entry()
 
+        # Did this event pass the basic event cuts?
+        if event_no not in passed_events: continue
 
-        if found_all_images:
-            io_manager.save_entry()
-        # if i_evt > 65:
-            # break
+        io_dict['cuts'].save_entry()
+
 
     # Close Larcv:
     if found_pmaps:
