@@ -217,13 +217,21 @@ def store_mc_info(io_manager, this_hits, this_particles):
     event_cluster3d = io_manager.get_data("cluster3d", "mc_hits")
     event_cluster3d.clear()
 
+    meta = get_NEW_LR_meta()
+
+
+    # Storage for vertex:
+    vertex_set = io_manager.get_data("bbox3d", "vertex")
+    vertex_set.clear()
+    vertex_collection = larcv.BBoxCollection3D()
+    vertex_collection.meta(meta)
+
 
     if 'particle_indx' in this_hits.dtype.names:
         cluster_indexes = numpy.unique(this_hits['particle_indx'])
     else:
         cluster_indexes = numpy.unique(this_hits['particle_id'])
 
-    meta = get_NEW_LR_meta()
 
     sc = larcv.SparseCluster3D()
     sc.meta(meta)
@@ -261,15 +269,47 @@ def store_mc_info(io_manager, this_hits, this_particles):
     positron = False
 
     # How to find the vertex?  It's where the gamma interacts.
-    # There can be multiple gammas, so take the one that comes first.
 
-    found_vertex = False
     vertex = None
 
+    # First, find the direct ancestor of the 2.6 MeV Gamma:
+    ancestor = this_particles[this_particles['particle_name'] == b'Pb208[2614.522]']
+    # print("Ancestor: ", ancestor, "of len", len(ancestor))
 
-    vertex_set = io_manager.get_data("bbox3d", "vertex")
-    vertex_collection = larcv.BBoxCollection3D()
-    vertex_collection.meta(meta)
+    # Next, find the daughter gamma of this particle:
+    ancestor_daughters = this_particles[this_particles['mother_id'] == ancestor['particle_id']]
+    gamma = ancestor_daughters[ancestor_daughters['particle_name'] == b'gamma']
+    # print("2.6MeV gamma: ", gamma, "of len", len(gamma))
+
+    # Find all the daughters of this gamma:
+    gamma_daughters = this_particles[this_particles['mother_id'] == gamma['particle_id']]
+    # print("gamma daughthers: ", gamma_daughters)
+
+    # Filter the gamma daughters to the active volume:
+    active_gamma_daughters = gamma_daughters[gamma_daughters['initial_volume'] == b'ACTIVE']
+    if len(active_gamma_daughters) > 0:
+        # print(active_gamma_daughters)
+        # Select the active gamma daughter with the earliest time as the vertex:
+        first_active_gamma_daughter_idx = numpy.argmin(active_gamma_daughters['initial_t'])
+        # print(first_active_gamma_daughter_idx)
+        vertex = active_gamma_daughters[first_active_gamma_daughter_idx]
+        # print(vertex)
+
+
+
+        # vertex = [gamma['final_x'], gamma['final_x'], gamma['final_x']]
+        # print("Vertex Candidate: ", particle)
+        vertex_bbox = larcv.BBox3D(
+            (vertex['initial_x'], vertex['initial_y'], vertex['initial_z']),
+            (0., 0., 0.)
+        )
+        vertex_collection.append(vertex_bbox)
+        vertex_set.append(vertex_collection)
+
+    # Are any of the gamma daughters e+?
+    # Implicitly checking only the daughter that start in the ACTIVE volume
+    if b'e+' in active_gamma_daughters['particle_name']:
+        positron = True
 
     # Now, store the particles:
     for i, particle in enumerate(this_particles):
@@ -283,28 +323,6 @@ def store_mc_info(io_manager, this_hits, this_particles):
         # Parent's name == "Pb208[2614.552]" OR kinetic_energy = 2.6145043
 
 
-
-        if particle['particle_name'] == b'gamma' \
-            and numpy.abs(particle['kin_energy'] - 2.6145043) < 0.01 \
-            and not found_vertex:
-            # print(particle.dtype)
-            if 'final_vertex' in particle.dtype.names:
-                vertex = particle['final_vertex']
-            else:
-                vertex = [particle['final_x'], particle['final_x'], particle['final_x']]
-
-            # Check that the vertex is in the fiducial volume:
-            if vertex[2] < 510.0 and vertex[2] > 20.0:
-                if numpy.sqrt(vertex[0]**2 + vertex[1]**2) < 180.:
-
-
-                    found_vertex = True
-                    # print("Vertex Candidate: ", particle)
-                    vertex_bbox = larcv.BBox3D(
-                        (vertex[0], vertex[1], vertex[2]),
-                        (0., 0., 0.)
-                    )
-                    vertex_collection.append(vertex_bbox)
 
         if b'Pb208' in particle['particle_name']:
             pdg_code = 30000000
@@ -351,7 +369,6 @@ def store_mc_info(io_manager, this_hits, this_particles):
         particle_set.append(p)
 
 
-    vertex_set.append(vertex_collection)
 
     return positron
 
@@ -525,7 +542,7 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
 
 
     event_numbers = events['evt_number']
-    print(event_numbers)
+
     # event_energy  = summary['evt_energy']
 
     if process_lr_hits:
