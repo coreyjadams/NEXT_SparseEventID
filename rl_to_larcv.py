@@ -66,7 +66,7 @@ def read_mandatory_tables(input_files):
         for table_name in mandatory_tables:
             # print(f"looking for {table_name}")
             if has_table(open_file, table_name):
-                # print(f"Found table {table_name} in file {input_files}")
+                print(f"Found table {table_name} in file {_f}")
                 m_found_tables[table_name] = open_file.get_node(table_name).read()
 
             else:
@@ -107,7 +107,7 @@ def read_mandatory_tables(input_files):
 
     return image_tables, mc_tables
 
-def convert_entry_point(input_files, output_file, db_location):
+def convert_entry_point(input_files, output_file, run, subrun, db_location):
 
     image_tables, mc_tables = read_mandatory_tables(input_files)
 
@@ -120,7 +120,7 @@ def convert_entry_point(input_files, output_file, db_location):
     }
 
 
-    convert_to_larcv(image_tables, mc_tables, output_file, db_lookup)
+    convert_to_larcv(image_tables, mc_tables, output_file, db_lookup, run, subrun)
 
 
 
@@ -141,6 +141,18 @@ def main():
         required=True,
         help="Name of output file.")
 
+    parser.add_argument("-r", "--run",
+        type=int,
+        required=False,
+        default=-1,
+        help="Run for this file.")
+
+    parser.add_argument("-sr", "--subrun",
+        type=int,
+        required=False,
+        default=0,
+        help="Subrun for this file.")
+
     parser.add_argument('-db', "--sipm-db-file",
         type=pathlib.Path,
         required=True,
@@ -148,7 +160,7 @@ def main():
 
     args = parser.parse_args()
 
-    convert_entry_point(args.input, args.output, args.sipm_db_file)
+    convert_entry_point(args.input, args.output, args.run, args.subrun, args.sipm_db_file)
 
 
 # files = files[0:5]
@@ -387,10 +399,13 @@ def store_pmaps(io_manager, this_pmaps, db_lookup):
 
     x_locations, y_locations, z_locations, energy = pmaps_to_xyzE(this_pmaps, db_lookup)
 
-    if len(x_locations) == 0: return False
+    if len(x_locations) == 0: 
+        print("No PMAPS!")
+        return False
 
     # Put them into larcv:
     event_sparse3d = io_manager.get_data("sparse3d", "pmaps")
+    event_sparse3d.clear()
 
     meta = get_NEW_meta()
 
@@ -522,7 +537,7 @@ def energy_corrected(energy, z_min, z_max):
 
     return energy/(1. - Z_corr_factor*(z_max-z_min))
 
-def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr_hits=False):
+def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, run_no, subrun, process_lr_hits=False):
 
     # print(image_tables.keys())
     # print(mc_tables.keys())
@@ -575,11 +590,15 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
     # event no is events[i_evt][0]
     # run no is run[i_evt][0]
     # We'll set all subrun info to 0, it doesn't matter.
-
-    this_run = run[0][0]
+    if run_no != -1:
+        this_run = run[0][0]
+    else:
+        this_run = run_no
 
 
     event_numbers = events['evt_number']
+
+
 
     # event_energy  = summary['evt_energy']
 
@@ -598,14 +617,19 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
 
 
     # print(numpy.unique(lr_hits['event'], return_counts=True))
-
     for i_evt, event_no in enumerate(event_numbers):
 
         found_all_images = True
+        out_of_map = False
+
 
 
         # Slice off this summary object:
         this_summary = summary[summary['event'] == event_no]
+
+        if this_summary['evt_out_of_map']:
+            out_of_map = True
+
 
         if len(this_summary) == 0:continue
 
@@ -614,7 +638,8 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
 
         for _, io_manager in io_dict.items():
             found_pmaps = store_pmaps(io_manager, this_pmaps, db_lookup)
-        
+        if not found_pmaps: continue
+
         found_all_images = found_pmaps and found_all_images
         # print(event_no, found_pmaps)
         # Parse out the deconv hits:
@@ -639,6 +664,9 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
 
             rowMask = eventMap['evt_number'] == event_no
             nexus_event = eventMap[rowMask]['nexus_evt']
+
+            if event_no == 33228:
+                print(nexus_event)
 
             this_particles = mc_particles[mc_particles['event_id'] == nexus_event]
             this_hits      = mc_hits[mc_hits['event_id'] == nexus_event]
@@ -697,7 +725,7 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
 
         # Set the event ID for all managers:
         for key, val in io_dict.items():
-            val.set_id(this_run, 0, event_no)
+            val.set_id(this_run, subrun, event_no)
 
         io_dict['all'].save_entry()
 
@@ -705,13 +733,12 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
             io_dict['lr'].save_entry()
 
         # Did this event pass the basic event cuts?
-        if event_no not in passed_events: continue
+        if event_no not in passed_events and not out_of_map: continue
 
         io_dict['cuts'].save_entry()
 
-
     # Close Larcv:
-    if found_pmaps:
+    for key, io_manager in io_dict.items():
         io_manager.finalize()
 
     # Close tables:
