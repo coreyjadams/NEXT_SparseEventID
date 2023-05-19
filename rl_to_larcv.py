@@ -66,7 +66,7 @@ def read_mandatory_tables(input_files):
         for table_name in mandatory_tables:
             # print(f"looking for {table_name}")
             if has_table(open_file, table_name):
-                print(f"Found table {table_name} in file {input_files}")
+                print(f"Found table {table_name} in file {_f}")
                 m_found_tables[table_name] = open_file.get_node(table_name).read()
 
             else:
@@ -107,9 +107,10 @@ def read_mandatory_tables(input_files):
 
     return image_tables, mc_tables
 
-def convert_entry_point(input_files, output_file, db_location):
+def convert_entry_point(input_files, output_file, run, subrun, db_location):
 
     image_tables, mc_tables = read_mandatory_tables(input_files)
+
 
     sipm_db = pandas.read_pickle(db_location)
     db_lookup = {
@@ -119,7 +120,8 @@ def convert_entry_point(input_files, output_file, db_location):
     }
 
 
-    convert_to_larcv(image_tables, mc_tables, output_file, db_lookup)
+    convert_to_larcv(image_tables, mc_tables, output_file, db_lookup, run, subrun)
+
 
 
 def main():
@@ -139,6 +141,18 @@ def main():
         required=True,
         help="Name of output file.")
 
+    parser.add_argument("-r", "--run",
+        type=int,
+        required=False,
+        default=-1,
+        help="Run for this file.")
+
+    parser.add_argument("-sr", "--subrun",
+        type=int,
+        required=False,
+        default=0,
+        help="Subrun for this file.")
+
     parser.add_argument('-db', "--sipm-db-file",
         type=pathlib.Path,
         required=True,
@@ -146,7 +160,7 @@ def main():
 
     args = parser.parse_args()
 
-    convert_entry_point(args.input, args.output, args.sipm_db_file)
+    convert_entry_point(args.input, args.output, args.run, args.subrun, args.sipm_db_file)
 
 
 # files = files[0:5]
@@ -380,88 +394,23 @@ def slice_into_event(_pmaps, event_number, _keys):
 
     return this_pmaps
 
+
 def store_pmaps(io_manager, this_pmaps, db_lookup):
 
-    # SiPM locations range from -235 to 235 mm in X and Y (inclusive) every 10mm
-    # That's 47 locations in X and Y.
+    x_locations, y_locations, z_locations, energy = pmaps_to_xyzE(this_pmaps, db_lookup)
 
-
-    # First, we note the time of S1, which will tell us Z locations
-    s1_e = this_pmaps["S1"]["ene"]
-    if len(s1_e) == 0: return False
-    s1_peak = numpy.argmax(s1_e)
-    # This will be in nano seconds
-    s1_t    = this_pmaps['S1']['time'][s1_peak]
-
-
-
-    s2_times = this_pmaps['S2']['time']
-    waveform_length = len(s2_times)
-
-    # This is more sensors than we need, strictly.  Not all of them are filled.
-
-    # For each sensor in the raw waveforms, we need to take the sensor index,
-    # look up the X/Y,
-    # convert to index, and deposit in the dense data
-
-    # We loop over the waveforms in chunks of (s2_times)
-
-
-    # Figure out the total number of sensors:
-    n_sensors = int(len(this_pmaps["S2Si"]) / waveform_length)
-
-    # print(n_sensors)
-
-
-
-    # Get the energy, and use it to select only active hits
-    energy      = this_pmaps["S2Si"]["ene"]
-    # The energy is over all sipms:
-    energy_selection   = energy != 0.0
-
-    # # Make sure we're selecting only active sensors:
-    active_selection   = numpy.take(db_lookup["active"], this_pmaps["S2Si"]["nsipm"]).astype(bool)
-
-
-
-    # # Merge the selections:
-    # selection = numpy.logical_and(energy_selection, active_selection)
-    # selection = active_selection
-
-    # Each sensor has values, some zero, for every tick in the s2_times.
-    # The Z values are constructed from these, so stack this vector up
-    # by the total number of unique sensors
-    # print("s2_times: ", s2_times, len(s2_times))
-    # print("n_sensors: ", n_sensors)
-    # print("selection: ", selection)
-    # ticks       = numpy.tile(s2_times, n_sensors)[selection]
-    ticks       = numpy.tile(s2_times, n_sensors)
-    # print(ticks)
-
-    # x and y are from the sipm lookup tables, and then filter by active sites
-    # x_locations = numpy.take(db_lookup["x_lookup"], this_pmaps["S2Si"]["nsipm"])[selection]
-    # y_locations = numpy.take(db_lookup["y_lookup"], this_pmaps["S2Si"]["nsipm"])[selection]
-
-
-    x_locations = numpy.take(db_lookup["x_lookup"], this_pmaps["S2Si"]["nsipm"])
-    y_locations = numpy.take(db_lookup["y_lookup"], this_pmaps["S2Si"]["nsipm"])
-
-    # Filter the energy to active sites
-    energy      = energy
-    # energy      = energy[selection]
-
-    # Convert to physical coordinates
-    z_locations = ((ticks - s1_t) / 1000).astype(numpy.int32)
-
+    if len(x_locations) == 0: 
+        print("No PMAPS!")
+        return False
 
     # Put them into larcv:
     event_sparse3d = io_manager.get_data("sparse3d", "pmaps")
+    event_sparse3d.clear()
 
     meta = get_NEW_meta()
 
     st = larcv.SparseTensor3D()
     st.meta(meta)
-
 
     for x, y, z, e in zip(x_locations, y_locations, z_locations, energy) :
         if e > 0:
@@ -476,6 +425,110 @@ def store_pmaps(io_manager, this_pmaps, db_lookup):
 
     return True
 
+def pmaps_to_xyzE(this_pmaps, db_lookup):
+
+    # SiPM locations range from -235 to 235 mm in X and Y (inclusive) every 10mm
+    # That's 47 locations in X and Y.
+
+
+    # First, we note the time of S1, which will tell us Z locations
+    s1_e = this_pmaps["S1"]["ene"]
+    if len(s1_e) == 0: return [],[],[],[]
+    s1_peak = numpy.argmax(s1_e)
+    # This will be in nano seconds
+    s1_t    = this_pmaps['S1']['time'][s1_peak]
+
+
+
+
+    n_peaks = numpy.max(this_pmaps['S2']['peak'] + 1)
+    # print(n_peaks)
+    
+    x_list = []
+    y_list = []
+    z_list = []
+    e_list = []
+    
+    for i_peak in range(n_peaks):
+        s2_map = this_pmaps["S2"]['peak'] == i_peak        
+        filtered_S2   = this_pmaps["S2"][s2_map]
+        
+        s2si_map = this_pmaps['S2Si']['peak'] == i_peak
+        filtered_S2Si = this_pmaps["S2Si"][s2si_map]
+
+        s2_times = filtered_S2['time']
+    
+        waveform_length = len(s2_times)
+
+        # This is more sensors than we need, strictly.  Not all of them are filled.
+
+        # For each sensor in the raw waveforms, we need to take the sensor index,
+        # look up the X/Y,
+        # convert to index, and deposit in the dense data
+
+        # We loop over the waveforms in chunks of (s2_times)
+
+
+        # Figure out the total number of sensors:
+        n_sensors = int(len(filtered_S2Si) / waveform_length)
+
+
+
+
+        # Get the energy, and use it to select only active hits
+        energy      = filtered_S2Si["ene"]
+        # The energy is over all sipms:
+        energy_selection   = energy != 0.0
+
+        # # Make sure we're selecting only active sensors:
+        active_selection   = numpy.take(db_lookup["active"], filtered_S2Si["nsipm"]).astype(bool)
+
+
+
+        # # Merge the selections:
+        # selection = numpy.logical_and(energy_selection, active_selection)
+        # selection = active_selection
+
+        # Each sensor has values, some zero, for every tick in the s2_times.
+        # The Z values are constructed from these, so stack this vector up
+        # by the total number of unique sensors
+        # print("s2_times: ", s2_times, len(s2_times))
+        # print("n_sensors: ", n_sensors)
+        # print("selection: ", selection)
+        # ticks       = numpy.tile(s2_times, n_sensors)[selection]
+        # print(s2_times.shape)
+        # print(n_sensors)
+        ticks       = numpy.tile(s2_times, n_sensors)
+        # print(ticks)
+
+        # x and y are from the sipm lookup tables, and then filter by active sites
+        # x_locations = numpy.take(db_lookup["x_lookup"], this_pmaps["S2Si"]["nsipm"])[selection]
+        # y_locations = numpy.take(db_lookup["y_lookup"], this_pmaps["S2Si"]["nsipm"])[selection]
+
+
+        x_locations = numpy.take(db_lookup["x_lookup"], filtered_S2Si["nsipm"])
+        y_locations = numpy.take(db_lookup["y_lookup"], filtered_S2Si["nsipm"])
+
+        # Filter the energy to active sites
+        energy      = energy
+        # energy      = energy[selection]
+
+        # Convert to physical coordinates
+        z_locations = ((ticks - s1_t) / 1000).astype(numpy.int32)
+
+        
+        x_list.append(x_locations)
+        y_list.append(y_locations)
+        z_list.append(z_locations)
+        e_list.append(energy)
+
+
+    x_locations = numpy.concatenate(x_list)
+    y_locations = numpy.concatenate(y_list)
+    z_locations = numpy.concatenate(z_list)
+    energy = numpy.concatenate(e_list)
+        
+    return x_locations, y_locations, z_locations, energy
 
 
 
@@ -484,7 +537,7 @@ def energy_corrected(energy, z_min, z_max):
 
     return energy/(1. - Z_corr_factor*(z_max-z_min))
 
-def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr_hits=False):
+def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, run_no, subrun, process_lr_hits=False):
 
     # print(image_tables.keys())
     # print(mc_tables.keys())
@@ -501,7 +554,7 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
     if process_lr_hits: keys.append("lr")
     for key in keys:
         this_output_name = str(output_name) + f"_{key}.h5"
-        print(this_output_name)
+        # print(this_output_name)
         # Create an output larcv file:
         _io_manager = larcv.IOManager(larcv.IOManager.kWRITE)
         _io_manager.set_out_file(str(this_output_name))
@@ -537,11 +590,15 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
     # event no is events[i_evt][0]
     # run no is run[i_evt][0]
     # We'll set all subrun info to 0, it doesn't matter.
-
-    this_run = run[0][0]
+    if run_no != -1:
+        this_run = run[0][0]
+    else:
+        this_run = run_no
 
 
     event_numbers = events['evt_number']
+
+
 
     # event_energy  = summary['evt_energy']
 
@@ -560,14 +617,19 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
 
 
     # print(numpy.unique(lr_hits['event'], return_counts=True))
-
     for i_evt, event_no in enumerate(event_numbers):
 
         found_all_images = True
+        out_of_map = False
+
 
 
         # Slice off this summary object:
         this_summary = summary[summary['event'] == event_no]
+
+        if this_summary['evt_out_of_map']:
+            out_of_map = True
+
 
         if len(this_summary) == 0:continue
 
@@ -576,7 +638,8 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
 
         for _, io_manager in io_dict.items():
             found_pmaps = store_pmaps(io_manager, this_pmaps, db_lookup)
-        
+        if not found_pmaps: continue
+
         found_all_images = found_pmaps and found_all_images
         # print(event_no, found_pmaps)
         # Parse out the deconv hits:
@@ -601,6 +664,9 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
 
             rowMask = eventMap['evt_number'] == event_no
             nexus_event = eventMap[rowMask]['nexus_evt']
+
+            if event_no == 33228:
+                print(nexus_event)
 
             this_particles = mc_particles[mc_particles['event_id'] == nexus_event]
             this_hits      = mc_hits[mc_hits['event_id'] == nexus_event]
@@ -659,7 +725,7 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
 
         # Set the event ID for all managers:
         for key, val in io_dict.items():
-            val.set_id(this_run, 0, event_no)
+            val.set_id(this_run, subrun, event_no)
 
         io_dict['all'].save_entry()
 
@@ -667,13 +733,12 @@ def convert_to_larcv(image_tables, mc_tables, output_name, db_lookup, process_lr
             io_dict['lr'].save_entry()
 
         # Did this event pass the basic event cuts?
-        if event_no not in passed_events: continue
+        if event_no not in passed_events and not out_of_map: continue
 
         io_dict['cuts'].save_entry()
 
-
     # Close Larcv:
-    if found_pmaps:
+    for key, io_manager in io_dict.items():
         io_manager.finalize()
 
     # Close tables:
