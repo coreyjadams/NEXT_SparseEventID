@@ -24,19 +24,19 @@ class Norm(Enum):
 class Representation:
     normalization:        Norm         = Norm.none
     bias:                 bool         = True
-    blocks_per_layer:     int          = 2
+    blocks_per_layer:     int          = 4
     residual:             bool         = True
     weight_decay:         float        = 0.00
     growth_rate:          GrowthRate   = GrowthRate.additive
     downsampling:         DownSampling = DownSampling.convolutional
     depth:                int          = 4
-    n_initial_filters:    int          = 16
+    n_initial_filters:    int          = 32
 
 @dataclass
 class ClassificationHead:
     layers: Tuple[int] = field(default_factory=list)
 
-@dataclass 
+@dataclass
 class YoloHead:
     layers: Tuple[int] = field(default_factory=list)
 

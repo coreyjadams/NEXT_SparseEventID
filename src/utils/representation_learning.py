@@ -34,6 +34,8 @@ class rep_trainer(pl.LightningModule):
         self.log_keys = ["loss"]
 
         self.save_hyperparameters()
+    def on_train_start(self):
+        self.optimizers().param_groups = self.optimizers()._optimizer.param_groups
 
     # @profile
     def forward(self, batch):

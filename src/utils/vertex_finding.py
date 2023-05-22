@@ -39,6 +39,8 @@ class vertex_learning(pl.LightningModule):
 
         self.log_keys = ["loss"]
 
+    def on_train_start(self):
+        self.optimizers().param_groups = self.optimizers()._optimizer.param_groups
 
     def forward(self, batch):
 
