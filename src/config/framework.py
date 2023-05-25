@@ -12,7 +12,7 @@ class DistributedMode(Enum):
 @dataclass
 class Framework:
     name:    str = MISSING
-    sparse: bool = False
+    sparse: bool = True
 
 @dataclass
 class Lightning(Framework):

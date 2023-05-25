@@ -107,7 +107,7 @@ class WarmupFlatDecay(LRSchedule):
 
         segments = [
             Linear(
-                start_value = 0.0,
+                start_value = 0.001,
                 stop_value  = self.peak_learning_rate,
                 length      = self.epoch_length
             ),

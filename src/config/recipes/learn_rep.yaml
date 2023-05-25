@@ -1,6 +1,6 @@
 defaults:
   - representation
-  - override data: mc_bkg
+  - override data: mc_tl208
   - _self_
 
 data:
@@ -9,7 +9,10 @@ data:
     - val
   image_key: pmaps
 
-
+mode:
+  optimizer:
+    lr_schedule:
+      peak_learning_rate: 0.1
 # encoder:
 #   blocks_per_layer: 4
 #   n_initial_filters: 32

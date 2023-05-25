@@ -82,32 +82,36 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         Channels  = [0]
     )
 
-    # Get the deconvolved hits:
-    cb.add_batch_filler(
-        datatype  = "sparse3d",
-        producer  = "lr_hits",
-        name      = name+"lr_hits",
-        MaxVoxels = 8000,
-        Augment   = False,
-        Channels  = [0]
-    )
-
     # Build up the data_keys:
     data_keys = {
         'pmaps': name + 'pmaps',
-        'lr_hits': name + 'lr_hits',
     }
 
-    if is_mc:
-        # Vertex locations as BBoxes:
+    if data_args.image_key == "lr_hits":
+        # Get the deconvolved hits:
         cb.add_batch_filler(
-            datatype = "bbox3d",
-            producer = "vertex",
-            name     = name + "vertex",
-            MaxBoxes = 1,
-            Channels = [0]
+            datatype  = "sparse3d",
+            producer  = "lr_hits",
+            name      = name+"lr_hits",
+            MaxVoxels = 8000,
+            Augment   = False,
+            Channels  = [0]
         )
-        data_keys.update({'vertex': name + 'vertex'})
+
+        # Build up the data_keys:
+        data_keys['lr_hits'] = name + 'lr_hits'
+
+
+    if is_mc:
+        # # Vertex locations as BBoxes:
+        # cb.add_batch_filler(
+        #     datatype = "bbox3d",
+        #     producer = "vertex",
+        #     name     = name + "vertex",
+        #     MaxBoxes = 1,
+        #     Channels = [0]
+        # )
+        # data_keys.update({'vertex': name + 'vertex'})
 
         # Fetch the labels:
         cb.add_batch_filler(
