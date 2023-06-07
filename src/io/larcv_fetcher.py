@@ -87,19 +87,21 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         'pmaps': name + 'pmaps',
     }
 
-    if data_args.image_key == "lr_hits":
-        # Get the deconvolved hits:
-        cb.add_batch_filler(
-            datatype  = "sparse3d",
-            producer  = "lr_hits",
-            name      = name+"lr_hits",
-            MaxVoxels = 8000,
-            Augment   = False,
-            Channels  = [0]
-        )
 
-        # Build up the data_keys:
-        data_keys['lr_hits'] = name + 'lr_hits'
+
+    # if data_args.image_key == "lr_hits":
+    #     # Get the deconvolved hits:
+    #     cb.add_batch_filler(
+    #         datatype  = "sparse3d",
+    #         producer  = "lr_hits",
+    #         name      = name+"lr_hits",
+    #         MaxVoxels = 8000,
+    #         Augment   = False,
+    #         Channels  = [0]
+    #     )
+
+    #     # Build up the data_keys:
+    #     data_keys['lr_hits'] = name + 'lr_hits'
 
 
     if is_mc:
@@ -122,6 +124,22 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         data_keys.update({'label': name + 'label'})
 
 
+    if data_args.transform1:
+        add_augment_chain(cb, 
+            datatype="sparse3d", 
+            producer=data_args.image_key, 
+            start_key = data_args.image_key,
+            output_key  = data_args.image_key + "_1" 
+        )
+
+    if data_args.transform2:
+        add_augment_chain(cb, 
+            datatype="sparse3d", 
+            producer=data_args.image_key, 
+            start_key = data_args.image_key,
+            output_key  = data_args.image_key + "_2"
+        )
+
     # Prepare data managers:
     io_config = {
         'filler_name' : name,
@@ -130,8 +148,40 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         'make_copy'   : False
     }
 
+    import json
+    print(json.dumps(cb.get_config(), indent=2))
+
     return io_config, data_keys
 
+def add_augment_chain(config_builder, datatype, producer, start_key, output_key):
+
+    # GaussianBlur of pixels:
+    config_builder.add_preprocess(
+            datatype = datatype,
+            producer = start_key,
+            process  = "GaussianBlur",
+            Sigma    = 0.5,
+            OutputProducer = output_key
+        )
+
+    config_builder.add_preprocess(
+            datatype = datatype,
+            producer = output_key,
+            process  = "Mirror",
+            Axes = [0, 1, 2],
+            OutputProducer = output_key
+        )
+
+    config_builder.add_preprocess(
+            datatype = datatype,
+            producer = output_key,
+            process  = "Translate",
+            MaxShiftPerAxis = [20, 20, 50],
+            OutputProducer = output_key
+        )
+
+
+    return
 
 def prepare_interface(batch_size, storage_name, larcv_interface, io_config, data_keys, color=0):
 

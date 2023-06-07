@@ -66,7 +66,7 @@ class exec(object):
         logger.info(self.__str__())
 
         logger.info("Configuring Datasets.")
-        self.datasets, self.transforms = self.configure_datasets()
+        self.datasets = self.configure_datasets()
         logger.info("Data pipeline ready.")
 
 
@@ -161,11 +161,13 @@ class exec(object):
             # Get the image size:
             spatial_size = larcv_ds.image_size(self.args.data.image_key)
 
-        from src.transforms import build_transforms
-        augmentation = build_transforms(self.args, spatial_size)
+        return ds
+
+        # from src.transforms import build_transforms
+        # augmentation = build_transforms(self.args, spatial_size)
 
 
-        return ds, augmentation
+        # return ds, augmentation
 
 
     def configure_logger(self, rank):
@@ -221,7 +223,7 @@ class exec(object):
             start = time.time()
             for i, minibatch in enumerate(dataset):
                 image = minibatch[self.args.data.image_key]
-                transformed_data  = [ t(image) for t in self.transforms]
+                # transformed_data  = [ t(image) for t in self.transforms]
                 end = time.time()
                 if i >= break_i: break
                 logger.info(f"{i}: Time to fetch a minibatch of data: {end - start:.2f}s")

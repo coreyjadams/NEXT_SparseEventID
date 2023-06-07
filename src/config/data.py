@@ -7,10 +7,10 @@ from omegaconf import MISSING
 
 # from . transforms import TransformChain
 
-# dataset_top   = "/data/datasets/NEXT/officialProduction/"
-dataset_top   = "/lus/grand/projects/datascience/cadams/datasets/NEXT/polarisProduction/"
+dataset_top   = "/data/datasets/NEXT/"
+# dataset_top   = "/lus/grand/projects/datascience/cadams/datasets/NEXT/"
 mc_bkg_dir    = dataset_top + "Background/NEXT_v1_05_02_NEXUS_v5_07_10_bkg_v9/larcv/merged_final/"
-mc_tl_208_dir = dataset_top + "simCLR_train/"
+mc_tl_208_dir = dataset_top + "polarisProduction/simCLR_train/"
 # mc_tl_208_dir = dataset_top + "Calibration/NEXT_v1_05_02_NEXUS_v5_07_10_bkg_v9/larcv/merged/"
 
 
