@@ -1,0 +1,94 @@
+{
+  "EnableFilter": false,
+  "IOManager": {
+    "IOMode": 0,
+    "Input": {
+      "InputFiles": [],
+      "ReadOnlyName": [],
+      "ReadOnlyType": [],
+      "UseH5CoreDriver": false
+    },
+    "Output": {
+      "Compression": 1,
+      "OutFileName": "",
+      "StoreOnlyName": [],
+      "StoreOnlyType": []
+    },
+    "Verbosity": 6
+  },
+  "NumEntries": 0,
+  "ProcessList": {
+    "GaussianBlur_pmaps_sparse3d_f32176e8": {
+      "OutputProducer": "pmaps_1",
+      "Producer": "pmaps",
+      "Product": "sparse3d",
+      "Sigma": 0.5
+    },
+    "Translate_pmaps_1_sparse3d_58d89493": {
+      "MaxShiftPerAxis": [
+        10,
+        10,
+        25
+      ],
+      "OutputProducer": "pmaps_1",
+      "Producer": "pmaps_1",
+      "Product": "sparse3d"
+    },
+    "Mirror_pmaps_1_sparse3d_40bbe1a7": {
+      "Axes": [
+        0,
+        1,
+        2
+      ],
+      "OutputProducer": "pmaps_1",
+      "Producer": "pmaps_1",
+      "Product": "sparse3d"
+    },
+    "GaussianBlur_pmaps_sparse3d_c7c041b9": {
+      "OutputProducer": "pmaps_2",
+      "Producer": "pmaps",
+      "Product": "sparse3d",
+      "Sigma": 0.5
+    },
+    "Translate_pmaps_2_sparse3d_d1014513": {
+      "MaxShiftPerAxis": [
+        10,
+        10,
+        25
+      ],
+      "OutputProducer": "pmaps_2",
+      "Producer": "pmaps_2",
+      "Product": "sparse3d"
+    },
+    "Mirror_pmaps_2_sparse3d_278ff935": {
+      "Axes": [
+        0,
+        1,
+        2
+      ],
+      "OutputProducer": "pmaps_2",
+      "Producer": "pmaps_2",
+      "Product": "sparse3d"
+    }
+  },
+  "ProcessName": [
+    "GaussianBlur_pmaps_sparse3d_f32176e8",
+    "Mirror_pmaps_1_sparse3d_40bbe1a7",
+    "Translate_pmaps_1_sparse3d_58d89493",
+    "GaussianBlur_pmaps_sparse3d_c7c041b9",
+    "Mirror_pmaps_2_sparse3d_278ff935",
+    "Translate_pmaps_2_sparse3d_d1014513"
+  ],
+  "ProcessType": [
+    "GaussianBlur",
+    "Mirror",
+    "Translate",
+    "GaussianBlur",
+    "Mirror",
+    "Translate"
+  ],
+  "RandomAccess": false,
+  "RandomSeed": 0,
+  "StartEntry": 0,
+  "Verbosity": 6
+}
