@@ -18,6 +18,14 @@ class Encoder(torch.nn.Module):
         # How many filters did we start with?
         current_number_of_filters = params.encoder.n_initial_filters
 
+        if params.framework.sparse:
+            self.input_layer = scn.InputLayer(
+                dimension    = 3,
+                spatial_size = torch.tensor(image_size)
+            )
+        else:
+            self.input_layer = torch.nn.Identity()
+
         self.first_block = Block(
             nIn    = 1,
             nOut   = params.encoder.n_initial_filters,
@@ -30,6 +38,7 @@ class Encoder(torch.nn.Module):
             downsampler = MaxPool
 
         self.network_layers = torch.nn.ModuleList()
+
 
 
         for i_layer in range(params.encoder.depth):
@@ -49,23 +58,46 @@ class Encoder(torch.nn.Module):
             )
             current_number_of_filters = next_filters
 
+        final_shape = [i // 2**params.encoder.depth for i in image_size]
+        self.output_shape = [current_number_of_filters,] +  final_shape
+
+        # We apply a pooling layer to the image:
+        if params.framework.sparse:
+            self.pool = torch.nn.Sequential(
+                scn.AveragePooling(
+                    dimension = 3,
+                    pool_size = self.output_shape[1:],
+                    pool_stride = 1
+                    ),
+                scn.SparseToDense(
+                    dimension=3, nPlanes=current_number_of_filters)
+
+            )
+
+        else:
+            self.pool = torch.nn.AvgPool3d(self.output_shape[1:])
+
+
         if params.framework.sparse:
             self.final_activation = scn.Tanh()
         else:
             self.final_activation = torch.nn.Tanh()
 
+        self.flatten = torch.nn.Flatten(start_dim=1, end_dim=-1)
 
-        final_shape = [i // 2**params.encoder.depth for i in image_size]
-        self.output_shape = [current_number_of_filters,] +  final_shape
 
     def forward(self, x):
 
-        output = self.first_block(x)
+        output = self.input_layer(x)
+        output = self.first_block(output)
 
         for l in self.network_layers:
             output = l(output)
+        output = self.pool(output)
+        output = self.flatten(output)
+        return output
 
-        return self.final_activation(output)
+        # return self.final_activation(output)
 
 
     def increase_filters(self, current_filters, params):

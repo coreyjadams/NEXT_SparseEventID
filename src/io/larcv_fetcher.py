@@ -125,20 +125,50 @@ def prepare_next_config(batch_size, input_file, data_args, name,
 
 
     if data_args.transform1:
-        add_augment_chain(cb, 
-            datatype="sparse3d", 
-            producer=data_args.image_key, 
+        out_key = data_args.image_key + "_1"
+        add_augment_chain(cb,
+            datatype="sparse3d",
+            producer=data_args.image_key,
             start_key = data_args.image_key,
-            output_key  = data_args.image_key + "_1" 
+            output_key  = out_key
         )
+        # Get the pmaps:
+        cb.add_batch_filler(
+            datatype  = "sparse3d",
+            producer  = out_key,
+            name      = name+out_key,
+            MaxVoxels = 3000,
+            Augment   = False,
+            Channels  = [0]
+        )
+        # Build up the data_keys:
+        data_keys.update({
+            'pmaps_1': name + out_key,
+        })
 
     if data_args.transform2:
-        add_augment_chain(cb, 
-            datatype="sparse3d", 
-            producer=data_args.image_key, 
+        out_key = data_args.image_key + "_2"
+
+        add_augment_chain(cb,
+            datatype="sparse3d",
+            producer=data_args.image_key,
             start_key = data_args.image_key,
-            output_key  = data_args.image_key + "_2"
+            output_key  = out_key
         )
+        # Get the pmaps:
+        cb.add_batch_filler(
+            datatype  = "sparse3d",
+            producer  = out_key,
+            name      = name+out_key,
+            MaxVoxels = 3000,
+            Augment   = False,
+            Channels  = [0]
+        )
+        # Build up the data_keys:
+        data_keys.update({
+            'pmaps_2': name + out_key
+        })
+
 
     # Prepare data managers:
     io_config = {
@@ -148,19 +178,20 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         'make_copy'   : False
     }
 
-    import json
-    print(json.dumps(cb.get_config(), indent=2))
+    # import json
+    # print(json.dumps(cb.get_config(), indent=2))
 
     return io_config, data_keys
 
 def add_augment_chain(config_builder, datatype, producer, start_key, output_key):
+
 
     # GaussianBlur of pixels:
     config_builder.add_preprocess(
             datatype = datatype,
             producer = start_key,
             process  = "GaussianBlur",
-            Sigma    = 0.5,
+            Sigma    = 0.05,
             OutputProducer = output_key
         )
 
@@ -168,7 +199,7 @@ def add_augment_chain(config_builder, datatype, producer, start_key, output_key)
             datatype = datatype,
             producer = output_key,
             process  = "Mirror",
-            Axes = [0, 1, 2],
+            Axes = [ 2],
             OutputProducer = output_key
         )
 
@@ -176,9 +207,11 @@ def add_augment_chain(config_builder, datatype, producer, start_key, output_key)
             datatype = datatype,
             producer = output_key,
             process  = "Translate",
-            MaxShiftPerAxis = [20, 20, 50],
+            MaxShiftPerAxis = [5, 5, 10],
             OutputProducer = output_key
         )
+
+
 
 
     return
@@ -296,7 +329,7 @@ class larcv_dataset(object):
         return meta['n_voxels'][0]
 
     def image_meta(self, key):
-        if key == "pmaps" : return pmaps_meta()
+        if "pmaps" in key: return pmaps_meta()
         else: return lr_meta()
 
     def fetch_next_batch(self, name, force_pop=False):
@@ -358,22 +391,24 @@ class larcv_dataset(object):
         # Shape the images:
 
         if not self.sparse:
-            if "lr_hits" in self.batch_keys:
-                minibatch_data['lr_hits']  = data_transforms.larcvsparse_to_dense_3d(
-                    minibatch_data['lr_hits'],
-                    dense_shape = self.lr_meta['n_voxels'][0],
-                )
-            if "pmaps" in self.batch_keys:
-                minibatch_data['pmaps']  = data_transforms.larcvsparse_to_dense_3d(
-                    minibatch_data['pmaps'],
-                    dense_shape = self.pmaps_meta['n_voxels'][0],
-                )
+            for key in self.batch_keys:
+                if "lr_hits" in key:
+                    minibatch_data[key]  = data_transforms.larcvsparse_to_dense_3d(
+                        minibatch_data[key],
+                        dense_shape = self.lr_meta['n_voxels'][0],
+                    )
+                if "pmaps" in key:
+                    minibatch_data[key]  = data_transforms.larcvsparse_to_dense_3d(
+                        minibatch_data[key],
+                        dense_shape = self.pmaps_meta['n_voxels'][0],
+                    )
         else:
-            if "lr_hits" in self.batch_keys:
-                minibatch_data['lr_hits']  = data_transforms.larcvsparse_to_scnsparse_3d(
-                    minibatch_data['lr_hits'])
-            if "pmaps" in self.batch_keys:
-                minibatch_data['pmaps']  = data_transforms.larcvsparse_to_scnsparse_3d(
-                    minibatch_data['pmaps'])
+            for key in self.batch_keys:
+                if "lr_hits" in key:
+                    minibatch_data[key]  = data_transforms.larcvsparse_to_scnsparse_3d(
+                        minibatch_data[key])
+                if "pmaps" in key:
+                    minibatch_data[key]  = data_transforms.larcvsparse_to_scnsparse_3d(
+                        minibatch_data[key])
 
         return minibatch_data

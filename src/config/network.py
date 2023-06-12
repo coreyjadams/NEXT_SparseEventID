@@ -27,7 +27,7 @@ class Representation:
     blocks_per_layer:     int          = 4
     residual:             bool         = True
     weight_decay:         float        = 0.00
-    growth_rate:          GrowthRate   = GrowthRate.additive
+    growth_rate:          GrowthRate   = GrowthRate.multiplicative
     downsampling:         DownSampling = DownSampling.convolutional
     depth:                int          = 4
     n_initial_filters:    int          = 32

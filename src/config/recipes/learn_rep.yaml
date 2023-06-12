@@ -13,3 +13,5 @@ head:
   layers:
     - 256
     - 128
+mode:
+  restore_encoder_only: True

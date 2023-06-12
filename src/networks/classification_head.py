@@ -28,23 +28,8 @@ def build_networks(params, input_shape):
     classification_head = torch.nn.Sequential()
     current_number_of_filters = output_shape[0]
 
-    # We apply a pooling layer to the image:
-    if params.framework.sparse:
-        classification_head.append(scn.AveragePooling(
-            dimension = 3,
-            pool_size = output_shape[1:],
-            pool_stride = 1
-            )
-        )
-        classification_head.append(scn.SparseToDense(
-            dimension=3, nPlanes=current_number_of_filters))
 
-    else:
-        classification_head.append(
-            torch.nn.AvgPool3d(output_shape[1:])
-        )
 
-    classification_head.append(torch.nn.Flatten())
 
     for i, layer in enumerate(params.head.layers):
         classification_head.append(torch.nn.Linear(
@@ -54,7 +39,7 @@ def build_networks(params, input_shape):
             classification_head.append(torch.nn.ReLU())
         current_number_of_filters = layer
 
-    classification_head.append(torch.nn.Tanh())
+    # classification_head.append(torch.nn.Tanh())
     #
     # if params.framework.sparse:
     #     yolo_head.append(scn.ReLU())

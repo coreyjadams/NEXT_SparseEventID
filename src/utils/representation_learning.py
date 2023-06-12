@@ -39,12 +39,13 @@ class rep_trainer(pl.LightningModule):
         self.optimizers().param_groups = self.optimizers()._optimizer.param_groups
 
     # @profile
-    def forward(self, batch):
+    def forward(self, augmented_images):
 
-        augmented_data = [ t(batch) for t in self.transforms ]
+        # print(batch.keys())
 
 
-        representation = [ self.encoder(ad) for ad in augmented_data ]
+
+        representation = [ self.encoder(ad) for ad in augmented_images ]
 
 
         logits = [ self.head(r) for r in representation]
@@ -54,12 +55,11 @@ class rep_trainer(pl.LightningModule):
     # @profile
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
+        augmented_images = [batch[k] for k in self.transforms]
 
-        image = batch[self.image_key]
+        encoded_images = self(augmented_images)
 
-        encoded_images = self(image)
-
-        loss, loss_metrics = self.calculate_loss(encoded_images[1], encoded_images[2])
+        loss, loss_metrics = self.calculate_loss(encoded_images[0], encoded_images[1])
 
         metrics = {
             'opt/loss' : loss,
@@ -75,11 +75,11 @@ class rep_trainer(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        image = batch[self.image_key]
+        augmented_images = [batch[k] for k in self.transforms]
 
-        encoded_images = self(image)
+        encoded_images = self(augmented_images)
 
-        loss, loss_metrics = self.calculate_loss(encoded_images[1], encoded_images[2])
+        loss, loss_metrics = self.calculate_loss(encoded_images[0], encoded_images[1])
 
         metrics = {
             'opt/loss' : loss,
@@ -108,7 +108,7 @@ class rep_trainer(pl.LightningModule):
     def exit(self):
         pass
 
-    def calculate_loss(self, first_images, second_images, temperature=1.0):
+    def calculate_loss(self, first_images, second_images, temperature=0.1):
         # Each image is represented with k parameters,
         # Assume the batch size is N, so the
         # inputs have shape (N, k)
@@ -116,12 +116,18 @@ class rep_trainer(pl.LightningModule):
         N = first_images.shape[0]
         k = first_images.shape[1]
 
+        # Need to dig in here to fix the loss function:
+        # https://medium.com/the-owl/simclr-in-pytorch-5f290cb11dd7
+
+        # Also it has LARS to use.
+
+        # print(first_images)
         # print("Min first_images: ", torch.min(first_images))
         # print("Max first_images: ", torch.max(first_images))
         # print("Min second_images: ", torch.min(second_images))
         # print("Max second_images: ", torch.max(second_images))
 
-        # First, normalize the tensors so that ||v|| = 1 for every one
+
         first_images = first_images / torch.norm(first_images,dim=1).reshape((-1,1))
         second_images = second_images / torch.norm(second_images,dim=1).reshape((-1,1))
 

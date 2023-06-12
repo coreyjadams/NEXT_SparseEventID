@@ -66,7 +66,8 @@ class exec(object):
         logger.info(self.__str__())
 
         logger.info("Configuring Datasets.")
-        self.datasets = self.configure_datasets()
+        self.datasets  = self.configure_datasets()
+        # self.datasets, self.transforms = self.configure_datasets()
         logger.info("Data pipeline ready.")
 
 
@@ -122,6 +123,10 @@ class exec(object):
         from src.io import create_torch_larcv_dataloader
 
         batch_keys = [self.args.data.image_key]
+        if self.args.data.transform1:
+            batch_keys.append(self.args.data.image_key + "_1")
+        if self.args.data.transform2:
+            batch_keys.append(self.args.data.image_key + "_2")
         if self.args.name == "yolo":
             batch_keys.append("vertex")
             batch_keys.append("label")
@@ -130,7 +135,7 @@ class exec(object):
             batch_keys.append("label")
         elif self.args.name == "unsupervised_eventID":
             batch_keys.append("energy")
-        
+
         ds = {}
         for active in self.args.data.active:
 
@@ -162,11 +167,11 @@ class exec(object):
             spatial_size = larcv_ds.image_size(self.args.data.image_key)
 
         return ds
-
+        #
         # from src.transforms import build_transforms
         # augmentation = build_transforms(self.args, spatial_size)
-
-
+        #
+        #
         # return ds, augmentation
 
 
@@ -209,7 +214,6 @@ class exec(object):
 
 
 
-
         for key, dataset in self.datasets.items():
             logger.info(f"Reading dataset {key}")
             global_start = time.time()
@@ -223,7 +227,6 @@ class exec(object):
             start = time.time()
             for i, minibatch in enumerate(dataset):
                 image = minibatch[self.args.data.image_key]
-                # transformed_data  = [ t(image) for t in self.transforms]
                 end = time.time()
                 if i >= break_i: break
                 logger.info(f"{i}: Time to fetch a minibatch of data: {end - start:.2f}s")
@@ -254,10 +257,15 @@ class exec(object):
         elif self.args.name == "supervised_eventID":
             from src.utils.supervised_eventID import create_lightning_module
 
+        transform_keys = []
+        if self.args.data.transform1:
+            transform_keys.append(self.args.data.image_key+"_1")
+        if self.args.data.transform2:
+             transform_keys.append(self.args.data.image_key+"_2")
         self.trainer = create_lightning_module(
             self.args,
             self.datasets,
-            self.transforms,
+            transform_keys,
             lr_schedule,
         )
 
