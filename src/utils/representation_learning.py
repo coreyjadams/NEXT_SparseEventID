@@ -31,6 +31,7 @@ class rep_trainer(pl.LightningModule):
         self.image_key    = image_key
         self.lr_scheduler = lr_scheduler
 
+
         self.log_keys = ["loss"]
 
         self.save_hyperparameters()
@@ -60,6 +61,8 @@ class rep_trainer(pl.LightningModule):
         encoded_images = self(augmented_images)
 
         loss, loss_metrics = self.calculate_loss(encoded_images[0], encoded_images[1])
+
+        print("My loss: ", loss)
 
         metrics = {
             'opt/loss' : loss,
@@ -113,8 +116,9 @@ class rep_trainer(pl.LightningModule):
         # Assume the batch size is N, so the
         # inputs have shape (N, k)
 
-        N = first_images.shape[0]
-        k = first_images.shape[1]
+        # # These are pre-distributed shapes:
+        # N = first_images.shape[0]
+        # k = first_images.shape[1]
 
         # Need to dig in here to fix the loss function:
         # https://medium.com/the-owl/simclr-in-pytorch-5f290cb11dd7
@@ -127,7 +131,6 @@ class rep_trainer(pl.LightningModule):
         # print("Min second_images: ", torch.min(second_images))
         # print("Max second_images: ", torch.max(second_images))
 
-
         first_images = first_images / torch.norm(first_images,dim=1).reshape((-1,1))
         second_images = second_images / torch.norm(second_images,dim=1).reshape((-1,1))
 
@@ -135,6 +138,11 @@ class rep_trainer(pl.LightningModule):
         # Then, reshape into Y = (1, 2N, k) and Z = (2N, 1, k)
 
         c = torch.concat([first_images, second_images], dim=0)
+
+        # Need to insert a gather here:
+        # These are pre-distributed shapes:
+        N = int(c.shape[0] / 2)
+        k = c.shape[1]
 
         Y = c.reshape((1, c.shape[0], c.shape[1]))
         Z = c.reshape((c.shape[0], 1, c.shape[1]))
@@ -151,7 +159,7 @@ class rep_trainer(pl.LightningModule):
         # but the norms are equal to 1.
         # So, summing the matrix over the dim = 0 and dim = 1 computes this for each pair.
 
-        sim = torch.sum(mat, dim=-1)
+        sim = torch.sum(mat, dim=-1) / temperature
 
 
         # This yields a symmetric matrix, diagonal entries equal 1.  Off diagonal are symmetrics and < 1.
@@ -175,37 +183,25 @@ class rep_trainer(pl.LightningModule):
 
 
 
-        # negative_factor = torch.sum(negative)
-
-        # Include a corrective factor that accounts for the fact that the loss has a floor > 0:
-        #
-        # print("Min positive: ", torch.min(positive_examples))
-        # print("Max positive: ", torch.max(positive_examples))
-        #
-        #
-        # print("Min negative: ", torch.min(negative_examples))
-        # print("Max negative: ", torch.max(negative_examples))
-
-
+        # Compute the alignment:
         alignment = torch.sum(positive_examples, dim=0)
-        # print(f"alignment: {alignment}")
 
         exp = torch.sum(torch.exp(negative_examples), dim=0)
 
-        # print(exp)
 
-
+        # And compute the logsumexp of the negative examples:
         log_sum_exp = torch.log(exp + 1e-8)
+
+        # Additionally, we can compute the "floor" of the loss at this batch size:
+        # floor = torch.log(1.*N) - 1.
 
         loss_metrics = {
             "alignment"   : torch.mean(alignment),
-            "log_sum_exp" : torch.mean(log_sum_exp)
+            "log_sum_exp" : torch.mean(log_sum_exp),
+            # "floor"       : floor,
         }
 
         loss = torch.mean( - alignment + log_sum_exp)
-
-        # loss = torch.mean( - torch.log(ratio))
-        # loss = torch.mean( - torch.log(ratio)) - torch.log(batch_size) + 1.
 
         return loss, loss_metrics
 

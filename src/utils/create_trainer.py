@@ -135,6 +135,7 @@ def train(args, lightning_model, datasets):
         limit_val_batches       = 1,
         callbacks               = [model_checkpoint],
     )
+    print(trainer.strategy)
 
     # Try to load the model from a checkpoint:
 
