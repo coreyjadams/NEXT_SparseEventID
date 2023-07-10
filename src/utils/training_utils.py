@@ -13,6 +13,9 @@ def init_optimizer(optimizer_kind, parameters):
         opt = torch.optim.Adagrad(parameters, lr=1.0)
     elif optimizer_kind == OptimizerKind.adadelta:
         opt = torch.optim.Adadelta(parameters, lr=1.0, eps=1e-6)
+    elif optimizer_kind == OptimizerKind.lars:
+        from . lars import LARS
+        opt = LARS(parameters, lr=1.0)
     else:
         opt = torch.optim.SGD(parameters, lr=1.0)
 
@@ -42,7 +45,7 @@ def format_log_message(log_keys, metrics, batch_size, global_step, mode=""):
 
     if len(time_string) > 0:
         s += " (" + " / ".join(time_string) + ")"
-    
+
     format_log_message.previous_log_time = datetime.datetime.now()
 
     return "{} Step {} metrics: {}".format(mode, global_step, s)

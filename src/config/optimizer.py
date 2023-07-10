@@ -18,6 +18,7 @@ class OptimizerKind(Enum):
     sgd      = 2
     adagrad  = 3
     adadelta = 4
+    lars     = 5
 
 @dataclass
 class LRScheduleConfig:
@@ -45,7 +46,7 @@ class FlatLR(LRScheduleConfig):
 class Optimizer:
     lr_schedule:          LRScheduleConfig = field(default_factory= lambda:WarmupFlatDecayConfig())
     loss_balance_scheme: LossBalanceScheme = LossBalanceScheme.focal
-    name:                    OptimizerKind = OptimizerKind.adam
+    name:                    OptimizerKind = OptimizerKind.lars
     gradient_accumulation:             int = 1
 
 cs = ConfigStore.instance()

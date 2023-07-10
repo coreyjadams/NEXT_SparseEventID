@@ -191,7 +191,7 @@ def add_augment_chain(config_builder, datatype, producer, start_key, output_key)
             datatype = datatype,
             producer = start_key,
             process  = "GaussianBlur",
-            Sigma    = 0.05,
+            Sigma    = 0.01,
             OutputProducer = output_key
         )
 

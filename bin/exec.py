@@ -90,6 +90,7 @@ class exec(object):
             return 0
         else:
             from mpi4py import MPI
+            self.args.run.world_size = MPI.COMM_WORLD.Get_size()
             return MPI.COMM_WORLD.Get_rank()
 
     def configure_lr_schedule(self, epoch_length, max_epochs):

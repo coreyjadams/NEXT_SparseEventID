@@ -32,6 +32,7 @@ class Run:
     id:                 str         = MISSING
     precision:          Precision   = Precision.float32
     profile:            bool        = False
+    world_size:         int         = 1
 
 cs = ConfigStore.instance()
 
@@ -113,4 +114,3 @@ class UnsupervisedClassification:
 
 cs.store(name="supervised_classification",   node=SupervisedClassification)
 cs.store(name="unsupervised_classification", node=UnsupervisedClassification)
-

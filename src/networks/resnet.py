@@ -64,7 +64,7 @@ class Encoder(torch.nn.Module):
         # We apply a pooling layer to the image:
         if params.framework.sparse:
             self.pool = torch.nn.Sequential(
-                scn.AveragePooling(
+                scn.MaxPooling(
                     dimension = 3,
                     pool_size = self.output_shape[1:],
                     pool_stride = 1
@@ -75,7 +75,7 @@ class Encoder(torch.nn.Module):
             )
 
         else:
-            self.pool = torch.nn.AvgPool3d(self.output_shape[1:])
+            self.pool = torch.nn.MaxPool3d(self.output_shape[1:])
 
 
         if params.framework.sparse:

@@ -14,4 +14,4 @@ head:
     - 256
     - 128
 mode:
-  restore_encoder_only: True
+  restore_encoder_only: False

@@ -28,7 +28,7 @@ def train(args, lightning_model, datasets):
 
     # Map the profiling to lightning args:
     if args.run.profile:
-        profiler = "advanced"
+        profiler = "simple"
     else:
         profiler  = None
 
@@ -41,7 +41,6 @@ def train(args, lightning_model, datasets):
             environment = OversubscribeMPI(oversubscribe)
     else:
         environment = LightningEnvironment()
-
 
     # Distributed strategy:
     if args.run.distributed:
@@ -135,7 +134,6 @@ def train(args, lightning_model, datasets):
         limit_val_batches       = 1,
         callbacks               = [model_checkpoint],
     )
-    print(trainer.strategy)
 
     # Try to load the model from a checkpoint:
 
@@ -152,5 +150,4 @@ def train(args, lightning_model, datasets):
         train_dataloaders=datasets["train"],
         val_dataloaders  = datasets["val"],
         ckpt_path        = checkpoint_path
-
     )

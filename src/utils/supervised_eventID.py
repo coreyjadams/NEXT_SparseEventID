@@ -44,9 +44,8 @@ class supervised_eventID(pl.LightningModule):
 
     def forward(self, batch):
 
-        t = self.transforms[0](batch)
 
-        representation = self.encoder(t)
+        representation = self.encoder(batch)
 
         logits = self.head(representation)
 
