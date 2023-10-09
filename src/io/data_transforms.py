@@ -66,6 +66,8 @@ def larcvsparse_to_dense_3d(input_array, dense_shape):
     y_coords   = input_array[:,0,:,1]
     z_coords   = input_array[:,0,:,2]
     val_coords = input_array[:,0,:,3]
+
+
     # print(x_coords[0:100])
     # print(y_coords[0:100])
     # print(z_coords[0:100])
@@ -82,7 +84,6 @@ def larcvsparse_to_dense_3d(input_array, dense_shape):
     # Fill in the output tensor
 
     output_array[batch_index, 0, x_index, y_index, z_index] = values
-
     return output_array
 
 

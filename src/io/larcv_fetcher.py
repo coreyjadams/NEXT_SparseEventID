@@ -25,7 +25,7 @@ def pmaps_meta():
     # The size of the images here are padded and expanded.  This lets me downsample
     # and upsample in the networks more smoothly
     return numpy.array([
-        ([48, 48, 288], [480., 480., 576.],[-240., -240., 0])],
+        ([48, 48, 55], [480., 480., 576.],[-240., -240., 0])],
         dtype=[
             ('n_voxels', "int", (3)),
             ('size', "float", (3)),
@@ -70,21 +70,21 @@ def prepare_next_config(batch_size, input_file, data_args, name,
     cb.set_parameter(6, "ProcessDriver", "Verbosity")
     cb.set_parameter(6, "Verbosity")
 
-
+    producer_name = data_args.image_key
 
     # Get the pmaps:
     cb.add_batch_filler(
         datatype  = "sparse3d",
-        producer  = "pmaps",
-        name      = name+"pmaps",
-        MaxVoxels = 3000,
+        producer  = producer_name,
+        name      = name+producer_name,
+        MaxVoxels = 300,
         Augment   = False,
         Channels  = [0]
     )
 
     # Build up the data_keys:
     data_keys = {
-        'pmaps': name + 'pmaps',
+        producer_name: name + producer_name,
     }
 
 
@@ -143,7 +143,7 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         )
         # Build up the data_keys:
         data_keys.update({
-            'pmaps_1': name + out_key,
+            producer_name + '_1': name + out_key,
         })
 
     if data_args.transform2:
@@ -166,7 +166,7 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         )
         # Build up the data_keys:
         data_keys.update({
-            'pmaps_2': name + out_key
+            producer_name + '_2': name + out_key
         })
 
 
@@ -191,7 +191,7 @@ def add_augment_chain(config_builder, datatype, producer, start_key, output_key)
             datatype = datatype,
             producer = start_key,
             process  = "GaussianBlur",
-            Sigma    = 0.01,
+            Sigma    = 0.00,
             OutputProducer = output_key
         )
 
@@ -199,7 +199,7 @@ def add_augment_chain(config_builder, datatype, producer, start_key, output_key)
             datatype = datatype,
             producer = output_key,
             process  = "Mirror",
-            Axes = [ 2],
+            Axes = [0,1,2],
             OutputProducer = output_key
         )
 
@@ -329,7 +329,7 @@ class larcv_dataset(object):
         return meta['n_voxels'][0]
 
     def image_meta(self, key):
-        if "pmaps" in key: return pmaps_meta()
+        if "pmaps" in key or "chits" in key: return pmaps_meta()
         else: return lr_meta()
 
     def fetch_next_batch(self, name, force_pop=False):
@@ -390,6 +390,7 @@ class larcv_dataset(object):
 
         # Shape the images:
 
+
         if not self.sparse:
             for key in self.batch_keys:
                 if "lr_hits" in key:
@@ -397,18 +398,21 @@ class larcv_dataset(object):
                         minibatch_data[key],
                         dense_shape = self.lr_meta['n_voxels'][0],
                     )
-                if "pmaps" in key:
+                if "pmaps" in key or "chits" in key:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_dense_3d(
                         minibatch_data[key],
                         dense_shape = self.pmaps_meta['n_voxels'][0],
                     )
+                    # if "chits" in key: minibatch_data[key] /= 10000.
         else:
             for key in self.batch_keys:
                 if "lr_hits" in key:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_scnsparse_3d(
                         minibatch_data[key])
-                if "pmaps" in key:
+                if "pmaps" in key or "chits" in key:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_scnsparse_3d(
                         minibatch_data[key])
+                    # if "chits" in key: minibatch_data[key] /= 10000.
+
 
         return minibatch_data

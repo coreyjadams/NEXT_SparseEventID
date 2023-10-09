@@ -51,6 +51,7 @@ class rep_trainer(pl.LightningModule):
         # CHECK MPS SCALE OUT?
         # Launch large scale runs
 
+
         representation = [ self.encoder(ad) for ad in augmented_images ]
 
         logits = [ self.head(r) for r in representation]

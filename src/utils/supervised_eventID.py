@@ -30,7 +30,7 @@ class supervised_eventID(pl.LightningModule):
         self.args         = args
         self.transforms   = transforms
         self.encoder      = encoder
-        self.head         = head
+        # self.head         = head
         self.image_key    = image_key
         self.lr_scheduler = lr_scheduler
 
@@ -46,9 +46,10 @@ class supervised_eventID(pl.LightningModule):
 
 
         representation = self.encoder(batch)
-
-        logits = self.head(representation)
-
+        # print(representation)
+        # logits = self.head(representation)
+        logits = representation
+        # print(logits)
         return logits
 
 
@@ -84,6 +85,7 @@ class supervised_eventID(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+
 
         image = batch[self.image_key]
 
@@ -147,8 +149,8 @@ class supervised_eventID(pl.LightningModule):
 
 
     def calculate_accuracy(self, prediction, labels):
-        SIGNAL = 0
-        BACKGROUND = 1
+        SIGNAL = 1
+        BACKGROUND = 0
 
         accuracy = prediction == labels
 
@@ -169,17 +171,28 @@ class supervised_eventID(pl.LightningModule):
 
     def calculate_loss(self, batch, logits, prediction=None):
 
+        # logits = torch.nn.functional.softmax(logits, dim=-1)
+
+        # print(batch['label'].shape)
+        # print(logits.shape)
+        logger.info(logits)
+        # logger.info(torch.nn.functional.softmax(logits))
+        logger.info(batch['label'])
+        n_sig = torch.sum(batch['label']) 
+        logger.info(f"signal fraction: {n_sig / len(batch['label']):.3f}")
         loss = torch.nn.functional.cross_entropy(
             input  = logits,
             target = batch['label'],
-            weight = torch.tensor([3.96109349, 0.57223151], device=logits.device),
+            # weight = torch.tensor([0.75, 1.25], device=logits.device),
             reduction = "none"
         )
+        # print(loss.shape)
+        # print(loss)
 
         # print(loss.shape)
-        # if prediction is not None:
-        #     focus = (prediction - batch['label'])**2
-        #     loss = loss*focus
+        if prediction is not None:
+            focus = (prediction - batch['label'])**2
+            loss = loss*focus
 
         # focus = (batch['label'] - logits)**2
         # print(focus)
@@ -214,6 +227,7 @@ def create_lightning_module(args, datasets, transforms=None, lr_scheduler=None, 
     # Next, create the network:
     from src.networks.classification_head import build_networks
     encoder, class_head = build_networks(args, image_shape)
+
 
     model = supervised_eventID(
         args,

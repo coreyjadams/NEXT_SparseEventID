@@ -8,17 +8,6 @@ from . resnet import Encoder
 def build_networks(params, input_shape):
 
 
-    if params.framework.sparse:
-        import sparseconvnet as scn
-        from . sparse_building_blocks import Block, ResidualBlock
-        from . sparse_building_blocks import ConvolutionDownsample
-        from . sparse_building_blocks import BlockSeries
-    else:
-        from . building_blocks import Block, ResidualBlock, BlockSeries
-        from . building_blocks import ConvolutionDownsample
-        from . building_blocks import MaxPooling
-
-
     resnet = Encoder(params, input_shape)
 
     output_shape = resnet.output_shape
@@ -32,6 +21,7 @@ def build_networks(params, input_shape):
 
 
     for i, layer in enumerate(params.head.layers):
+
         classification_head.append(torch.nn.Linear(
             in_features  = current_number_of_filters,
             out_features = layer))

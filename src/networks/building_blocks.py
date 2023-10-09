@@ -4,6 +4,19 @@ from torch import nn
 
 from src.config.network import  Norm
 
+
+class InputNorm(nn.Module):
+
+    def __init__(self, *, nIn, nOut):
+        nn.Module.__init__(self)
+
+        self.layer = nn.BatchNorm3d(nOut)
+
+    def forward(self, x):
+
+        return self.layer(x)
+
+
 class Block(nn.Module):
 
     def __init__(self, *,

@@ -1,13 +1,12 @@
 defaults:
   - representation
-  - override data: mc_tl208
+  - override data: mc_mk_tl208
   - _self_
 
 data:
   active:
     - train
     - val
-  image_key: pmaps
 
 head:
   layers:
