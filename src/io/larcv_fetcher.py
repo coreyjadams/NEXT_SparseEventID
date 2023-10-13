@@ -25,7 +25,8 @@ def pmaps_meta():
     # The size of the images here are padded and expanded.  This lets me downsample
     # and upsample in the networks more smoothly
     return numpy.array([
-        ([48, 48, 55], [480., 480., 576.],[-240., -240., 0])],
+        ([51, 51, 128], [480., 480., 576.],[-240., -240., 0])],
+        # ([48, 48, 55], [480., 480., 576.],[-240., -240., 0])],
         dtype=[
             ('n_voxels', "int", (3)),
             ('size', "float", (3)),
@@ -118,7 +119,7 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         # Fetch the labels:
         cb.add_batch_filler(
             datatype  = "particle",
-            producer  = "event",
+            producer  = "label",
             name      = name+"label",
         )
         data_keys.update({'label': name + 'label'})
@@ -398,7 +399,7 @@ class larcv_dataset(object):
                         minibatch_data[key],
                         dense_shape = self.lr_meta['n_voxels'][0],
                     )
-                if "pmaps" in key or "chits" in key:
+                if "pmaps" in key or "chits" in key or "voxels" in key:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_dense_3d(
                         minibatch_data[key],
                         dense_shape = self.pmaps_meta['n_voxels'][0],
@@ -409,7 +410,7 @@ class larcv_dataset(object):
                 if "lr_hits" in key:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_scnsparse_3d(
                         minibatch_data[key])
-                if "pmaps" in key or "chits" in key:
+                if "pmaps" in key or "chits" in key or "voxels" in key:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_scnsparse_3d(
                         minibatch_data[key])
                     # if "chits" in key: minibatch_data[key] /= 10000.
