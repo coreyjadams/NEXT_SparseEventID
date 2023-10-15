@@ -39,6 +39,10 @@ class supervised_eventID(pl.LightningModule):
 
         self.log_keys = ["loss"]
 
+        self.criterion = torch.nn.CrossEntropyLoss(reduction="none", 
+                                                   weight=torch.tensor([0.1, 10])
+                                                   )
+
     def on_train_start(self):
         self.optimizers().param_groups = self.optimizers()._optimizer.param_groups
 
@@ -158,7 +162,7 @@ class supervised_eventID(pl.LightningModule):
         is_background = labels == BACKGROUND
 
         sig_acc  = torch.mean(accuracy[is_signal].to(torch.float32))
-        bkg_acc = torch.mean(accuracy[torch.logical_not(is_signal)].to(torch.float32))
+        bkg_acc = torch.mean(accuracy[is_background].to(torch.float32))
         accuracy = torch.mean(accuracy.to(torch.float32))
 
 
@@ -171,28 +175,49 @@ class supervised_eventID(pl.LightningModule):
 
     def calculate_loss(self, batch, logits, prediction=None):
 
+        # # This section computes the loss via focal loss, since the classes are imbalanced:
+        # # Create the full label:
+        # y = torch.nn.functional.one_hot(batch["label"], logits.size(-1))
+        # # print("y: ", y)
+        # softmax = torch.nn.functional.softmax(logits) 
+        # softmax = softmax.clamp(1e-7, 1. - 1e-7)
+        # # print("softmax:", softmax)
+        # loss = - y * torch.log(softmax)
+        # # Apply the focal part:
+        # focus = (1 - softmax)**2.5
+        # # print("focus: ", focus)
+        # loss = loss * (1 - softmax)**4
+        # # print("loss:", loss)
+        # loss = loss.sum(axis=-1)
+        # # print("loss: ", loss)
+
+        # return torch.mean(loss)
+        # # First, apply the 
+
         # logits = torch.nn.functional.softmax(logits, dim=-1)
 
         # print(batch['label'].shape)
         # print(logits.shape)
-        logger.info(logits)
+        # logger.info(logits)
         # logger.info(torch.nn.functional.softmax(logits))
-        logger.info(batch['label'])
-        n_sig = torch.sum(batch['label']) 
-        logger.info(f"signal fraction: {n_sig / len(batch['label']):.3f}")
-        loss = torch.nn.functional.cross_entropy(
-            input  = logits,
-            target = batch['label'],
-            # weight = torch.tensor([0.75, 1.25], device=logits.device),
-            reduction = "none"
-        )
+        # logger.info(batch['label'])
+        # n_sig = torch.sum(batch['label']) 
+        # logger.info(f"signal fraction: {n_sig / len(batch['label']):.3f}")
+        # logits = torch.nn.softmax(logits)
+        loss = self.criterion(logits, target = batch["label"])
+        # loss = torch.nn.sparse_softmax_cross_entropy_with_logits(
+        #     logits  = logits,
+        #     labels = batch['label'],
+        #     # weight = torch.tensor([0.75, 1.25], device=logits.device),
+        #     reduction = "none"
+        # )
         # print(loss.shape)
         # print(loss)
 
         # print(loss.shape)
-        if prediction is not None:
-            focus = (prediction - batch['label'])**2
-            loss = loss*focus
+        # if prediction is not None:
+        #     focus = (prediction - batch['label'])**2
+        #     loss = loss*focus
 
         # focus = (batch['label'] - logits)**2
         # print(focus)

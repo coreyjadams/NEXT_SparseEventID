@@ -12,15 +12,15 @@ class Encoder(torch.nn.Module):
 
         super().__init__()
 
-        Block, BlockSeries, ConvDonsample, MaxPool, InputNorm = \
+        Block, BlockSeries, ConvDonsample, Pool, InputNorm = \
             self.import_building_blocks(params.framework.sparse)
 
         # How many filters did we start with?
         current_number_of_filters = params.encoder.n_initial_filters
 
-
+        print("Image size: ", image_size)
         if params.framework.sparse:
-            image_size = [64,64,64]
+            image_size = [64,64,128]
             self.input_layer = scn.InputLayer(
                 dimension    = 3,
                 # spatial_size = 512,
@@ -40,25 +40,25 @@ class Encoder(torch.nn.Module):
         if params.encoder.downsampling == DownSampling.convolutional:
             downsampler = ConvDonsample
         else:
-            downsampler = MaxPool
+            downsampler = Pool
 
         self.network_layers = torch.nn.ModuleList()
 
 
 
         for i_layer in range(params.encoder.depth):
+            self.network_layers.append(
+                BlockSeries(
+                    nIn      = current_number_of_filters,
+                    n_blocks = params.encoder.blocks_per_layer,
+                    params   = params.encoder
+                )
+            )
             next_filters = self.increase_filters(current_number_of_filters, params.encoder)
             self.network_layers.append(downsampler(
                     nIn    = current_number_of_filters,
                     nOut   = next_filters,
                     params = params.encoder
-                )
-            )
-            self.network_layers.append(
-                BlockSeries(
-                    nIn      = next_filters,
-                    n_blocks = params.encoder.blocks_per_layer,
-                    params   = params.encoder
                 )
             )
             current_number_of_filters = next_filters
@@ -104,16 +104,19 @@ class Encoder(torch.nn.Module):
     def forward(self, x):
 
         output = self.input_layer(x)
-        # print(output.sum())
+        # print("after input_layer: ", output.get_spatial_locations()[:,-1])
         # print(output.sum(axis=(1,2,3,4)))
         # print("Input: ", output.features)
         # output = self.input_norm(output)
 
         output = self.first_block(output)
-
-        for l in self.network_layers:
+        # print("after first block: ", output.get_spatial_locations()[:,-1])
+        for i, l in enumerate(self.network_layers):
             output = l(output)
+            # print(i, "after l: ", output.get_spatial_locations()[:,-1])
+            # print("  (l is: )", l)
             # print("Layer: ", output.features)
+            # print(output)
             # print("Layer.shape: ", output.features.shape)
             # print("Layer features mean: ", torch.mean(output.features))
             # print("Layer: ", output.spatial_size)
@@ -122,15 +125,18 @@ class Encoder(torch.nn.Module):
         # print("bottleneck.spatial_size: ", output.spatial_size)
         # print("bottleneck.features.shape: ", output.features.shape)
         # print("bottleneck.features: ", output.features)
+        # print(output.get_spatial_locations()[:,-1])
         output = self.pool(output)
         # print("Pooled: ", output)
         # print("Pooled shape: ", output.shape)
         # exit()
         # print(output.shape)
-        # print(output[0])
+        # print(output)
         output = self.flatten(output)
         # print("output.shape: ", output.shape)
         # print("output.shape: ", output.shape)
+        # exit()
+        # print(output)
         # exit()
         return output
 
@@ -149,10 +155,10 @@ class Encoder(torch.nn.Module):
             from . sparse_building_blocks import ConvolutionDownsample
             from . sparse_building_blocks import BlockSeries
             from . sparse_building_blocks import InputNorm
-            MaxPooling = None
+            from . sparse_building_blocks import Pooling
         else:
             from . building_blocks import Block, BlockSeries
             from . building_blocks import ConvolutionDownsample
             from . building_blocks import MaxPooling
             from . building_blocks import InputNorm
-        return Block, BlockSeries, ConvolutionDownsample, MaxPooling, InputNorm
+        return Block, BlockSeries, ConvolutionDownsample, Pooling, InputNorm

@@ -12,23 +12,24 @@ class GrowthRate(Enum):
 
 class DownSampling(Enum):
     convolutional = 0
-    max_pooling   = 1
+    pooling       = 1
 
 class Norm(Enum):
     none  = 0
     batch = 1
     layer = 2
+    group = 3
 
 
 @dataclass
 class Representation:
-    normalization:        Norm         = Norm.batch
+    normalization:        Norm         = Norm.group
     bias:                 bool         = False
     blocks_per_layer:     int          = 2
     residual:             bool         = True
     weight_decay:         float        = 0.00
     growth_rate:          GrowthRate   = GrowthRate.additive
-    downsampling:         DownSampling = DownSampling.convolutional
+    downsampling:         DownSampling = DownSampling.pooling
     depth:                int          = 4
     n_initial_filters:    int          = 16
     n_output_filters:     int          = 2
