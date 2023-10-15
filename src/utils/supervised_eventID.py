@@ -45,12 +45,12 @@ class supervised_eventID(pl.LightningModule):
     def forward(self, batch):
 
 
-        representation = self.encoder(batch)
-        # print(representation)
+        representation, summed = self.encoder(batch)
+
         # logits = self.head(representation)
         logits = representation
         # print(logits)
-        return logits
+        return logits, summed
 
 
     def training_step(self, batch, batch_idx):
@@ -60,9 +60,14 @@ class supervised_eventID(pl.LightningModule):
 
         image = batch[self.image_key]
 
-        logits = self(image)
+        logits, summed = self(image)
 
+        # print(summed.shape)
+        # print(batch["label"].shape)
 
+        # both = torch.stack([summed, batch["label"]], axis=-1)
+        # print(both)
+        # exit()
         prediction = self.predict_event(logits)
         loss = self.calculate_loss(batch, logits, prediction)
 
@@ -89,7 +94,7 @@ class supervised_eventID(pl.LightningModule):
 
         image = batch[self.image_key]
 
-        logits = self(image)
+        logits, _ = self(image)
 
 
         prediction = self.predict_event(logits)
@@ -175,24 +180,24 @@ class supervised_eventID(pl.LightningModule):
 
         # print(batch['label'].shape)
         # print(logits.shape)
-        logger.info(logits)
+        # logger.info(logits)
         # logger.info(torch.nn.functional.softmax(logits))
-        logger.info(batch['label'])
-        n_sig = torch.sum(batch['label']) 
-        logger.info(f"signal fraction: {n_sig / len(batch['label']):.3f}")
+        # logger.info(batch['label'])
+        # n_sig = torch.sum(batch['label']) 
+        # logger.info(f"signal fraction: {n_sig / len(batch['label']):.3f}")
         loss = torch.nn.functional.cross_entropy(
             input  = logits,
             target = batch['label'],
-            # weight = torch.tensor([0.75, 1.25], device=logits.device),
+            weight = torch.tensor([0.75, 1.5], device=logits.device),
             reduction = "none"
         )
         # print(loss.shape)
         # print(loss)
 
         # print(loss.shape)
-        if prediction is not None:
-            focus = (prediction - batch['label'])**2
-            loss = loss*focus
+        # if prediction is not None:
+        #     focus = (prediction - batch['label'])**2
+        #     loss = loss*focus
 
         # focus = (batch['label'] - logits)**2
         # print(focus)

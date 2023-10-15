@@ -22,7 +22,7 @@ class Norm(Enum):
 
 @dataclass
 class Representation:
-    normalization:        Norm         = Norm.batch
+    normalization:        Norm         = Norm.none
     bias:                 bool         = False
     blocks_per_layer:     int          = 2
     residual:             bool         = True

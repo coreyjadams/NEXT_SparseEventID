@@ -25,7 +25,7 @@ def pmaps_meta():
     # The size of the images here are padded and expanded.  This lets me downsample
     # and upsample in the networks more smoothly
     return numpy.array([
-        ([51, 51, 128], [480., 480., 576.],[-240., -240., 0])],
+        ([64, 64, 128], [480., 480., 576.],[-240., -240., 0])],
         # ([48, 48, 55], [480., 480., 576.],[-240., -240., 0])],
         dtype=[
             ('n_voxels', "int", (3)),
@@ -330,7 +330,7 @@ class larcv_dataset(object):
         return meta['n_voxels'][0]
 
     def image_meta(self, key):
-        if "pmaps" in key or "chits" in key: return pmaps_meta()
+        if "pmaps" in key or "chits" in key or "voxels" in key: return pmaps_meta()
         else: return lr_meta()
 
     def fetch_next_batch(self, name, force_pop=False):

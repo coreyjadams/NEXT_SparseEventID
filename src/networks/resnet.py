@@ -20,7 +20,7 @@ class Encoder(torch.nn.Module):
 
 
         if params.framework.sparse:
-            image_size = [64,64,64]
+            # image_size = [64,64,64]
             self.input_layer = scn.InputLayer(
                 dimension    = 3,
                 # spatial_size = 512,
@@ -103,37 +103,29 @@ class Encoder(torch.nn.Module):
 
     def forward(self, x):
 
-        output = self.input_layer(x)
-        # print(output.sum())
-        # print(output.sum(axis=(1,2,3,4)))
-        # print("Input: ", output.features)
-        # output = self.input_norm(output)
+        # print(x)
 
-        output = self.first_block(output)
+        scnTensor = self.input_layer(x)
+
+
+        output = self.first_block(scnTensor)
 
         for l in self.network_layers:
             output = l(output)
-            # print("Layer: ", output.features)
-            # print("Layer.shape: ", output.features.shape)
-            # print("Layer features mean: ", torch.mean(output.features))
-            # print("Layer: ", output.spatial_size)
+  
 
         output = self.bottleneck(output)
-        # print("bottleneck.spatial_size: ", output.spatial_size)
-        # print("bottleneck.features.shape: ", output.features.shape)
-        # print("bottleneck.features: ", output.features)
-        output = self.pool(output)
-        # print("Pooled: ", output)
-        # print("Pooled shape: ", output.shape)
-        # exit()
-        # print(output.shape)
-        # print(output[0])
-        output = self.flatten(output)
-        # print("output.shape: ", output.shape)
-        # print("output.shape: ", output.shape)
-        # exit()
-        return output
 
+        output = self.pool(output)
+
+        output = self.flatten(output)
+
+        summed = scn.SparseToDense(dimension=3, nPlanes=1)(scnTensor)
+        summed = torch.nn.AvgPool3d([64,64,128],divisor_override=1)(summed)
+        summed = summed.reshape((summed.shape[0],))
+
+
+        return output, summed
         # return self.final_activation(output)
 
 
