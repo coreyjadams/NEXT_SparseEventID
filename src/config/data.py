@@ -7,8 +7,8 @@ from omegaconf import MISSING
 
 # from . transforms import TransformChain
 
-dataset_top   = "/data/datasets/NEXT/"
-# dataset_top   = "/lus/grand/projects/datascience/cadams/datasets/NEXT/"
+# dataset_top   = "/data/datasets/NEXT/"
+dataset_top   = "/lus/grand/projects/datascience/cadams/datasets/NEXT/"
 mc_bkg_dir    = dataset_top + "Background/NEXT_v1_05_02_NEXUS_v5_07_10_bkg_v9/larcv/merged_final/"
 mc_tl_208_dir = dataset_top + "polarisProduction/simCLR_train/"
 mc_mk_tl_208_dir = dataset_top + "dnn-dataset/simulation/larcv_2023/"
@@ -61,6 +61,7 @@ class MCMKTl208(Data):
     val:   str = mc_mk_tl_208_dir + "representation_learning_tl208_cuts_val.h5"
     image_key:   str = "chitslowTh"
 
+
 @dataclass
 class OldMCMKTl208(Data):
     name:  str = "mc_mk_tl208"
@@ -73,6 +74,7 @@ class OldMCMKTl208(Data):
     test:  str = old_mk_tl208_dir + ""
     val:   str = old_mk_tl208_dir + "run_6206_larcv_merged.h5"
     image_key:   str = "voxels"
+
 
 @dataclass
 class MCMKTl208_CLS(Data):

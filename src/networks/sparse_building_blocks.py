@@ -32,17 +32,23 @@ class Block(nn.Module):
         if params.normalization == Norm.batch:
             self._do_normalization = True
             self.norm = scn.BatchNormalization(nOut)
+        elif params.normalization == Norm.group:
+            self._do_normalization = True
+            self.norm = scn.SparseGroupNorm(num_groups=1, num_channels=nOut)
         elif params.normalization == Norm.layer:
             raise Exception("Layer norm not supported in SCN")
         self.activation = activation()
 
     def forward(self, x):
 
+        # print("Pre conv batch locations: ", x.get_spatial_locations()[:,-1])
         out = self.conv1(x)
+        # print("Post conv batch locations: ", out.get_spatial_locations()[:,-1])
         if self._do_normalization:
             out = self.norm(out)
+            # print("Post normalization: ", out.get_spatial_locations()[:,-1])
         out = self.activation(out)
-
+        # print("Post activation: ", out.get_spatial_locations()[:,-1])
         return out
 
 
@@ -86,90 +92,6 @@ class ResidualBlock(nn.Module):
 
         return out
 
-# # class SparseBlock(nn.Module):
-# class Block(nn.Module):
-
-#     def __init__(self, nIn, nOut, params):
-
-#         nn.Module.__init__(self)
-
-#         self.conv1 = scn.SubmanifoldConvolution(
-#             dimension   = 3,
-#             nIn         = nIn,
-#             nOut        = nOut,
-#             filter_size = 3,
-#             bias        = params.bias)
-
-#         if params.normalization == Norm.batch:
-#             self.activation = scn.BatchNormReLU(nOut,momentum=0.5)
-#         else:
-#             self.activation = scn.ReLU()
-#         # self.relu = scn.ReLU()
-
-#     def forward(self, x):
-
-#         out = self.conv1(x)
-#         out = self.activation(out)
-
-#         return out
-
-# # class SparseResidualBlock(nn.Module):
-# class ResidualBlock(nn.Module):
-
-#     def __init__(self, nIn, nOut, params):
-#         nn.Module.__init__(self)
-
-
-#         self.conv1 = scn.SubmanifoldConvolution(
-#             dimension   = 3,
-#             nIn         = nIn,
-#             nOut        = nOut,
-#             filter_size = 3,
-#             bias        = params.bias)
-
-
-#         if params.normalization == Norm.batch:
-#             self.activation1 = scn.BatchNormReLU(nOut,momentum=0.5)
-#         else:
-#             self.activation1 = scn.ReLU()
-
-#         self.conv2 = scn.SubmanifoldConvolution(
-#             dimension   = 3,
-#             nIn         = nOut,
-#             nOut        = nOut,
-#             filter_size = 3,
-#             bias        = bias)
-
-#         if params.normalization == Norm.batch:
-#             self.activation2 = scn.BatchNormReLU(nOut,momentum=0.5)
-#         else:
-#             self.activation2 = scn.ReLU()
-
-
-#         self.residual = scn.Identity()
-
-#         self.add = scn.AddTable()
-
-#     def forward(self, x):
-
-#         # This is using the pre-activation variant of resnet
-
-#         residual = self.residual(x)
-
-#         out = self.activation1(x)
-
-#         out = self.conv1(out)
-
-#         out = self.activation2(out)
-
-#         out = self.conv2(out)
-
-#         out = self.add([out, residual])
-
-#         return out
-
-
-
 
 class ConvolutionDownsample(nn.Module):
 
@@ -180,25 +102,100 @@ class ConvolutionDownsample(nn.Module):
             dimension       = 3,
             nIn             = nIn,
             nOut            = nOut,
-            filter_size     = [2,2,2],
-            filter_stride   = [2,2,2],
-            bias            = params.bias
+            filter_size     = 2,
+            filter_stride   = 2,
+            bias            = False
         )
 
         self._do_normalization = False
         if params.normalization == Norm.batch:
             self._do_normalization = True
             self.norm = scn.BatchNormalization(nOut)
+        elif params.normalization == Norm.group:
+            self._do_normalization = True
+            self.norm = scn.SparseGroupNorm(num_groups=1, num_channels=nOut)
         elif params.normalization == Norm.layer:
             raise Exception("Layer norm not supported in SCN")
         self.relu = scn.LeakyReLU()
 
     def forward(self, x):
+        # print("Downsample pre locs: ", x.get_spatial_locations())
+        # print("Downsample pre size: ", x.spatial_size)
         out = self.conv(x)
+        # print("Downsample post locs: ", out.get_spatial_locations()[:])
+        # print("Downsample post size: ", out.spatial_size)
         if self._do_normalization:
             out = self.norm(out)
         out = self.relu(out)
         return out
+
+
+class Pooling(nn.Module):
+
+    def __init__(self, *, nIn, nOut, params):
+        nn.Module.__init__(self)
+
+        self.pooling = scn.AveragePooling(
+            dimension   = 3, 
+            pool_size   = 2,
+            pool_stride = 2,
+        )
+
+        self.filter_update = Block(
+            nIn     = nIn,
+            nOut    = nOut,
+            params  = params,
+            kernel  = [1,1,1]
+        )
+
+    def forward(self, x):
+
+        # print("Entering pooling layer with locs: ", x.get_spatial_locations()[:,-1])
+        # Apply the pooling:
+        # print("Before pooling with spatial size: ", x.spatial_size)
+        # print("Before Pooling with x locs: ", x.get_spatial_locations()[:,0])
+        # print("Before Pooling with y locs: ", x.get_spatial_locations()[:,1])
+        # print("Before Pooling with z locs: ", x.get_spatial_locations()[:,2])
+        out = self.pooling(x)
+        # print("After pooling with spatial size: ", out.spatial_size)
+        # print("Before Pooling with x locs: ", out.get_spatial_locations()[:,0])
+        # print("Before Pooling with y locs: ", out.get_spatial_locations()[:,1])
+        # print("Before Pooling with z locs: ", out.get_spatial_locations()[:,2])
+        # print("After pooling op with locs: ", out.get_spatial_locations()[:,-1])
+        out = self.filter_update(out)
+        # print("After filter update with locs: ", out.get_spatial_locations()[:,-1])
+        return out
+
+# class SparseConvolutionDownsample(nn.Module):
+
+#     def __init__(self, inplanes, outplanes, batch_norm, leaky_relu):
+#         nn.Module.__init__(self)
+
+#         self.batch_norm = batch_norm
+#         self.leaky_relu = leaky_relu
+
+#         self.conv = scn.Convolution(dimension=3,
+#             nIn             = inplanes,
+#             nOut            = outplanes,
+#             filter_size     = 2,
+#             filter_stride   = 2,
+#             bias            = False
+#         )
+
+#         if self.batch_norm:
+#             self.bn   = scn.BatchNormalization(outplanes)
+
+#         if self.leaky_relu: self.relu = scn.LeakyReLU()
+#         else:                self.relu = scn.ReLU()
+
+#     def forward(self, x):
+#         out = self.conv(x)
+
+#         if self.batch_norm:
+#             out = self.bn(out)
+
+#         out = self.relu(out)
+#         return out
 
 
 class ConvolutionUpsample(nn.Module):
@@ -216,14 +213,17 @@ class ConvolutionUpsample(nn.Module):
 
         self._do_normalization = False
         if params.normalization == Norm.batch:
-            self.relu = scn.BatchNormLeakyReLU(nOut)
+            self.norm = scn.BatchNorm(nOut)
+        elif params.normalization == Norm.group:
+            self._do_normalization = True
+            self.norm = scn.SparseGroupNorm(num_groups=1, num_channels=nOut)
         elif params.normalization == Norm.layer:
             raise Exception("Layer norm not supported in SCN")
-        else:
-            self.relu = scn.LeakyReLU()
+        self.relu = scn.LeakyReLU()
 
     def forward(self, x):
         out = self.conv(x)
+        if self._do_normalization: out = self.norm(out)
         out = self.relu(out)
         return out
 
@@ -253,6 +253,9 @@ class BlockSeries(torch.nn.Module):
 
 
     def forward(self, x):
+        # print("Entering block series of length ", len(self.blocks))
+        # print("  Batch locs: ", x.get_spatial_locations()[:,-1])
         for i in range(len(self.blocks)):
             x = self.blocks[i](x)
+            # print("    after a block: ", x.get_spatial_locations()[:,-1])
         return x

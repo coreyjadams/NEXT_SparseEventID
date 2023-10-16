@@ -99,7 +99,15 @@ class exec(object):
 
         if self.args.mode.optimizer.lr_schedule.name == "one_cycle":
             from src.utils import OneCycle
-            lr_schedule = OneCycle(self.args.mode.optimizer.lr_schedule)
+            schedule_args = self.args.mode.optimizer.lr_schedule
+            lr_schedule = OneCycle(
+                min_learning_rate  = 1e-5,
+                peak_learning_rate = schedule_args.peak_learning_rate,
+                decay_floor        = schedule_args.decay_floor, 
+                epoch_length       = epoch_length,
+                decay_epochs       = schedule_args.decay_epochs,
+                total_epochs       = max_epochs
+            )
         elif self.args.mode.optimizer.lr_schedule.name == "standard":
             from src.utils import WarmupFlatDecay
             schedule_args = self.args.mode.optimizer.lr_schedule

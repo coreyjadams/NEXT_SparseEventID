@@ -40,7 +40,7 @@ class supervised_eventID(pl.LightningModule):
         self.log_keys = ["loss"]
 
         self.criterion = torch.nn.CrossEntropyLoss(reduction="none", 
-                                                   weight=torch.tensor([0.1, 10])
+                                                   weight=torch.tensor([0.5, 1.25])
                                                    )
 
     def on_train_start(self):
@@ -49,12 +49,12 @@ class supervised_eventID(pl.LightningModule):
     def forward(self, batch):
 
 
-        representation = self.encoder(batch)
-        # print(representation)
+        representation, summed = self.encoder(batch)
+
         # logits = self.head(representation)
         logits = representation
         # print(logits)
-        return logits
+        return logits, summed
 
 
     def training_step(self, batch, batch_idx):
@@ -64,9 +64,14 @@ class supervised_eventID(pl.LightningModule):
 
         image = batch[self.image_key]
 
-        logits = self(image)
+        logits, summed = self(image)
 
+        # print(summed.shape)
+        # print(batch["label"].shape)
 
+        # both = torch.stack([summed, batch["label"]], axis=-1)
+        # print(both)
+        # exit()
         prediction = self.predict_event(logits)
         loss = self.calculate_loss(batch, logits, prediction)
 
@@ -93,7 +98,7 @@ class supervised_eventID(pl.LightningModule):
 
         image = batch[self.image_key]
 
-        logits = self(image)
+        logits, _ = self(image)
 
 
         prediction = self.predict_event(logits)
@@ -175,52 +180,20 @@ class supervised_eventID(pl.LightningModule):
 
     def calculate_loss(self, batch, logits, prediction=None):
 
-        # # This section computes the loss via focal loss, since the classes are imbalanced:
-        # # Create the full label:
-        # y = torch.nn.functional.one_hot(batch["label"], logits.size(-1))
-        # # print("y: ", y)
-        # softmax = torch.nn.functional.softmax(logits) 
-        # softmax = softmax.clamp(1e-7, 1. - 1e-7)
-        # # print("softmax:", softmax)
-        # loss = - y * torch.log(softmax)
-        # # Apply the focal part:
-        # focus = (1 - softmax)**2.5
-        # # print("focus: ", focus)
-        # loss = loss * (1 - softmax)**4
-        # # print("loss:", loss)
-        # loss = loss.sum(axis=-1)
-        # # print("loss: ", loss)
 
-        # return torch.mean(loss)
-        # # First, apply the 
 
-        # logits = torch.nn.functional.softmax(logits, dim=-1)
+        # This section computes the loss via focal loss, since the classes are imbalanced:
+        # Create the full label:
+        y = torch.nn.functional.one_hot(batch["label"], logits.size(-1))
+        softmax = torch.nn.functional.softmax(logits) 
+        softmax = softmax.clamp(1e-7, 1. - 1e-7)
+        loss = - y * torch.log(softmax)
 
-        # print(batch['label'].shape)
-        # print(logits.shape)
-        # logger.info(logits)
-        # logger.info(torch.nn.functional.softmax(logits))
-        # logger.info(batch['label'])
-        # n_sig = torch.sum(batch['label']) 
-        # logger.info(f"signal fraction: {n_sig / len(batch['label']):.3f}")
-        # logits = torch.nn.softmax(logits)
-        loss = self.criterion(logits, target = batch["label"])
-        # loss = torch.nn.sparse_softmax_cross_entropy_with_logits(
-        #     logits  = logits,
-        #     labels = batch['label'],
-        #     # weight = torch.tensor([0.75, 1.25], device=logits.device),
-        #     reduction = "none"
-        # )
-        # print(loss.shape)
-        # print(loss)
+        # Apply the focal part:
+        loss = loss * (1 - softmax)**2
+        loss = loss.sum(axis=-1)
 
-        # print(loss.shape)
-        # if prediction is not None:
-        #     focus = (prediction - batch['label'])**2
-        #     loss = loss*focus
-
-        # focus = (batch['label'] - logits)**2
-        # print(focus)
+        # loss = self.criterion(logits, target = batch["label"])
 
         return torch.mean(loss)
 

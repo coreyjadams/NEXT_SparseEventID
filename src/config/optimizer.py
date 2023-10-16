@@ -23,7 +23,7 @@ class OptimizerKind(Enum):
 @dataclass
 class LRScheduleConfig:
     name:                 str = ""
-    peak_learning_rate: float = 1e-3
+    peak_learning_rate: float = 5e-4
 
 @dataclass
 class OneCycleConfig(LRScheduleConfig):
@@ -44,9 +44,9 @@ class FlatLR(LRScheduleConfig):
 
 @dataclass
 class Optimizer:
-    lr_schedule:          LRScheduleConfig = field(default_factory= lambda:WarmupFlatDecayConfig())
+    lr_schedule:          LRScheduleConfig = field(default_factory= lambda:OneCycleConfig())
     loss_balance_scheme: LossBalanceScheme = LossBalanceScheme.focal
-    name:                    OptimizerKind = OptimizerKind.lars
+    name:                    OptimizerKind = OptimizerKind.adam
     gradient_accumulation:             int = 1
 
 cs = ConfigStore.instance()
