@@ -7,7 +7,7 @@ data:
   active:
     - train
     - val
-  transform1: False
+  transform1: True
   transform2: False
 
 head:

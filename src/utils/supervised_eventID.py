@@ -10,6 +10,8 @@ import datetime
 
 from . training_utils import init_optimizer, format_log_message
 
+from src.config.optimizer import LossBalanceScheme
+
 from src import logging
 
 logger = logging.getLogger("NEXT")
@@ -39,8 +41,12 @@ class supervised_eventID(pl.LightningModule):
 
         self.log_keys = ["loss"]
 
+        if args.mode.optimizer.loss_balance_scheme == LossBalanceScheme.even:
+            weight = torch.tensor([0.582, 1.417])
+        else: weight = None
+
         self.criterion = torch.nn.CrossEntropyLoss(reduction="none", 
-                                                   weight=torch.tensor([0.5, 1.25])
+                                                   weight=weight
                                                    )
 
     def on_train_start(self):
@@ -49,29 +55,21 @@ class supervised_eventID(pl.LightningModule):
     def forward(self, batch):
 
 
-        representation, summed = self.encoder(batch)
+        representation = self.encoder(batch)
 
         # logits = self.head(representation)
         logits = representation
         # print(logits)
-        return logits, summed
+        return logits
 
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
 
-
-
         image = batch[self.image_key]
 
-        logits, summed = self(image)
+        logits = self(image)
 
-        # print(summed.shape)
-        # print(batch["label"].shape)
-
-        # both = torch.stack([summed, batch["label"]], axis=-1)
-        # print(both)
-        # exit()
         prediction = self.predict_event(logits)
         loss = self.calculate_loss(batch, logits, prediction)
 
@@ -98,7 +96,7 @@ class supervised_eventID(pl.LightningModule):
 
         image = batch[self.image_key]
 
-        logits, _ = self(image)
+        logits = self(image)
 
 
         prediction = self.predict_event(logits)
@@ -180,20 +178,19 @@ class supervised_eventID(pl.LightningModule):
 
     def calculate_loss(self, batch, logits, prediction=None):
 
+        if self.args.mode.optimizer.loss_balance_scheme == LossBalanceScheme.focal:
+            # This section computes the loss via focal loss, since the classes are imbalanced:
+            # Create the full label:
+            y = torch.nn.functional.one_hot(batch["label"], logits.size(-1))
+            softmax = torch.nn.functional.softmax(logits) 
+            softmax = softmax.clamp(1e-7, 1. - 1e-7)
+            loss = - y * torch.log(softmax)
 
-
-        # This section computes the loss via focal loss, since the classes are imbalanced:
-        # Create the full label:
-        y = torch.nn.functional.one_hot(batch["label"], logits.size(-1))
-        softmax = torch.nn.functional.softmax(logits) 
-        softmax = softmax.clamp(1e-7, 1. - 1e-7)
-        loss = - y * torch.log(softmax)
-
-        # Apply the focal part:
-        loss = loss * (1 - softmax)**2
-        loss = loss.sum(axis=-1)
-
-        # loss = self.criterion(logits, target = batch["label"])
+            # Apply the focal part:
+            loss = loss * (1 - softmax)**2
+            loss = loss.sum(axis=-1)
+        else:
+            loss = self.criterion(logits, target = batch["label"])
 
         return torch.mean(loss)
 
@@ -226,6 +223,12 @@ def create_lightning_module(args, datasets, transforms=None, lr_scheduler=None, 
     from src.networks.classification_head import build_networks
     encoder, class_head = build_networks(args, image_shape)
 
+    # For this, we use the augmented data if its available:
+    image_key = args.data.image_key
+    if args.data.transform1:
+        image_key += "_1"
+    elif args.data.transform2:
+        image_key += "_2"
 
     model = supervised_eventID(
         args,
@@ -233,7 +236,7 @@ def create_lightning_module(args, datasets, transforms=None, lr_scheduler=None, 
         class_head,
         transforms,
         image_meta,
-        args.data.image_key,
+        image_key,
         lr_scheduler,
     )
     return model

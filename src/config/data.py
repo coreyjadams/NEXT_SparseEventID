@@ -73,7 +73,7 @@ class OldMCMKTl208(Data):
     train: str = old_mk_tl208_dir + "NEXT_White_train_randomized.h5"
     test:  str = old_mk_tl208_dir + ""
     val:   str = old_mk_tl208_dir + "run_6206_larcv_merged.h5"
-    image_key:   str = "voxels"
+    image_key:   str = "voxels_low"
 
 
 @dataclass

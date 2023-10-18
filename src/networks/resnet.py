@@ -19,8 +19,9 @@ class Encoder(torch.nn.Module):
         # How many filters did we start with?
         current_number_of_filters = params.encoder.n_initial_filters
 
-        if params.framework.mode == DataMode.sparse:
-            image_size = [64,64,128]
+        if params.framework.sparse:
+            # image_size = [64,64,128]
+            image_size = [512,512,512]
             self.input_layer = scn.InputLayer(
                 dimension    = 3,
                 # spatial_size = 512,
@@ -31,11 +32,19 @@ class Encoder(torch.nn.Module):
 
         # self.input_norm = InputNorm(nIn=1, nOut=1)
 
-        self.first_block = Block(
-            nIn    = 1,
-            nOut   = params.encoder.n_initial_filters,
-            params = params.encoder
-        )
+        # self.first_block = Block(
+        #     nIn    = 1,
+        #     nOut   = params.encoder.n_initial_filters,
+        #     params = params.encoder
+        # )
+
+        self.initial_convolution = scn.SubmanifoldConvolution(
+                dimension   = 3,
+                nIn         = 1,
+                nOut        = params.encoder.n_initial_filters,
+                filter_size = 5,
+                bias        = params.encoder.bias
+            )
 
         if params.encoder.downsampling == DownSampling.convolutional:
             downsampler = ConvDonsample
@@ -63,13 +72,18 @@ class Encoder(torch.nn.Module):
             )
             current_number_of_filters = next_filters
 
+        self.final_layer = BlockSeries(
+                    nIn      = current_number_of_filters,
+                    n_blocks = params.encoder.blocks_per_layer,
+                    params   = params.encoder
+                )
 
-        self.bottleneck  = Block(
-            nIn    = current_number_of_filters,
-            nOut   = params.encoder.n_output_filters,
-            # kernel = [1,1,1],
-            params = params.encoder
-        )
+        self.bottleneck  = scn.SubmanifoldConvolution(dimension=3,
+                    nIn  = current_number_of_filters,
+                    nOut = 2,
+                    filter_size=3,
+                    bias=params.encoder.bias)
+
 
 
         final_shape = [i // 2**params.encoder.depth for i in image_size]
@@ -78,15 +92,10 @@ class Encoder(torch.nn.Module):
         # We apply a global pooling layer to the image, to produce the encoding:
         if params.framework.mode == DataMode.sparse:
             self.pool = torch.nn.Sequential(
-                # scn.AveragePooling(
-                #     dimension = 3,
-                #     pool_size = self.output_shape[1:],
-                #     pool_stride = 1
-                #     ),
                 scn.SparseToDense(
                     dimension=3, nPlanes=self.output_shape[0]),
-                torch.nn.AvgPool3d(self.output_shape[1:], divisor_override=1),
-
+                torch.nn.AvgPool3d(self.output_shape[1:]),
+                # torch.nn.AvgPool3d(self.output_shape[1:], divisor_override=1),
             )
 
         else:
@@ -103,30 +112,26 @@ class Encoder(torch.nn.Module):
 
     def forward(self, x):
 
-        # print(x)
+        x = self.input_layer(x)
+       
+        x = self.initial_convolution(x)
+        
+        for i, l in enumerate(self.network_layers):
+            x = l(x)
+         
 
-        scnTensor = self.input_layer(x)
+        # Last convolutional Layers:
+        x = self.final_layer(x)
+        
+        # Bottleneck for the right number of outputs:
+        x = self.bottleneck(x)
+        
+        # Pool correctly:
+        x = self.pool(x)
 
+        output = self.flatten(x)
 
-        output = self.first_block(scnTensor)
-
-        for l in self.network_layers:
-            output = l(output)
-  
-
-        output = self.bottleneck(output)
-
-        output = self.pool(output)
-
-        output = self.flatten(output)
-
-        summed = scn.SparseToDense(dimension=3, nPlanes=1)(scnTensor)
-        summed = torch.nn.AvgPool3d([64,64,128],divisor_override=1)(summed)
-        summed = summed.reshape((summed.shape[0],))
-
-
-        return output, summed
-        # return self.final_activation(output)
+        return output
 
 
     def increase_filters(self, current_filters, params):
