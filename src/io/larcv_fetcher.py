@@ -78,8 +78,8 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         datatype  = "sparse3d",
         producer  = producer_name,
         name      = name+producer_name,
-        MaxVoxels = 300,
-        Augment   = False,
+        MaxVoxels = 6500,
+        Augment   = True,
         Channels  = [0]
     )
 
@@ -128,10 +128,9 @@ def prepare_next_config(batch_size, input_file, data_args, name,
     if data_args.transform1:
         out_key = data_args.image_key + "_1"
         add_augment_chain(cb,
-            datatype="sparse3d",
-            producer=data_args.image_key,
-            start_key = data_args.image_key,
-            output_key  = out_key
+            datatype   = "sparse3d",
+            producer   = data_args.image_key,
+            output_key = out_key
         )
         # Get the pmaps:
         cb.add_batch_filler(
@@ -151,10 +150,9 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         out_key = data_args.image_key + "_2"
 
         add_augment_chain(cb,
-            datatype="sparse3d",
-            producer=data_args.image_key,
-            start_key = data_args.image_key,
-            output_key  = out_key
+            datatype   ="sparse3d",
+            producer   = data_args.image_key,
+            output_key = out_key
         )
         # Get the pmaps:
         cb.add_batch_filler(
@@ -184,33 +182,32 @@ def prepare_next_config(batch_size, input_file, data_args, name,
 
     return io_config, data_keys
 
-def add_augment_chain(config_builder, datatype, producer, start_key, output_key):
-
-
-    # GaussianBlur of pixels:
+def add_augment_chain(config_builder, datatype, producer, output_key):
+    
     config_builder.add_preprocess(
             datatype = datatype,
-            producer = start_key,
-            process  = "GaussianBlur",
-            Sigma    = 0.00,
-            OutputProducer = output_key
-        )
-
-    config_builder.add_preprocess(
-            datatype = datatype,
-            producer = output_key,
+            producer = producer,
             process  = "Mirror",
             Axes = [0,1,2],
             OutputProducer = output_key
         )
 
-    config_builder.add_preprocess(
-            datatype = datatype,
-            producer = output_key,
-            process  = "Translate",
-            MaxShiftPerAxis = [5, 5, 10],
-            OutputProducer = output_key
-        )
+    # # GaussianBlur of pixels:
+    # config_builder.add_preprocess(
+    #         datatype = datatype,
+    #         producer = output_key,
+    #         process  = "GaussianBlur",
+    #         Sigma    = 0.02,
+    #         OutputProducer = output_key
+    #     )
+
+    # config_builder.add_preprocess(
+    #         datatype = datatype,
+    #         producer = output_key,
+    #         process  = "Translate",
+    #         MaxShiftPerAxis = [5, 5, 10],
+    #         OutputProducer = output_key
+    #     )
 
 
 
@@ -345,6 +342,7 @@ class larcv_dataset(object):
         minibatch_data = self.larcv_interface.fetch_minibatch_data(self.storage_name,
             pop=pop,fetch_meta_data=metadata)
         minibatch_dims = self.larcv_interface.fetch_minibatch_dims(self.storage_name)
+
 
         # If the returned data is None, return none and don't load more:
         if minibatch_data is None:

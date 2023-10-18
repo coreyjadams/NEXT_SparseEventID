@@ -8,9 +8,8 @@ from omegaconf import MISSING
 
 class LossBalanceScheme(Enum):
     none  = 0
-    light = 1
-    even  = 2
-    focal = 3
+    even  = 1
+    focal = 2
 
 class OptimizerKind(Enum):
     adam     = 0
@@ -23,7 +22,7 @@ class OptimizerKind(Enum):
 @dataclass
 class LRScheduleConfig:
     name:                 str = ""
-    peak_learning_rate: float = 5e-4
+    peak_learning_rate: float = 3e-3
 
 @dataclass
 class OneCycleConfig(LRScheduleConfig):
@@ -44,7 +43,7 @@ class FlatLR(LRScheduleConfig):
 
 @dataclass
 class Optimizer:
-    lr_schedule:          LRScheduleConfig = field(default_factory= lambda:OneCycleConfig())
+    lr_schedule:          LRScheduleConfig = field(default_factory= lambda:WarmupFlatDecayConfig())
     loss_balance_scheme: LossBalanceScheme = LossBalanceScheme.focal
     name:                    OptimizerKind = OptimizerKind.adam
     gradient_accumulation:             int = 1
