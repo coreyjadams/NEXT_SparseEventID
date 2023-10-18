@@ -9,10 +9,15 @@ class DistributedMode(Enum):
     horovod   = 1
     DeepSpeed = 2
 
+class DataMode(Enum):
+    dense  = 0
+    sparse = 1
+    graph  = 2
+
 @dataclass
 class Framework:
-    name:    str = MISSING
-    sparse: bool = True
+    name:      str = MISSING
+    mode: DataMode = DataMode.sparse
 
 @dataclass
 class Lightning(Framework):

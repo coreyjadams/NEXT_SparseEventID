@@ -179,3 +179,37 @@ def form_yolo_targets(vertex_depth, vertex_labels, particle_labels, event_labels
         "energy"     : event_energy,
         "xy_loc"     : vertex_labels,
     }
+
+
+def larcvsparse_to_pytorch_geometric(input_array):
+
+    # Need to create node features and an adjacency matrix.
+    # Define points as connected if they fall within some radius R
+    # For each node, it's node features can be (x, y, z, E) as well as
+    # The number of nearby nodes (within R), the average energy of those
+    # nodes, and average distance away from its neighbors.
+    # For each edge, dunno
+
+    # Ultimately, need to build this into a graph for pytorch_geometric
+    
+    batch_size = input_array.shape[0]
+
+    # output_array = numpy.zeros((batch_size, 1, 45, 45, 275), dtype=numpy.float32)
+    x_coords   = input_array[:,0,:,0]
+    y_coords   = input_array[:,0,:,1]
+    z_coords   = input_array[:,0,:,2]
+    val_coords = input_array[:,0,:,3]
+
+
+    # Find the non_zero indexes of the input:
+    batch_index, voxel_index = numpy.where(val_coords != -999)
+
+    values  = val_coords[batch_index, voxel_index]
+    x_index = numpy.int32(x_coords[batch_index, voxel_index])
+    y_index = numpy.int32(y_coords[batch_index, voxel_index])
+    z_index = numpy.int32(z_coords[batch_index, voxel_index])
+
+
+    print(values.shape)
+    print(x_index.shape)
+    exit()

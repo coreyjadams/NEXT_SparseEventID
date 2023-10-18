@@ -2,6 +2,7 @@ import os
 import time
 
 from . import data_transforms
+from src.config.framework import DataMode
 
 import numpy
 
@@ -234,9 +235,10 @@ def prepare_interface(batch_size, storage_name, larcv_interface, io_config, data
     return larcv_interface.size(storage_name)
 
 
+
 def create_larcv_dataset(data_args, batch_size, batch_keys,
                          input_file, name,
-                         distributed=False, sparse=False):
+                         distributed=False, data_mode=DataMode.sparse):
     """
     Create a new iterable dataset of the file specified in data_args
     pass
@@ -274,7 +276,7 @@ def create_larcv_dataset(data_args, batch_size, batch_keys,
         name            = name,
         data_args       = data_args,
         is_mc           = data_args.mc,
-        sparse          = sparse)
+        data_mode       = data_mode)
 
 
     return dataset
@@ -288,7 +290,7 @@ class larcv_dataset(object):
 
     """
 
-    def __init__(self, larcv_interface, batch_keys, name, data_args, is_mc=True, sparse=False):
+    def __init__(self, larcv_interface, batch_keys, name, data_args, is_mc=True, data_mode=DataMode.sparse):
         """
         Init takes a preconfigured larcv queue interface
         """
@@ -299,7 +301,7 @@ class larcv_dataset(object):
         self.batch_keys      = batch_keys + ['entries', 'event_ids']
         # self.vertex_depth    = vertex_depth
         # self.event_id        = event_id
-        self.sparse          = sparse
+        self.data_mode       = data_mode
 
         # self.data_keys = data_keys
 
@@ -392,7 +394,7 @@ class larcv_dataset(object):
         # Shape the images:
 
 
-        if not self.sparse:
+        if self.data_mode == DataMode.dense:
             for key in self.batch_keys:
                 if "lr_hits" in key:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_dense_3d(
@@ -404,7 +406,15 @@ class larcv_dataset(object):
                         minibatch_data[key],
                         dense_shape = self.pmaps_meta['n_voxels'][0],
                     )
-                    # if "chits" in key: minibatch_data[key] /= 10000.
+        elif self.data_mode == DataMode.graph:
+            for key in self.batch_keys:
+                if "lr_hits" in key:
+                    minibatch_data[key]  = data_transforms.larcvsparse_to_pytorch_geometric(
+                        minibatch_data[key])
+                if "pmaps" in key or "chits" in key or "voxels" in key:
+                    minibatch_data[key]  = data_transforms.larcvsparse_to_pytorch_geometric(
+                        minibatch_data[key])
+
         else:
             for key in self.batch_keys:
                 if "lr_hits" in key:
@@ -413,7 +423,6 @@ class larcv_dataset(object):
                 if "pmaps" in key or "chits" in key or "voxels" in key:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_scnsparse_3d(
                         minibatch_data[key])
-                    # if "chits" in key: minibatch_data[key] /= 10000.
 
 
         return minibatch_data

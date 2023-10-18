@@ -4,6 +4,7 @@ import sparseconvnet as scn
 import numpy
 
 from src.config.network import GrowthRate, DownSampling
+from src.config.framework import DataMode
 
 
 class Encoder(torch.nn.Module):
@@ -13,12 +14,12 @@ class Encoder(torch.nn.Module):
         super().__init__()
 
         Block, BlockSeries, ConvDonsample, Pool, InputNorm = \
-            self.import_building_blocks(params.framework.sparse)
+            self.import_building_blocks(params.framework.mode)
 
         # How many filters did we start with?
         current_number_of_filters = params.encoder.n_initial_filters
 
-        if params.framework.sparse:
+        if params.framework.mode == DataMode.sparse:
             image_size = [64,64,128]
             self.input_layer = scn.InputLayer(
                 dimension    = 3,
@@ -75,7 +76,7 @@ class Encoder(torch.nn.Module):
         self.output_shape = [params.encoder.n_output_filters,] +  final_shape
 
         # We apply a global pooling layer to the image, to produce the encoding:
-        if params.framework.sparse:
+        if params.framework.mode == DataMode.sparse:
             self.pool = torch.nn.Sequential(
                 # scn.AveragePooling(
                 #     dimension = 3,
@@ -134,8 +135,8 @@ class Encoder(torch.nn.Module):
         else: # GrowthRate.additive
             return current_filters + params.n_initial_filters
 
-    def import_building_blocks(self, sparse):
-        if sparse:
+    def import_building_blocks(self, mode):
+        if mode == DataMode.sparse:
             from . sparse_building_blocks import Block
             from . sparse_building_blocks import ConvolutionDownsample
             from . sparse_building_blocks import BlockSeries

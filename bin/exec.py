@@ -155,7 +155,7 @@ class exec(object):
                 name         = active,
                 distributed  = self.args.run.distributed,
                 batch_keys   = batch_keys,
-                sparse       = self.args.framework.sparse,
+                data_mode    = self.args.framework.mode,
             )
             # # We pull out the energy and labels for this dataset:
             # import h5py

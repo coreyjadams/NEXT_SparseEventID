@@ -19,6 +19,8 @@ class OptimizerKind(Enum):
     adagrad  = 3
     adadelta = 4
     lars     = 5
+    lamb     = 6
+    novograd = 7
 
 @dataclass
 class LRScheduleConfig:

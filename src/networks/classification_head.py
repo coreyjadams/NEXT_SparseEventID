@@ -1,18 +1,22 @@
 import numpy
 import torch
 
-from . resnet import Encoder
 
+from src.config.framework import DataMode
 
 
 def build_networks(params, input_shape):
 
+    if params.framework.mode != DataMode.graph:
+        from . resnet import Encoder
+        encoder = Encoder(params, input_shape)
+    else:
+        from . mpnn import Encoder
+        encoder = Encoder(params, input_shape)
 
-    resnet = Encoder(params, input_shape)
+    output_shape = encoder.output_shape
 
-    output_shape = resnet.output_shape
-
-    # resnet, output_shape = create_resnet(params, input_shape)
+    # encoder, output_shape = create_resnet(params, input_shape)
 
     classification_head = torch.nn.Sequential()
     current_number_of_filters = output_shape[0]
@@ -38,4 +42,4 @@ def build_networks(params, input_shape):
     # else:
     #     yolo_head.append(torch.nn.ReLU())
 
-    return resnet, classification_head
+    return encoder, classification_head

@@ -1,0 +1,6 @@
+larcv
+hydra-core
+pytorch-lightning
+torch-optimizer
+torch-geometric
+sparseconvnet

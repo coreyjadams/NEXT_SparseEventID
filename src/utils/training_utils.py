@@ -1,6 +1,8 @@
 import torch
 import datetime
 
+import torch_opmtimizer as optim
+
 def init_optimizer(optimizer_kind, parameters):
 
     from src.config import OptimizerKind
@@ -16,6 +18,10 @@ def init_optimizer(optimizer_kind, parameters):
     elif optimizer_kind == OptimizerKind.lars:
         from . lars import LARS
         opt = LARS(parameters, lr=1.0)
+    elif optimizer_kind == OptimizerKind.lamb:
+        opt = optim.Lamb(parameters, lr=1.0)
+    elif optimizer_kind == OptimizerKind.novograd:
+        opt = optim.Novograd(parameters, lr=1.0)
     else:
         opt = torch.optim.SGD(parameters, lr=1.0)
 
