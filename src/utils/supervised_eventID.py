@@ -32,7 +32,7 @@ class supervised_eventID(pl.LightningModule):
         self.args         = args
         self.transforms   = transforms
         self.encoder      = encoder
-        # self.head         = head
+        self.head         = head
         self.image_key    = image_key
         self.lr_scheduler = lr_scheduler
 
@@ -45,9 +45,7 @@ class supervised_eventID(pl.LightningModule):
             weight = torch.tensor([0.582, 1.417])
         else: weight = None
 
-        self.criterion = torch.nn.CrossEntropyLoss(reduction="none", 
-                                                   weight=weight
-                                                   )
+        self.criterion = torch.nn.CrossEntropyLoss(weight=weight)
 
     def on_train_start(self):
         self.optimizers().param_groups = self.optimizers()._optimizer.param_groups
@@ -57,9 +55,9 @@ class supervised_eventID(pl.LightningModule):
 
         representation = self.encoder(batch)
 
-        # logits = self.head(representation)
-        logits = representation
-        # print(logits)
+        # logits = representation
+        logits = self.head(representation)
+
         return logits
 
 
@@ -188,11 +186,11 @@ class supervised_eventID(pl.LightningModule):
 
             # Apply the focal part:
             loss = loss * (1 - softmax)**2
-            loss = loss.sum(axis=-1)
+            loss = loss.sum(axis=-1).mean()
         else:
             loss = self.criterion(logits, target = batch["label"])
 
-        return torch.mean(loss)
+        return loss
 
 
     def configure_optimizers(self):

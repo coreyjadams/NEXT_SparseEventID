@@ -114,3 +114,4 @@ class UnsupervisedClassification:
 
 cs.store(name="supervised_classification",   node=SupervisedClassification)
 cs.store(name="unsupervised_classification", node=UnsupervisedClassification)
+cs.store(name="detect_vertex",               node=DetectVertex)

@@ -21,19 +21,18 @@ class vertex_learning(pl.LightningModule):
     a NotImplemented error.
 
     '''
-    def __init__(self, args, encoder, head, transforms,
+    def __init__(self, args, encoder, head,
                  image_meta,
                  image_key   = "pmaps",
                  lr_scheduler=None):
         super().__init__()
 
         self.args         = args
-        self.transforms   = transforms
         self.encoder      = encoder
         self.head         = head
         self.image_key    = image_key
         self.lr_scheduler = lr_scheduler
-
+        print(image_meta)
         self.image_size   = torch.tensor(image_meta['size'][0])
         self.image_origin = torch.tensor(image_meta['origin'][0])
 
@@ -45,9 +44,8 @@ class vertex_learning(pl.LightningModule):
     def forward(self, batch):
 
 
-        t = self.transforms[0](batch)
 
-        representation = self.encoder(t)
+        representation = self.encoder(batch)
 
         logits = self.head(representation)
 
@@ -366,7 +364,6 @@ def create_lightning_module(args, datasets, transforms=None, lr_scheduler=None, 
         args,
         encoder,
         yolo_head,
-        transforms,
         image_meta,
         args.data.image_key,
         lr_scheduler,

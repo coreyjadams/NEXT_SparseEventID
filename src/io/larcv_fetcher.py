@@ -26,7 +26,7 @@ def pmaps_meta():
     # The size of the images here are padded and expanded.  This lets me downsample
     # and upsample in the networks more smoothly
     return numpy.array([
-        ([64, 64, 128], [480., 480., 576.],[-240., -240., 0])],
+        ([64, 64, 64], [640, 640, 670],[-240., -240., 0])],
         # ([48, 48, 55], [480., 480., 576.],[-240., -240., 0])],
         dtype=[
             ('n_voxels', "int", (3)),
@@ -57,7 +57,7 @@ def create_larcv_interface(random_access_mode, distributed, seed):
     return larcv_interface
 
 def prepare_next_config(batch_size, input_file, data_args, name,
-                        is_mc = True):
+                        is_mc = True, get_vertex=True):
 
 
     # First, verify the files exist:
@@ -80,7 +80,7 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         producer  = producer_name,
         name      = name+producer_name,
         MaxVoxels = 6500,
-        Augment   = True,
+        Augment   = False,
         Channels  = [0]
     )
 
@@ -107,15 +107,6 @@ def prepare_next_config(batch_size, input_file, data_args, name,
 
 
     if is_mc:
-        # # Vertex locations as BBoxes:
-        # cb.add_batch_filler(
-        #     datatype = "bbox3d",
-        #     producer = "vertex",
-        #     name     = name + "vertex",
-        #     MaxBoxes = 1,
-        #     Channels = [0]
-        # )
-        # data_keys.update({'vertex': name + 'vertex'})
 
         # Fetch the labels:
         cb.add_batch_filler(
@@ -124,6 +115,18 @@ def prepare_next_config(batch_size, input_file, data_args, name,
             name      = name+"label",
         )
         data_keys.update({'label': name + 'label'})
+
+    if get_vertex:
+        # Vertex locations as BBoxes:
+        cb.add_batch_filler(
+            datatype = "bbox3d",
+            producer = "vertex",
+            name     = name + "vertex",
+            MaxBoxes = 1,
+            Channels = [0]
+        )
+        data_keys.update({'vertex': name + 'vertex'})
+
 
 
     if data_args.transform1:
@@ -178,8 +181,6 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         'make_copy'   : False
     }
 
-    # import json
-    # print(json.dumps(cb.get_config(), indent=2))
 
     return io_config, data_keys
 
@@ -193,22 +194,22 @@ def add_augment_chain(config_builder, datatype, producer, output_key):
             OutputProducer = output_key
         )
 
-    # # GaussianBlur of pixels:
-    # config_builder.add_preprocess(
-    #         datatype = datatype,
-    #         producer = output_key,
-    #         process  = "GaussianBlur",
-    #         Sigma    = 0.02,
-    #         OutputProducer = output_key
-    #     )
+    # GaussianBlur of pixels:
+    config_builder.add_preprocess(
+            datatype = datatype,
+            producer = output_key,
+            process  = "GaussianBlur",
+            Sigma    = 0.0001,
+            OutputProducer = output_key
+        )
 
-    # config_builder.add_preprocess(
-    #         datatype = datatype,
-    #         producer = output_key,
-    #         process  = "Translate",
-    #         MaxShiftPerAxis = [5, 5, 10],
-    #         OutputProducer = output_key
-    #     )
+    config_builder.add_preprocess(
+            datatype = datatype,
+            producer = output_key,
+            process  = "Translate",
+            MaxShiftPerAxis = [5, 5, 10],
+            OutputProducer = output_key
+        )
 
 
 
@@ -255,7 +256,9 @@ def create_larcv_dataset(data_args, batch_size, batch_keys,
         data_args  = data_args,
         input_file = input_file,
         name       = name,
-        is_mc      = data_args.mc)
+        is_mc      = data_args.mc,
+        get_vertex = data_args.vertex
+    )
 
     # Now, fire up the interface:
     prepare_interface(
@@ -344,7 +347,6 @@ class larcv_dataset(object):
         minibatch_data = self.larcv_interface.fetch_minibatch_data(self.storage_name,
             pop=pop,fetch_meta_data=metadata)
         minibatch_dims = self.larcv_interface.fetch_minibatch_dims(self.storage_name)
-
 
         # If the returned data is None, return none and don't load more:
         if minibatch_data is None:

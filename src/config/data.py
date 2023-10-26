@@ -7,8 +7,8 @@ from omegaconf import MISSING
 
 # from . transforms import TransformChain
 
-dataset_top   = "/data/datasets/NEXT/"
-# dataset_top   = "/lus/grand/projects/datascience/cadams/datasets/NEXT/"
+# dataset_top   = "/data/datasets/NEXT/"
+dataset_top   = "/lus/grand/projects/datascience/cadams/datasets/NEXT/"
 mc_bkg_dir    = dataset_top + "Background/NEXT_v1_05_02_NEXUS_v5_07_10_bkg_v9/larcv/merged_final/"
 mc_tl_208_dir = dataset_top + "polarisProduction/simCLR_train/"
 mc_mk_tl_208_dir = dataset_top + "dnn-dataset/simulation/larcv_2023/"
@@ -25,6 +25,7 @@ class RandomMode(Enum):
 class Data:
     name:        str = ""
     mc:         bool = False
+    vertex:     bool = False
     mode: RandomMode = RandomMode.random_events
     seed:        int = -1
     train:       str = ""
@@ -50,15 +51,15 @@ class MCTl208(Data):
 
 @dataclass
 class MCMKTl208(Data):
-    name:  str = "mc_mk_tl208"
-    mc:   bool = True
+    name:    str = "mc_mk_tl208"
+    mc:     bool = True
     # train: str = mc_tl_208_dir + "Tl208_NEW_v1.2.0_v9.dhist_larcv_train.h5"
     # test:  str = mc_tl_208_dir + "Tl208_NEW_v1.2.0_v9.dhist_larcv_test.h5"
     # val:   str = mc_tl_208_dir + "Tl208_NEW_v1.2.0_v9.dhist_larcv_val.h5"
 
-    train: str = mc_mk_tl_208_dir + "representation_learning_tl208_cuts_train.h5"
+    train: str = mc_mk_tl_208_dir + "representation_learning_tl208_no_cuts_train.h5"
     test:  str = mc_mk_tl_208_dir + ""
-    val:   str = mc_mk_tl_208_dir + "representation_learning_tl208_cuts_val.h5"
+    val:   str = mc_mk_tl_208_dir + "representation_learning_tl208_no_cuts_val.h5"
     image_key:   str = "chitslowTh"
 
 
@@ -66,6 +67,7 @@ class MCMKTl208(Data):
 class OldMCMKTl208(Data):
     name:  str = "mc_mk_tl208"
     mc:   bool = True
+    vertex: bool = False
     # train: str = mc_tl_208_dir + "Tl208_NEW_v1.2.0_v9.dhist_larcv_train.h5"
     # test:  str = mc_tl_208_dir + "Tl208_NEW_v1.2.0_v9.dhist_larcv_test.h5"
     # val:   str = mc_tl_208_dir + "Tl208_NEW_v1.2.0_v9.dhist_larcv_val.h5"
@@ -80,6 +82,7 @@ class OldMCMKTl208(Data):
 class MCMKTl208_CLS(Data):
     name:  str = "mc_mk_tl208_cls"
     mc:   bool = True
+    vertex: bool = True
     
     train: str = mc_mk_tl_208_dir + "eventID_tl208_cuts_train.h5"
     test:  str = mc_mk_tl_208_dir + ""

@@ -1,7 +1,7 @@
 import torch
 import datetime
 
-import torch_opmtimizer as optim
+import torch_optimizer as optim
 
 def init_optimizer(optimizer_kind, parameters):
 
@@ -21,7 +21,7 @@ def init_optimizer(optimizer_kind, parameters):
     elif optimizer_kind == OptimizerKind.lamb:
         opt = optim.Lamb(parameters, lr=1.0)
     elif optimizer_kind == OptimizerKind.novograd:
-        opt = optim.Novograd(parameters, lr=1.0)
+        opt = optim.NovoGrad(parameters, lr=1.0)
     else:
         opt = torch.optim.SGD(parameters, lr=1.0)
 

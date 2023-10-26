@@ -25,14 +25,14 @@ class Norm(Enum):
 class Representation:
     normalization:        Norm         = Norm.batch
     bias:                 bool         = True
-    blocks_per_layer:     int          = 2
+    blocks_per_layer:     int          = 4
     residual:             bool         = True
     weight_decay:         float        = 0.00
     growth_rate:          GrowthRate   = GrowthRate.additive
     downsampling:         DownSampling = DownSampling.convolutional
-    depth:                int          = 5
+    depth:                int          = 4
     n_initial_filters:    int          = 8
-    n_output_filters:     int          = 2
+    n_output_filters:     int          = 128
 
 @dataclass
 class ClassificationHead:

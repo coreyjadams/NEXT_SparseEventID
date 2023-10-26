@@ -19,9 +19,8 @@ class Encoder(torch.nn.Module):
         # How many filters did we start with?
         current_number_of_filters = params.encoder.n_initial_filters
 
-        if params.framework.sparse:
+        if params.framework.mode == DataMode.sparse:
             # image_size = [64,64,128]
-            image_size = [512,512,512]
             self.input_layer = scn.InputLayer(
                 dimension    = 3,
                 # spatial_size = 512,
@@ -80,7 +79,7 @@ class Encoder(torch.nn.Module):
 
         self.bottleneck  = scn.SubmanifoldConvolution(dimension=3,
                     nIn  = current_number_of_filters,
-                    nOut = 2,
+                    nOut = params.encoder.n_output_filters,
                     filter_size=3,
                     bias=params.encoder.bias)
 
@@ -94,7 +93,7 @@ class Encoder(torch.nn.Module):
             self.pool = torch.nn.Sequential(
                 scn.SparseToDense(
                     dimension=3, nPlanes=self.output_shape[0]),
-                torch.nn.AvgPool3d(self.output_shape[1:]),
+                # torch.nn.AvgPool3d(self.output_shape[1:]),
                 # torch.nn.AvgPool3d(self.output_shape[1:], divisor_override=1),
             )
 
@@ -102,12 +101,12 @@ class Encoder(torch.nn.Module):
             self.pool = torch.nn.AvgPool3d(self.output_shape[1:])
 
 
-        # if params.framework.sparse:
+        # if params.framework.mode == DataMode.sparse:
         #     self.final_activation = scn.Tanh()
         # else:
         #     self.final_activation = torch.nn.Tanh()
 
-        self.flatten = torch.nn.Flatten(start_dim=1, end_dim=-1)
+        # self.flatten = torch.nn.Flatten(start_dim=1, end_dim=-1)
 
 
     def forward(self, x):
@@ -126,12 +125,10 @@ class Encoder(torch.nn.Module):
         # Bottleneck for the right number of outputs:
         x = self.bottleneck(x)
         
-        # Pool correctly:
+        # # Pool correctly:
         x = self.pool(x)
 
-        output = self.flatten(x)
-
-        return output
+        return x
 
 
     def increase_filters(self, current_filters, params):
