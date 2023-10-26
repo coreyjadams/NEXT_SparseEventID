@@ -49,6 +49,7 @@ class Optimizer:
     loss_balance_scheme: LossBalanceScheme = LossBalanceScheme.focal
     name:                    OptimizerKind = OptimizerKind.adam
     gradient_accumulation:             int = 1
+    weight_decay:                    float = 1e-6
 
 cs = ConfigStore.instance()
 

@@ -1,8 +1,8 @@
 #!/bin/bash -l
-#PBS -l select=1:system=polaris
+#PBS -l select=3:system=polaris
 #PBS -l place=scatter
-#PBS -l walltime=0:45:00
-#PBS -q debug
+#PBS -l walltime=1:00:00
+#PBS -q debug-scaling
 #PBS -A datascience
 #PBS -l filesystems=home:grand
 
@@ -18,10 +18,8 @@ NRANKS_PER_NODE=4
 
 let NRANKS=${NNODES}*${NRANKS_PER_NODE}
 
-# NRANKS=1
-LOCAL_BATCH_SIZE=512
-# let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${NRANKS}
-let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}
+LOCAL_BATCH_SIZE=256
+let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${NRANKS}
 
 echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
 
@@ -38,24 +36,22 @@ module load cray-hdf5/1.12.1.3
 export NCCL_COLLNET_ENABLE=1
 export NCCL_NET_GDR_LEVEL=PHB
 
-LOSS_BALANCE=even
-OPT=adam
-NORM=batch
+run_id=simclr-supervised_ID_mb${GLOBAL_BATCH_SIZE}-3e-4
 
-run_id=supervised_ID_mk_mb${GLOBAL_BATCH_SIZE}-${LOSS_BALANCE}-${OPT}-${NORM}-dev
-# run_id=supervised_ID_mk_mb${GLOBAL_BATCH_SIZE}-${LOSS_BALANCE}-${OPT}-${NORM}-head-smallerSize
+WEIGHTS="/home/cadams/Polaris/NEXT_SparseEventID/output/repr_mb10240-lr1e-2-adam-benchmark-dev-blur/checkpoints/epoch\=95-step\=4950.ckpt"
+# WEIGHTS="/home/cadams/Polaris/NEXT_SparseEventID/output/repr_mb8192-lr1e-3-smallerAug/checkpoints/epoch\=55-step\=3800.ckpt"
+echo $WEIGHTS
 
-# mpiexec -n ${NRANKS} -ppn ${NRANKS_PER_NODE} --cpu-bind=numa \
+mpiexec -n ${NRANKS} -ppn ${NRANKS_PER_NODE} --cpu-bind=numa \
 python bin/exec.py \
 --config-name supervised_eventID \
 mode=train \
-framework.oversubscribe=1 \
+mode.weights_location=${WEIGHTS} \
+mode.optimizer.lr_schedule.peak_learning_rate=0.0003 \
 run.distributed=True \
 run.id=${run_id} \
+framework.oversubscribe=1 \
 run.minibatch_size=${GLOBAL_BATCH_SIZE} \
-mode.optimizer.loss_balance_scheme=${LOSS_BALANCE} \
-mode.optimizer.lr_schedule.peak_learning_rate=3e-3 \
-mode.optimizer.name=${OPT} \
-output_dir=output-test \
-run.length=50
+run.length=150
 
+# data.image_key=lr_hits \

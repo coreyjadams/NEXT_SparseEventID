@@ -30,9 +30,9 @@ class Representation:
     weight_decay:         float        = 0.00
     growth_rate:          GrowthRate   = GrowthRate.additive
     downsampling:         DownSampling = DownSampling.convolutional
-    depth:                int          = 4
-    n_initial_filters:    int          = 8
-    n_output_filters:     int          = 128
+    depth:                int          = 3
+    n_initial_filters:    int          = 32
+    n_output_filters:     int          = 256
 
 @dataclass
 class ClassificationHead:

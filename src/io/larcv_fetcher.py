@@ -26,8 +26,7 @@ def pmaps_meta():
     # The size of the images here are padded and expanded.  This lets me downsample
     # and upsample in the networks more smoothly
     return numpy.array([
-        ([64, 64, 64], [640, 640, 670],[-240., -240., 0])],
-        # ([48, 48, 55], [480., 480., 576.],[-240., -240., 0])],
+        ([64, 64, 64], [640, 640, 640],[-320., -320., -45])],
         dtype=[
             ('n_voxels', "int", (3)),
             ('size', "float", (3)),
@@ -111,7 +110,7 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         # Fetch the labels:
         cb.add_batch_filler(
             datatype  = "particle",
-            producer  = "label",
+            producer  = "event",
             name      = name+"label",
         )
         data_keys.update({'label': name + 'label'})
@@ -181,6 +180,9 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         'make_copy'   : False
     }
 
+    # import json
+    # print(json.dumps(cb.get_config(), indent=4))
+
 
     return io_config, data_keys
 
@@ -199,7 +201,7 @@ def add_augment_chain(config_builder, datatype, producer, output_key):
             datatype = datatype,
             producer = output_key,
             process  = "GaussianBlur",
-            Sigma    = 0.0001,
+            Sigma    = 0.0005,
             OutputProducer = output_key
         )
 

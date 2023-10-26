@@ -196,7 +196,7 @@ class supervised_eventID(pl.LightningModule):
     def configure_optimizers(self):
         learning_rate = 1.0
         # learning_rate = self.args.mode.optimizer.learning_rate
-        opt = init_optimizer(self.args.mode.optimizer.name, self.parameters())
+        opt = init_optimizer(self.args.mode.optimizer.name, self.parameters(), self.args.mode.optimizer.weight_decay)
 
         lr_fn = lambda x : self.lr_scheduler[x]
 

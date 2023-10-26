@@ -11,7 +11,6 @@ def build_networks(params, input_shape):
 
     yolo_head = torch.nn.Sequential()
 
-    print("Output shape: ", output_shape)
 
     # Only using dense blocks here:
 

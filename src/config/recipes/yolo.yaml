@@ -14,4 +14,4 @@ head:
   layers: 
     - 64
     - 64
-    - 4
+    - 5 # [vertex present]
