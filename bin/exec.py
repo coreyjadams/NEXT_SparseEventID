@@ -265,6 +265,9 @@ class exec(object):
             from src.utils.vertex_finding import create_lightning_module
         elif self.args.name == "supervised_eventID":
             from src.utils.supervised_eventID import create_lightning_module
+        elif self.args.name == "unsupervised_eventID":
+            from src.utils.unsupervised_eventID import create_lightning_module
+
 
         transform_keys = []
         if self.args.data.transform1:

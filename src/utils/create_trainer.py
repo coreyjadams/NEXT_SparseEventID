@@ -102,8 +102,8 @@ def train(args, lightning_model, datasets):
 
             lightning_model.encoder.load_state_dict(encoder_dict)
             # We also FREEZE the encoder:
-            # for param in lightning_model.encoder.parameters():
-            #     param.requires_grad = False
+            for param in lightning_model.encoder.parameters():
+                param.requires_grad = False
         else:
             lightning_model.load_from_checkpoint(args.mode.weights_location)
     else:
@@ -116,6 +116,10 @@ def train(args, lightning_model, datasets):
             # state_dict = lightning_model.load_from_checkpoint(checkpoint_options[0])
             # print("Loaded model from checkpoint")
 
+
+    # If we're doing unsupervised training, we have to fit the datasets initially based on energy:
+    if args.name == "unsupervised_eventID":
+        lightning_model.prefit_distribution(datasets["train"].dataset.ds.energy)
 
     trainer = pl.Trainer(
         accelerator             = args.run.compute_mode.name.lower(),
@@ -147,7 +151,7 @@ def train(args, lightning_model, datasets):
 
     trainer.fit(
         lightning_model,
-        train_dataloaders=datasets["train"],
+        train_dataloaders= datasets["train"],
         val_dataloaders  = datasets["val"],
         ckpt_path        = checkpoint_path
     )
