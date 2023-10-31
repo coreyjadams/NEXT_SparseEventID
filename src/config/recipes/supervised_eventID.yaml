@@ -1,6 +1,6 @@
 defaults:
   - supervised_classification
-  - override data: old_mc_mk_tl208_cls
+  - override data: mc_mk_tl208_cls
   - _self_
 
 data:

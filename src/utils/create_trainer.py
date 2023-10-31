@@ -102,8 +102,8 @@ def train(args, lightning_model, datasets):
 
             lightning_model.encoder.load_state_dict(encoder_dict)
             # We also FREEZE the encoder:
-            for param in lightning_model.encoder.parameters():
-                param.requires_grad = False
+            # for param in lightning_model.encoder.parameters():
+            #     param.requires_grad = False
         else:
             lightning_model.load_from_checkpoint(args.mode.weights_location)
     else:

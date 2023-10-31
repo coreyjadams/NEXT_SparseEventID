@@ -223,9 +223,9 @@ class vertex_learning(pl.LightningModule):
         abs_vtx_res = torch.sqrt(torch.sum(vertex_resolution**2, dim=1))
 
         return {
-            "acc/label"    : event_accuracy,
-            "acc/sig"      : acc_sig,
-            "acc/bkg"      : acc_bkg,
+            "acc/accuracy" : event_accuracy,
+            "acc/sig_acc"  : acc_sig,
+            "acc/bkg_acc"  : acc_bkg,
             "acc/vertex_decection" : vertex_anchor_acc,
             "acc/vertex_x" : torch.mean(vertex_resolution[:,0]),
             "acc/vertex_y" : torch.mean(vertex_resolution[:,1]),

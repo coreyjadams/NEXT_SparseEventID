@@ -125,8 +125,11 @@ class Encoder(torch.nn.Module):
         # Bottleneck for the right number of outputs:
         x = self.bottleneck(x)
         
-        # # Pool correctly:
+        # # Pool correctly: 
         x = self.pool(x)
+
+        # Normalize the output features?
+        x = torch.sigmoid(x)
 
         return x
 

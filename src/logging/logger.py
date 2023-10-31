@@ -49,7 +49,6 @@ class logger():
         self.name = name
         self.format_template = "{date} - {severity} - {msg}"
         self.setLevel(level)
-
         self.setFile(file_path)
         return
 
@@ -100,7 +99,8 @@ class logger():
         if level >= self.level:
             print(msg, flush=True)
             if hasattr(self, "file"):
-                self.file.write(msg)
+                n = self.file.write(msg + "\n")
+                self.file.flush()
 
     def info(self, message):
         self.print(
