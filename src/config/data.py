@@ -7,8 +7,8 @@ from omegaconf import MISSING
 
 # from . transforms import TransformChain
 
-# dataset_top   = "/data/datasets/NEXT/"
-dataset_top   = "/lus/grand/projects/datascience/cadams/datasets/NEXT/"
+dataset_top   = "/data/datasets/NEXT/"
+# dataset_top   = "/lus/grand/projects/datascience/cadams/datasets/NEXT/"
 mc_bkg_dir    = dataset_top + "Background/NEXT_v1_05_02_NEXUS_v5_07_10_bkg_v9/larcv/merged_final/"
 mc_tl_208_dir = dataset_top + "polarisProduction/simCLR_train/"
 mc_mk_tl_208_dir = dataset_top + "dnn-dataset/simulation/larcv_2023/"
@@ -33,6 +33,7 @@ class Data:
     val:         str = ""
     image_key:   str = "pmaps"
     active: Tuple[str] = field(default_factory=list)
+    normalize:  bool = True 
     transform1: bool = True
     transform2: bool = True
 

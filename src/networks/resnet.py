@@ -29,13 +29,13 @@ class Encoder(torch.nn.Module):
         else:
             self.input_layer = torch.nn.Identity()
 
-        # self.input_norm = InputNorm(nIn=1, nOut=1)
-
         # self.first_block = Block(
         #     nIn    = 1,
         #     nOut   = params.encoder.n_initial_filters,
         #     params = params.encoder
         # )
+
+
 
         self.initial_convolution = scn.SubmanifoldConvolution(
                 dimension   = 3,

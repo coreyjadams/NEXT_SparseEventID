@@ -9,7 +9,7 @@ class InputNorm(nn.Module):
     def __init__(self, *, nIn, nOut):
 
         nn.Module.__init__(self)
-        self.layer = scn.BatchNormalization(nOut)
+        self.layer = scn.SparseGroupNorm(num_groups=1, num_channels=nOut)
 
     def forward(self, x):
 

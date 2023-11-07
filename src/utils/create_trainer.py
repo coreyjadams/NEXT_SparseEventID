@@ -105,7 +105,8 @@ def train(args, lightning_model, datasets):
             for param in lightning_model.encoder.parameters():
                 param.requires_grad = False
         else:
-            lightning_model.load_from_checkpoint(args.mode.weights_location)
+            # lightning_model.load_from_checkpoint(args.mode.weights_location)
+            checkpoint_path = args.mode.weights_location
     else:
         import glob
         # Check to see if there are already checkpoints present:

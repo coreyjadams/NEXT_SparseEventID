@@ -73,6 +73,19 @@ def prepare_next_config(batch_size, input_file, data_args, name,
 
     producer_name = data_args.image_key
 
+
+    # Sparse Normalization (Do it first!):
+    if data_args.normalize:
+        cb.add_preprocess(
+            datatype = "sparse3d",
+            producer = producer_name,
+            process  = "Normalize",
+            OutputProducer = producer_name,
+            Mean = 10.0,
+            Std = 1.0
+        )
+
+
     # Get the pmaps:
     cb.add_batch_filler(
         datatype  = "sparse3d",
@@ -82,6 +95,8 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         Augment   = False,
         Channels  = [0]
     )
+
+
 
     # Build up the data_keys:
     data_keys = {
@@ -180,17 +195,17 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         'make_copy'   : False
     }
 
-    # import json
-    # print(json.dumps(cb.get_config(), indent=4))
 
 
     return io_config, data_keys
 
 def add_augment_chain(config_builder, datatype, producer, output_key):
     
+
+
     config_builder.add_preprocess(
             datatype = datatype,
-            producer = producer,
+            producer = output_key,
             process  = "Mirror",
             Axes = [0,1,2],
             OutputProducer = output_key

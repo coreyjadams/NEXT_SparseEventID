@@ -12,6 +12,6 @@ data:
 
 head:
   layers: 
-    - 64
-    - 64
+    # - 64
+    # - 64
     - 5 # [vertex present]
