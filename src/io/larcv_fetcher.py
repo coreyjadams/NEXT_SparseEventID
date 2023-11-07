@@ -277,6 +277,15 @@ def create_larcv_dataset(data_args, batch_size, batch_keys,
         get_vertex = data_args.vertex
     )
 
+    # If the file has it, read in the event-wise energy for ALL events:
+    import h5py
+    f = h5py.File(input_file)
+    particle_group_name = 'particle_event_group'
+    if particle_group_name in f['Data/']:
+        energy_array = f['Data'][particle_group_name]['particles']['energy_deposit']
+    else:
+        energy_array = None
+
     # Now, fire up the interface:
     prepare_interface(
         batch_size,
@@ -293,6 +302,7 @@ def create_larcv_dataset(data_args, batch_size, batch_keys,
         name            = name,
         data_args       = data_args,
         is_mc           = data_args.mc,
+        energy          = energy_array,
         data_mode       = data_mode)
 
 
@@ -307,7 +317,7 @@ class larcv_dataset(object):
 
     """
 
-    def __init__(self, larcv_interface, batch_keys, name, data_args, is_mc=True, data_mode=DataMode.sparse):
+    def __init__(self, larcv_interface, batch_keys, name, data_args, is_mc=True, energy = None, data_mode=DataMode.sparse):
         """
         Init takes a preconfigured larcv queue interface
         """
@@ -320,6 +330,7 @@ class larcv_dataset(object):
         # self.event_id        = event_id
         self.data_mode       = data_mode
 
+        self.energy          = energy
         # self.data_keys = data_keys
 
         # Get image meta:
@@ -379,6 +390,11 @@ class larcv_dataset(object):
 
             minibatch_data[key] = numpy.reshape(minibatch_data[key], minibatch_dims[key])
 
+        if 'energy' in self.batch_keys:
+            label_particle = minibatch_data['label'][:,0]
+            minibatch_data['energy'] = label_particle['_energy_deposit']
+
+
         # We need the event id for vertex classification, even if it's not used.
         # if self.event_id or self.vertex_depth is not None:
         if 'label' in minibatch_data.keys():
@@ -386,8 +402,6 @@ class larcv_dataset(object):
             minibatch_data['label'] = label_particle['_pdg'].astype("int64")
 
 
-        if 'energy' in self.batch_keys:
-            minibatch_data['energy'] = label_particle['energy_init']
 
         if "vertex" in minibatch_data.keys():
         #     downsample_level = 2**self.data_args.downsample

@@ -1,8 +1,8 @@
 #!/bin/bash -l
-#PBS -l select=4:system=polaris
+#PBS -l select=24:system=polaris
 #PBS -l place=scatter
-#PBS -l walltime=1:00:00
-#PBS -q debug-scaling
+#PBS -l walltime=3:00:00
+#PBS -q prod
 #PBS -A datascience
 #PBS -l filesystems=home:grand
 
@@ -21,18 +21,18 @@ echo "Hosts:"
 echo $HOSTS
 
 OVERSUBSCRIBE=4
-# Turn on MPS:
-nvidia-cuda-mps-control -d
+
 
 let NRANKS_PER_NODE=4*${OVERSUBSCRIBE}
 
 
 let NRANKS=${NNODES}*${NRANKS_PER_NODE}
 
-LOCAL_BATCH_SIZE=256
-let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${NRANKS}
 
-echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
+# Turn on MPS:
+# (on every rank!!)
+mpiexec -n ${NNODES} -ppn 1 nvidia-cuda-mps-control -d
+
 
 # Set up software deps:
 module load conda/2022-09-08
@@ -70,20 +70,30 @@ export OMP_NUM_THREADS=4
 
 i=1
 n=2
-for OPT in lamb adam;
+# for OPT in lamb;
+for OPT in lamb adam novograd;
 do 
-    for LR in 3e-4;
+    # for LR in 3e-1;
+    for LR in 3e-1 3e-2 3e-3 3e-4;
     do
+
         hosts=$(cat $PBS_NODEFILE | tail -n +$i | head -n 2)
         hosts=$(echo ${hosts} | tr -s " " ",")
         echo $hosts
         echo ""
-        run_id=repr_mb${GLOBAL_BATCH_SIZE}-${OPT}=${LR}
+        run_id=repr-sigmoid_mb${GLOBAL_BATCH_SIZE}-${OPT}-${LR}
         echo $run_id
 
+        let "LOCAL_RANKS=${n}*${NRANKS_PER_NODE}"
+        echo $LOCAL_RANKS
+        LOCAL_BATCH_SIZE=256
+        let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${LOCAL_RANKS}"
 
-        mpiexec -n ${NRANKS} -ppn ${NRANKS_PER_NODE} \
-        --hosts ${hosts}
+        echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
+
+
+        mpiexec -n ${LOCAL_RANKS} -ppn ${NRANKS_PER_NODE} \
+        --hosts ${hosts} \
         --cpu-bind list:${CPU_AFFINITY} \
         python bin/exec.py \
         --config-name learn_rep \
@@ -95,9 +105,11 @@ do
         run.profile=True \
         run.id=${run_id} \
         run.minibatch_size=${GLOBAL_BATCH_SIZE} \
-        run.length=500
+        run.length=500  & 
 
         let "i=i+n"
     done    
 done
 echo ""
+
+wait

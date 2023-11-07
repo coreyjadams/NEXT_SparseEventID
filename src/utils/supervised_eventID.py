@@ -57,7 +57,6 @@ class supervised_eventID(pl.LightningModule):
 
         # logits = representation
         logits = self.head(representation)
-
         return logits
 
 

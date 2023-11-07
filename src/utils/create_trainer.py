@@ -118,6 +118,10 @@ def train(args, lightning_model, datasets):
             # print("Loaded model from checkpoint")
 
 
+    # If we're doing unsupervised training, we have to fit the datasets initially based on energy:
+    if args.name == "unsupervised_eventID":
+        lightning_model.prefit_distribution(datasets["train"].dataset.ds.energy)
+
     trainer = pl.Trainer(
         accelerator             = args.run.compute_mode.name.lower(),
         default_root_dir        = args.output_dir,
@@ -148,7 +152,7 @@ def train(args, lightning_model, datasets):
 
     trainer.fit(
         lightning_model,
-        train_dataloaders=datasets["train"],
+        train_dataloaders= datasets["train"],
         val_dataloaders  = datasets["val"],
         ckpt_path        = checkpoint_path
     )

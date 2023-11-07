@@ -14,12 +14,23 @@ cd ${WORK_DIR}
 
 # MPI and OpenMP settings
 NNODES=`wc -l < $PBS_NODEFILE`
-NRANKS_PER_NODE=4
+
+
+OVERSUBSCRIBE=4
+let NRANKS_PER_NODE=4*${OVERSUBSCRIBE}
+
+
+# Turn on MPS:
+# (on every rank!!)
+mpiexec -n ${NNODES} -ppn 1 nvidia-cuda-mps-control -d
+
+
 
 let NRANKS=${NNODES}*${NRANKS_PER_NODE}
 
 LOCAL_BATCH_SIZE=256
-let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${NRANKS}
+# let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${NRANKS}
+let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}
 
 echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
 
@@ -36,22 +47,56 @@ module load cray-hdf5/1.12.1.3
 export NCCL_COLLNET_ENABLE=1
 export NCCL_NET_GDR_LEVEL=PHB
 
-run_id=simclr-supervised_ID_mb${GLOBAL_BATCH_SIZE}-3e-4
+# For OVERSUBSCRIBE=4:
+CPU_AFFINITY="24-25,56-57:26-27,58-59:28-29,60-61:30-31,62-63"
+CPU_AFFINITY="${CPU_AFFINITY}:16-17,48-49:18-19,50-51:20-21,52-53:22-23,54-55"
+CPU_AFFINITY="${CPU_AFFINITY}:8-9,40-41:10-11,42-43:12-13,44-45:14-15,46-47"
+CPU_AFFINITY="${CPU_AFFINITY}:0-1,32-33:2-3,34-35:4-5,36-37:6-7,38-39"
+export OMP_NUM_THREADS=4
 
-WEIGHTS="/home/cadams/Polaris/NEXT_SparseEventID/output/repr_mb10240-lr1e-2-adam-benchmark-dev-blur/checkpoints/epoch\=95-step\=4950.ckpt"
-# WEIGHTS="/home/cadams/Polaris/NEXT_SparseEventID/output/repr_mb8192-lr1e-3-smallerAug/checkpoints/epoch\=55-step\=3800.ckpt"
-echo $WEIGHTS
 
-mpiexec -n ${NRANKS} -ppn ${NRANKS_PER_NODE} --cpu-bind=numa \
-python bin/exec.py \
---config-name supervised_eventID \
-mode=train \
-mode.weights_location=${WEIGHTS} \
-mode.optimizer.lr_schedule.peak_learning_rate=0.0003 \
-run.distributed=True \
-run.id=${run_id} \
-framework.oversubscribe=1 \
-run.minibatch_size=${GLOBAL_BATCH_SIZE} \
-run.length=150
+WEIGHT_PREFIX=/home/cadams/Polaris/NEXT_SparseEventID/output/
 
-# data.image_key=lr_hits \
+
+
+i=1
+n=2
+for OPT in lamb adam;
+do 
+    for LR in 3e-1 3e-2 3e-3 3e-4;
+    do
+
+        weight_id=repr_mb8192-${OPT}-${LR}
+        checkpoint=$(ls ${WEIGHT_PREFIX}/${weight_id}/checkpoints)
+        echo "Checkpoint: ${checkpoint}"
+
+        WEIGHTS=${WEIGHT_PREFIX}/${weight_id}/checkpoints/${checkpoint}
+        echo "Weights: ${WEIGHTS//=/\\=}"
+
+        run_id=repr_class_mb${GLOBAL_BATCH_SIZE}-${OPT}-${LR}
+        echo $run_id
+
+        let "LOCAL_RANKS=${n}*${NRANKS_PER_NODE}"
+        echo $LOCAL_RANKS
+        LOCAL_BATCH_SIZE=256
+        # let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}"
+        let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${LOCAL_RANKS}"
+
+        echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
+
+
+        mpiexec -n ${NRANKS} -ppn ${NRANKS_PER_NODE} --cpu-bind=numa \
+        --cpu-bind list:${CPU_AFFINITY} \
+        python bin/exec.py \
+        --config-name supervised_eventID \
+        mode=train \
+        mode.weights_location=${WEIGHTS//=/\\=} \
+        mode.optimizer.lr_schedule.peak_learning_rate=0.0003 \
+        run.distributed=True \
+        run.id=${run_id} \
+        framework.oversubscribe=4 \
+        run.minibatch_size=${GLOBAL_BATCH_SIZE} \
+        run.length=25
+
+    done    
+done
