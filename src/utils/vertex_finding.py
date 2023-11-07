@@ -113,7 +113,7 @@ class vertex_learning(pl.LightningModule):
             'loss/anchor_loss' : anchor_loss,
             'loss/regression_loss' : regression_loss,
             'loss/event_loss'  : event_loss,
-            'opt/lr' : self.optimizers().state_dict()['param_groups'][0]['lr']
+            # 'opt/lr' : self.optimizers().state_dict()['param_groups'][0]['lr']
         }
 
 

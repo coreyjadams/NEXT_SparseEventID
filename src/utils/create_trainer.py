@@ -14,7 +14,7 @@ class OversubscribeMPI(MPIEnvironment):
         lr = super().local_rank()
         return lr // self.os
 
-def train(args, lightning_model, datasets):
+def create_trainer(args, lightning_model, datasets):
 
     from src.config import Precision
 
@@ -122,6 +122,11 @@ def train(args, lightning_model, datasets):
     if args.name == "unsupervised_eventID":
         lightning_model.prefit_distribution(datasets["train"].dataset.ds.energy)
 
+    if 'optimizer' in args.mode:
+        accum_grad_batches = args.mode.optimizer.gradient_accumulation
+    else:
+        accum_grad_batches = 1
+
     trainer = pl.Trainer(
         accelerator             = args.run.compute_mode.name.lower(),
         default_root_dir        = args.output_dir,
@@ -133,12 +138,14 @@ def train(args, lightning_model, datasets):
         log_every_n_steps       = 1,
         max_epochs              = args.run.length,
         # plugins                 = plugins,
-        accumulate_grad_batches = args.mode.optimizer.gradient_accumulation,
+        accumulate_grad_batches = accum_grad_batches,
         val_check_interval      = 10,
         check_val_every_n_epoch = None,
         limit_val_batches       = 1,
         callbacks               = [model_checkpoint],
     )
+
+    return trainer, lightning_model, checkpoint_path
 
     # Try to load the model from a checkpoint:
 
@@ -150,9 +157,3 @@ def train(args, lightning_model, datasets):
 
     # lightning_model.load_from_checkpoint(args.output_dir + "/checkpoints/")
 
-    trainer.fit(
-        lightning_model,
-        train_dataloaders= datasets["train"],
-        val_dataloaders  = datasets["val"],
-        ckpt_path        = checkpoint_path
-    )

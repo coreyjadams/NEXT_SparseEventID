@@ -202,9 +202,37 @@ class exec(object):
 
         self.make_trainer()
 
-        from src.utils.create_trainer import train
+        from src.utils import create_trainer
 
-        train(self.args, self.trainer, self.datasets)
+        trainer, model, checkpoint_path = create_trainer(self.args, self.trainer, self.datasets)
+
+        trainer.fit(
+            model,
+            train_dataloaders= self.datasets["train"],
+            val_dataloaders  = self.datasets["val"],
+            ckpt_path        = checkpoint_path
+        )
+
+
+    def inference(self):
+        logger = logging.getLogger("NEXT")
+
+
+        logger.info("Running Inference")
+
+        self.make_trainer()
+
+        from src.utils import create_trainer
+
+
+        trainer, model, checkpoint_path = create_trainer(self.args, self.trainer, self.datasets)
+
+        trainer.validate(
+            model,
+            dataloaders  = self.datasets["val"],
+            ckpt_path    = checkpoint_path
+        )
+
 
     def iotest(self):
 
