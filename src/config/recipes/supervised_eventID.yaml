@@ -11,7 +11,7 @@ data:
   transform2: False
 
 head:
-  layers: [128, 2]
+  layers: [2,]
     # - 128
     # - 128
     # - 64

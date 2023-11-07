@@ -308,20 +308,35 @@ class vertex_learning(pl.LightningModule):
 
         anchor_prediction = prediction[:,0,:,:,:]
         anchor_labels = vertex_labels["anchor"]
+            
 
+        # print("Anchor prediction: ", anchor_prediction.shape)
+        # print("anchor_prediction[0]: ", anchor_prediction[0])
+        # print("anchor_labels[0]: ", anchor_labels[0])
         # Compute the loss:
         anchor_loss = torch.nn.functional.binary_cross_entropy(
             anchor_prediction, anchor_labels, reduction="none")
-        focus = (anchor_prediction - anchor_labels)**4
+
+        # print(anchor_loss.shape)
+        # print("anchor_loss[0]: ", anchor_loss[0])
+
+
+        focus = (anchor_prediction - anchor_labels)**2
+
+        # print("focus.shape: ", focus.shape)
+        # print("focus[0]: ", focus[0])
+
         # Sum over images; average over batch dimensions
         batch_size = anchor_loss.shape[0]
         anchor_loss = torch.reshape(anchor_loss*focus, (batch_size,-1))
-        # Sum over entire images, but not the batch:
-        anchor_loss = torch.sum(anchor_loss, dim=1)
+        
 
-        # We want to take the mean over the batch, but weighing the two categories
-        # differently.  The dataset is about 90% bkg and 10% signal.
-        # We want to use weights so that w_bkg * 0.9 + w_sig * 0.1 = 1
+        # print("Final anchor_loss.shape: ", anchor_loss.shape)
+        # print("Final anchor_loss[0]: ", anchor_loss[0])
+        
+        # Sum over entire images, but not the batch:
+        # anchor_loss = torch.sum(anchor_loss, dim=1)
+        # exit()
         anchor_loss = torch.mean(anchor_loss)
 
         # For the regression loss, it's actually easy to calculate.
@@ -346,7 +361,7 @@ class vertex_learning(pl.LightningModule):
         # Finally, for the label loss, we can compute it like regression:
         # We compute for every box, and scale by the anchor value
 
-        event_prediction = prediction[:,1,:,:,:]
+        event_prediction = prediction[:,1,:,:,:].detach()
         # Add 3 dimensions to the label to broadcast:
         event_label = vertex_labels['class'].reshape((-1,1,1,1))
 

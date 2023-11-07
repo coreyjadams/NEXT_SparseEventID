@@ -23,13 +23,23 @@ def build_networks(params, input_shape):
 
     for layer in params.head.layers:
         yolo_head.append(
-            Block(
+            ResidualBlock(
                 nIn  = current_number_of_filters,
-                nOut = layer,
+                nOut = current_number_of_filters,
                 params = params.encoder
             )
         )
-        current_number_of_filters = layer
+        current_number_of_filters = current_number_of_filters
+
+    # THe yolo head needs one final conversion to the right shape:
+    yolo_head.append(
+            Block(
+                nIn  = current_number_of_filters,
+                nOut = layer,
+                params = params.encoder,
+                activation = lambda x: x,
+            )
+    )
 
 
     yolo_head.append(torch.nn.Sigmoid())
