@@ -23,7 +23,7 @@ class Norm(Enum):
 
 @dataclass
 class Representation:
-    normalization:        Norm         = Norm.batch
+    normalization:        Norm         = Norm.group
     bias:                 bool         = True
     blocks_per_layer:     int          = 4
     residual:             bool         = True
@@ -32,7 +32,7 @@ class Representation:
     downsampling:         DownSampling = DownSampling.convolutional
     depth:                int          = 3
     n_initial_filters:    int          = 32
-    n_output_filters:     int          = 256
+    n_output_filters:     int          = 128
 
 @dataclass
 class ClassificationHead:
