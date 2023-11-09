@@ -124,8 +124,10 @@ def create_trainer(args, lightning_model, datasets):
 
     if 'optimizer' in args.mode:
         accum_grad_batches = args.mode.optimizer.gradient_accumulation
+        limit_val_batches = 1
     else:
         accum_grad_batches = 1
+        limit_val_batches = 10
 
     trainer = pl.Trainer(
         accelerator             = args.run.compute_mode.name.lower(),
@@ -141,7 +143,7 @@ def create_trainer(args, lightning_model, datasets):
         accumulate_grad_batches = accum_grad_batches,
         val_check_interval      = 10,
         check_val_every_n_epoch = None,
-        limit_val_batches       = 1,
+        limit_val_batches       = limit_val_batches,
         callbacks               = [model_checkpoint],
     )
 
