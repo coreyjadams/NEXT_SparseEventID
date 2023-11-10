@@ -1,5 +1,5 @@
 import numpy
-
+import torch_geometric
 '''
 This is a torch-free file that exists to massage data
 From sparse to dense or dense to sparse, etc.
@@ -82,101 +82,9 @@ def larcvsparse_to_dense_3d(input_array, dense_shape):
     return output_array
 
 
+import torch
 
-def form_yolo_targets(vertex_depth, vertex_labels, particle_labels, event_labels, dataformat, image_meta, ds):
-
-    batch_size = event_labels.shape[0]
-    event_energy = particle_labels['_energy_init'][:,0]
-
-    # Vertex comes out with shape [batch_size, channels, max_boxes, 2*ndim (so 4, in this case)]
-    image_shape = [ int(i /ds) for i in image_meta['full_pixels'][0] ]
-
-    vertex_labels = vertex_labels[:,:,0,0:2]
-    # The data gets loaded in (W, H) format and we need it in (H, W) format.:
-    vertex_labels[:,:,[0,1]] = vertex_labels[:,:,[1,0]]
-
-
-    # First, determine the dimensionality of the output space of the vertex yolo network:
-    vertex_output_space =tuple(d // 2**vertex_depth  for d in image_shape )
-
-
-    if dataformat == DataFormatKind.channels_last:
-        # print(vertex_labels.shape)
-        vertex_labels = numpy.transpose(vertex_labels,(0,2,1))
-        origin = numpy.transpose(image_meta["origin"])
-        size   = numpy.transpose(image_meta["size"])
-        vertex_presence_labels = numpy.zeros((batch_size,) + vertex_output_space + (3,), dtype="float32")
-        vertex_output_space_a  = numpy.reshape(numpy.asarray(vertex_output_space), (2,1))
-    else:
-        # Nimages, 3 planes, shape-per-plane
-        vertex_presence_labels = numpy.zeros((batch_size, 3,) + vertex_output_space, dtype="float32")
-        origin = image_meta["origin"]
-        size   = image_meta["size"]
-        vertex_output_space_a  = numpy.asarray(vertex_output_space)
-
-    n_pixels_vertex = 2**vertex_depth
-
-
-    # To create the right bounding box location, we have to map the vertex x/z/y to a set of pixels.
-    corrected_vertex_position = vertex_labels - origin
-    fractional_vertex_position = corrected_vertex_position / size
-
-    # print(vertex_output_space.shape)
-    vertex_output_space_anchor_box_float = vertex_output_space_a * fractional_vertex_position
-
-    vertex_output_space_anchor_box = vertex_output_space_anchor_box_float.astype("int")
-
-
-    # This part creates indexes into the presence labels values:
-    batch_index = numpy.arange(batch_size).repeat(3) # 3 for 3 planes
-    plane_index = numpy.tile(numpy.arange(3), batch_size) # Tile 3 times for 3 planes
-
-    if dataformat == DataFormatKind.channels_last:
-        h_index = numpy.concatenate(vertex_output_space_anchor_box[:,0,:])
-        w_index = numpy.concatenate(vertex_output_space_anchor_box[:,1,:])
-    else:
-        h_index = numpy.concatenate(vertex_output_space_anchor_box[:,:,0])
-        w_index = numpy.concatenate(vertex_output_space_anchor_box[:,:,1])
-
-    if dataformat == DataFormatKind.channels_last:
-        vertex_presence_labels[batch_index, h_index, w_index, plane_index] = 1.0
-    else:
-        vertex_presence_labels[batch_index, plane_index, h_index, w_index] = 1.0
-
-
-
-    # Finally, we should exclude any event that is labeled "cosmic only" from having a vertex
-    # truth label:
-    cosmics = event_labels == 3
-    vertex_presence_labels[cosmics,:,:,:] = 0.0
-
-
-
-
-    # Now, compute the location inside of an achor box for x/y.
-    # Normalize to (0,1)
-
-    bounding_box_location = vertex_output_space_anchor_box_float - vertex_output_space_anchor_box
-
-    bounding_box_location = bounding_box_location.astype("float32")
-
-    if dataformat == DataFormatKind.channels_last:
-        vertex_presence_labels = numpy.split(vertex_presence_labels, 3, axis=-1)
-        vertex_presence_labels = [v.reshape((batch_size, ) + vertex_output_space) for v in vertex_presence_labels]
-    else:
-        vertex_presence_labels = numpy.split(vertex_presence_labels, 3, axis=1)
-        vertex_presence_labels = [v.reshape((batch_size, ) + vertex_output_space) for v in vertex_presence_labels]
-
-
-    return {
-        "detection"  : vertex_presence_labels,
-        "regression" : bounding_box_location,
-        "energy"     : event_energy,
-        "xy_loc"     : vertex_labels,
-    }
-
-
-def larcvsparse_to_pytorch_geometric(input_array):
+def larcvsparse_to_pytorch_geometric(input_array, image_meta):
 
     # Need to create node features and an adjacency matrix.
     # Define points as connected if they fall within some radius R
@@ -189,22 +97,68 @@ def larcvsparse_to_pytorch_geometric(input_array):
     
     batch_size = input_array.shape[0]
 
-    # output_array = numpy.zeros((batch_size, 1, 45, 45, 275), dtype=numpy.float32)
-    x_coords   = input_array[:,0,:,0]
-    y_coords   = input_array[:,0,:,1]
-    z_coords   = input_array[:,0,:,2]
-    val_coords = input_array[:,0,:,3]
+    # # output_array = numpy.zeros((batch_size, 1, 45, 45, 275), dtype=numpy.float32)
+    # x_coords   = input_array[:,0,:,0]
+    # y_coords   = input_array[:,0,:,1]
+    # z_coords   = input_array[:,0,:,2]
+    # val_coords = input_array[:,0,:,3]
 
+    # print("val_coords.shape", val_coords.shape)
+    # # Find the non_zero indexes of the input:
+    # batch_index, voxel_index = numpy.where(val_coords != -999)
 
-    # Find the non_zero indexes of the input:
-    batch_index, voxel_index = numpy.where(val_coords != -999)
+    # values  = val_coords[batch_index, voxel_index]
+    # x_index = numpy.int32(x_coords[batch_index, voxel_index])
+    # y_index = numpy.int32(y_coords[batch_index, voxel_index])
+    # z_index = numpy.int32(z_coords[batch_index, voxel_index])
 
-    values  = val_coords[batch_index, voxel_index]
-    x_index = numpy.int32(x_coords[batch_index, voxel_index])
-    y_index = numpy.int32(y_coords[batch_index, voxel_index])
-    z_index = numpy.int32(z_coords[batch_index, voxel_index])
+    # print(batch_index)
+    # print(voxel_index)
 
+    # print(x_index)
 
-    print(values.shape)
-    print(x_index.shape)
-    exit()
+    voxel_size = image_meta['size'] / image_meta['n_voxels']
+
+    graph_data = []
+
+    # Doing this an inefficent way but at least it is working!
+    for i in range(batch_size):
+        # What index of the input data is this batch?
+        this_batch_data = input_array[i,0]
+        batch_values = this_batch_data[:,3]
+
+        # Which of this data are valid?
+        active_index = numpy.where(batch_values != -999)[0]
+        
+        # Select the data:
+        active_data = this_batch_data[active_index, :]
+        xyz = active_data[:,0:3] * voxel_size + image_meta['origin']
+
+        # r = numpy.sqrt(numpy.sum(xyz**2, axis=-1))
+        # What is the displacement between each active site?
+        edge_displacements = xyz.reshape(-1,1,3) - xyz.reshape(1,-1,3)
+
+        # Compute that as a magnitude:
+        r = numpy.sqrt(numpy.sum(edge_displacements**2, axis=-1))
+        row, col = numpy.where(r < 25)
+        edge_index = numpy.stack([row,col])
+
+        edge_attr = numpy.concatenate([
+            r[row,col].reshape(-1,1), 
+            edge_displacements[row, col,:]
+        ], axis=-1)
+        graph_data.append(
+            torch_geometric.data.Data(
+                x          = torch.tensor(active_data).reshape((-1,4)),
+                # x          = torch.tensor(active_data[:,3]).reshape((-1,1)),
+                edge_index = torch.tensor(edge_index),
+                edge_attr  = torch.tensor(edge_attr),
+                pos        = torch.tensor(xyz),
+            )
+        )
+
+    batch = torch_geometric.data.Batch.from_data_list(graph_data)
+
+    return batch
+
+    

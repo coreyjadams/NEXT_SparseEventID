@@ -5,7 +5,7 @@ from . import data_transforms
 from src.config.framework import DataMode
 
 import numpy
-
+import torch
 
 # Functional programming approach to building up the dataset objects:
 
@@ -325,7 +325,7 @@ class larcv_dataset(object):
         self.larcv_interface = larcv_interface
         self.data_args       = data_args
         self.storage_name    = name
-        self.batch_keys      = batch_keys + ['entries', 'event_ids']
+        self.batch_keys      = batch_keys + ['entries']
         # self.vertex_depth    = vertex_depth
         # self.event_id        = event_id
         self.data_mode       = data_mode
@@ -408,52 +408,47 @@ class larcv_dataset(object):
             batch_size = minibatch_data['vertex'].shape[0]
             minibatch_data['vertex'] = minibatch_data['vertex'].reshape([batch_size, 6])
             minibatch_data['vertex'] = minibatch_data['vertex'][:,0:3]
-            # # Put together the YOLO labels:
-            # minibatch_data["vertex"]  = data_transforms.form_yolo_targets(
-            #     self.encoder.depth,
-            #     minibatch_data["vertex"],
-            #     minibatch_data["particle"],
-            #     minibatch_data["label"],
-            #     self.image_meta,
-            #     downsample_level)
+ 
 
         # Purge unneeded keys:
         minibatch_data = {
             key : minibatch_data[key] for key in minibatch_data if key in self.batch_keys
         }
 
+
         # Shape the images:
 
-
-        if self.data_mode == DataMode.dense:
-            for key in self.batch_keys:
-                if "lr_hits" in key:
+        for key in self.batch_keys:
+            if key == "event_ids": continue
+            if "lr_hits" in key:
+                if self.data_mode == DataMode.dense:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_dense_3d(
                         minibatch_data[key],
                         dense_shape = self.lr_meta['n_voxels'][0],
                     )
-                if "pmaps" in key or "chits" in key or "voxels" in key:
+                elif self.data_mode == DataMode.graph:
+                    minibatch_data[key]  = data_transforms.larcvsparse_to_pytorch_geometric(
+                        minibatch_data[key],
+                        image_meta = self.lr_meta
+                    )
+                else:
+                    minibatch_data[key]  = data_transforms.larcvsparse_to_scnsparse_3d(
+                        minibatch_data[key])
+            elif "pmaps" in key or "chits" in key or "voxels" in key:
+                if self.data_mode == DataMode.dense:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_dense_3d(
                         minibatch_data[key],
                         dense_shape = self.pmaps_meta['n_voxels'][0],
                     )
-        elif self.data_mode == DataMode.graph:
-            for key in self.batch_keys:
-                if "lr_hits" in key:
+                elif self.data_mode == DataMode.graph:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_pytorch_geometric(
-                        minibatch_data[key])
-                if "pmaps" in key or "chits" in key or "voxels" in key:
-                    minibatch_data[key]  = data_transforms.larcvsparse_to_pytorch_geometric(
-                        minibatch_data[key])
-
-        else:
-            for key in self.batch_keys:
-                if "lr_hits" in key:
+                        minibatch_data[key],
+                        image_meta = self.pmaps_meta
+                    )
+                else:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_scnsparse_3d(
                         minibatch_data[key])
-                if "pmaps" in key or "chits" in key or "voxels" in key:
-                    minibatch_data[key]  = data_transforms.larcvsparse_to_scnsparse_3d(
-                        minibatch_data[key])
-
+            else:
+                minibatch_data[key] = torch.tensor(minibatch_data[key])
 
         return minibatch_data

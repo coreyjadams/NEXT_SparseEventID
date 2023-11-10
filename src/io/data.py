@@ -15,6 +15,8 @@ from torch.utils import data
 import warnings
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
 
+from src.config.framework import DataMode 
+
 class TorchLarcvDataset(data.IterableDataset):
 
     def __init__(self, larcv_dataset, global_batch_size):
@@ -74,7 +76,7 @@ def custom_convert(data, device):
         return data
 
 
-def create_torch_larcv_dataloader(larcv_ds, global_batch_size, device=None):
+def create_torch_larcv_dataloader(larcv_ds, global_batch_size, data_mode, device=None):
 
     ids =  TorchLarcvDataset(larcv_ds, global_batch_size)
 
@@ -83,12 +85,19 @@ def create_torch_larcv_dataloader(larcv_ds, global_batch_size, device=None):
     else:
         target_collate_fn = data.default_convert
 
-    torch_dl = data.DataLoader(ids,
-        num_workers    = 0,
-        batch_size    = None,
-        batch_sampler = None,
-        pin_memory    = False,
-        collate_fn    = target_collate_fn
-    )
+    if data_mode == DataMode.graph:
+        import torch_geometric
+        torch_dl = torch_geometric.loader.DataLoader(
+            ids, 
+            # exclude_keys = ["event_ids",]
+        )
+    else:
+        torch_dl = data.DataLoader(ids,
+            num_workers    = 0,
+            batch_size    = None,
+            batch_sampler = None,
+            pin_memory    = False,
+            collate_fn    = target_collate_fn
+        )
 
     return torch_dl

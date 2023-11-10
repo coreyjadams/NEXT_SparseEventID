@@ -50,6 +50,7 @@ defaults = [
     {"mode"      : "train"},
     {"data"      : "mc_tl208"},
     {"framework" : "lightning"},
+    {"encoder"   : "convnet"}
 ]
 
 @dataclass
@@ -61,7 +62,7 @@ class LearnRepresentation:
     mode:       Mode      = MISSING
     data:       Data      = MISSING
     framework:  Framework = MISSING
-    encoder:    Representation = field(default_factory= lambda : Representation())
+    encoder:    Representation = MISSING
     head:       ClassificationHead = field(default_factory= lambda : ClassificationHead())
     output_dir: str       = "output/"
     name:       str       = "simclr"
@@ -77,7 +78,7 @@ class DetectVertex:
     mode:       Mode      = MISSING
     data:       Data      = MISSING
     framework:  Framework = MISSING
-    encoder:    Representation = field(default_factory= lambda : Representation())
+    encoder:    Representation = MISSING
     head:       YoloHead  = field(default_factory= lambda : YoloHead())
     output_dir: str       = "output/"
     name:       str       = "yolo"
@@ -92,7 +93,7 @@ class SupervisedClassification:
     mode:       Mode      = MISSING
     data:       Data      = MISSING
     framework:  Framework = MISSING
-    encoder:    Representation = field(default_factory= lambda : Representation())
+    encoder:    Representation = MISSING
     head:       ClassificationHead = field(default_factory= lambda : ClassificationHead())
     output_dir: str       = "output/"
     name:       str       = "supervised_eventID"
@@ -106,7 +107,7 @@ class UnsupervisedClassification:
     mode:       Mode      = MISSING
     data:       Data      = MISSING
     framework:  Framework = MISSING
-    encoder:    Representation = field(default_factory= lambda : Representation())
+    encoder:    Representation = MISSING
     head:       ClassificationHead = field(default_factory= lambda : ClassificationHead())
     output_dir: str       = "output/"
     name:       str       = "unsupervised_eventID"

@@ -169,8 +169,11 @@ class exec(object):
             # print(labels)
 
             ds.update({
-                active :  create_torch_larcv_dataloader(larcv_ds,
-                    self.args.run.minibatch_size)
+                active :  create_torch_larcv_dataloader(
+                    larcv_ds,
+                    self.args.run.minibatch_size,
+                    self.args.framework.mode,
+                )
             })
             # Get the image size:
             spatial_size = larcv_ds.image_size(self.args.data.image_key)

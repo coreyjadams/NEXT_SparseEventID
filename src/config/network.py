@@ -2,7 +2,7 @@ from enum import Enum
 
 from dataclasses import dataclass, field
 from hydra.core.config_store import ConfigStore
-from typing import Tuple, Any
+from typing import Tuple, Any, List
 from omegaconf import MISSING
 
 
@@ -20,19 +20,35 @@ class Norm(Enum):
     layer = 2
     group = 3
 
-
 @dataclass
 class Representation:
+    depth:           int = 4
+    n_initial_filters:    int          = 32
+    n_output_filters:     int          = 128
+    weight_decay:         float        = 0.00
+
+
+
+@dataclass
+class ConvRepresentation(Representation):
     normalization:        Norm         = Norm.group
     bias:                 bool         = True
     blocks_per_layer:     int          = 4
     residual:             bool         = True
-    weight_decay:         float        = 0.00
     growth_rate:          GrowthRate   = GrowthRate.additive
     downsampling:         DownSampling = DownSampling.convolutional
-    depth:                int          = 3
-    n_initial_filters:    int          = 32
-    n_output_filters:     int          = 128
+
+
+@dataclass
+class MLPConfig():
+    layers:     List[int] = field(default_factory=lambda: [16,])
+    bias:            bool = True
+
+@dataclass
+class GraphRepresentation(Representation):
+    mlp_config: MLPConfig = field(default_factory= lambda : MLPConfig(layers=[32,32]))
+    graph_layer:      str = "GINConv"
+
 
 @dataclass
 class ClassificationHead:
@@ -43,6 +59,7 @@ class YoloHead:
     layers: Tuple[int] = field(default_factory=list)
 
 cs = ConfigStore.instance()
-cs.store(group="network", name="representation", node=Representation)
-cs.store(group="network", name="classification", node=ClassificationHead)
-cs.store(group="network", name="yolo",           node=YoloHead)
+cs.store(group="encoder", name="convnet",        node=ConvRepresentation)
+cs.store(group="encoder", name="gnn",            node=GraphRepresentation)
+cs.store(group="head", name="classification", node=ClassificationHead)
+cs.store(group="head", name="yolo",           node=YoloHead)
