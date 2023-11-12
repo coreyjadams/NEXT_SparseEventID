@@ -16,7 +16,7 @@ class MLP(torch.nn.Module):
 
         for n_out in params.layers:
             self.layers.append(torch.nn.Linear(n_in, n_out, bias=params.bias))
-            self.layers.append(torch.nn.LeakyReLU())
+            self.layers.append(torch.nn.Tanh())
             n_in = n_out
 
     def forward(self, x):

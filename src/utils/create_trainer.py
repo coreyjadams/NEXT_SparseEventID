@@ -68,7 +68,7 @@ def create_trainer(args, lightning_model, datasets):
     else:
         from pytorch_lightning.strategies import SingleDeviceStrategy
         plugins   = []
-        strategy  = SingleDeviceStrategy()
+        strategy  = SingleDeviceStrategy(f"{args.run.compute_mode.name.lower()}:0")
         devices   = 1
         num_nodes = 1
 

@@ -54,10 +54,9 @@ class supervised_eventID(pl.LightningModule):
 
 
         representation = self.encoder(batch)
-        print(representation)
         # logits = representation
         logits = self.head(representation)
-        print(logits)
+
         return logits
 
 
