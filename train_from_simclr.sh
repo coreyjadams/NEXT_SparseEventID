@@ -1,8 +1,8 @@
 #!/bin/bash -l
-#PBS -l select=3:system=polaris
+#PBS -l select=1:system=polaris
 #PBS -l place=scatter
 #PBS -l walltime=1:00:00
-#PBS -q debug-scaling
+#PBS -q debug
 #PBS -A datascience
 #PBS -l filesystems=home:grand
 
@@ -60,27 +60,30 @@ WEIGHT_PREFIX=/home/cadams/Polaris/NEXT_SparseEventID/output/
 
 
 i=1
-n=2
-for OPT in lamb adam;
+n=1
+for OPT in adam lamb novograd;
 do 
     for LR in 3e-1 3e-2 3e-3 3e-4;
     do
 
-        weight_id=repr_mb8192-${OPT}-${LR}
+        weight_id=repr-128_mb4096-${OPT}-${LR}
         checkpoint=$(ls ${WEIGHT_PREFIX}/${weight_id}/checkpoints)
         echo "Checkpoint: ${checkpoint}"
 
         WEIGHTS=${WEIGHT_PREFIX}/${weight_id}/checkpoints/${checkpoint}
         echo "Weights: ${WEIGHTS//=/\\=}"
 
-        run_id=repr_class_mb${GLOBAL_BATCH_SIZE}-${OPT}-${LR}
-        echo $run_id
+
 
         let "LOCAL_RANKS=${n}*${NRANKS_PER_NODE}"
         echo $LOCAL_RANKS
         LOCAL_BATCH_SIZE=256
         # let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}"
         let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${LOCAL_RANKS}"
+
+
+        run_id=repr_class_mb${GLOBAL_BATCH_SIZE}-${OPT}-${LR}
+        echo $run_id
 
         echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
 
@@ -91,6 +94,8 @@ do
         --config-name supervised_eventID \
         mode=train \
         mode.weights_location=${WEIGHTS//=/\\=} \
+        mode.optimizer.loss_balance_scheme=focal \
+        mode.optimizer.kind=rmsprop \
         mode.optimizer.lr_schedule.peak_learning_rate=0.0003 \
         run.distributed=True \
         run.id=${run_id} \

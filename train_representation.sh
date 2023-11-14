@@ -4,7 +4,7 @@
 #PBS -l walltime=3:00:00
 #PBS -q prod
 #PBS -A datascience
-#PBS -l filesystems=home:grand
+#PBS -l filesystems=home:eagle
 
 
 # What's the cosmic tagger work directory?
@@ -70,27 +70,27 @@ export OMP_NUM_THREADS=4
 
 i=1
 n=2
-# for OPT in lamb;
+# for OPT in novograd;
 for OPT in lamb adam novograd;
 do 
-    # for LR in 3e-1;
+    # for LR in 3e-2 3e-3;
     for LR in 3e-1 3e-2 3e-3 3e-4;
     do
+
+
+        let "LOCAL_RANKS=${n}*${NRANKS_PER_NODE}"
+        echo $LOCAL_RANKS
+        LOCAL_BATCH_SIZE=128
+        let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${LOCAL_RANKS}"
+
+        echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
 
         hosts=$(cat $PBS_NODEFILE | tail -n +$i | head -n 2)
         hosts=$(echo ${hosts} | tr -s " " ",")
         echo $hosts
         echo ""
-        run_id=repr-sigmoid_mb${GLOBAL_BATCH_SIZE}-${OPT}-${LR}
+        run_id=repr-mb${GLOBAL_BATCH_SIZE}-${OPT}-${LR}
         echo $run_id
-
-        let "LOCAL_RANKS=${n}*${NRANKS_PER_NODE}"
-        echo $LOCAL_RANKS
-        LOCAL_BATCH_SIZE=256
-        let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${LOCAL_RANKS}"
-
-        echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
-
 
         mpiexec -n ${LOCAL_RANKS} -ppn ${NRANKS_PER_NODE} \
         --hosts ${hosts} \

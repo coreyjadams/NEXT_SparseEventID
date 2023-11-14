@@ -11,17 +11,26 @@
 WORK_DIR=/home/cadams/Polaris/NEXT_SparseEventID
 cd ${WORK_DIR}
 
+OVERSUBSCRIBE=4
 
 # MPI and OpenMP settings
 NNODES=`wc -l < $PBS_NODEFILE`
-NRANKS_PER_NODE=4
+
+let NRANKS_PER_NODE=4*${OVERSUBSCRIBE}
+
 
 let NRANKS=${NNODES}*${NRANKS_PER_NODE}
 
+
+# Turn on MPS:
+# (on every rank!!)
+mpiexec -n ${NNODES} -ppn 1 nvidia-cuda-mps-control -d
+
+
 # NRANKS=1
-LOCAL_BATCH_SIZE=24
-# let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${NRANKS}
-let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}
+LOCAL_BATCH_SIZE=128
+let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${NRANKS}
+# let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}
 
 echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
 
@@ -38,24 +47,32 @@ module load cray-hdf5/1.12.1.3
 export NCCL_COLLNET_ENABLE=1
 export NCCL_NET_GDR_LEVEL=PHB
 
-LOSS_BALANCE=even
-OPT=lamb
+OPT=adam
 NORM=batch
+LR=3e-3
 
-run_id=yolo-supervised_ID_mk_mb${GLOBAL_BATCH_SIZE}-${LOSS_BALANCE}-${OPT}-${NORM}-depth3-bench
+run_id=yolo-supervised_ID_mk_mb${GLOBAL_BATCH_SIZE}-${OPT}-${NORM}-${LR}
 
-# mpiexec -n ${NRANKS} -ppn ${NRANKS_PER_NODE} --cpu-bind=numa \
-time \
+
+# For OVERSUBSCRIBE=4:
+CPU_AFFINITY="24-25,56-57:26-27,58-59:28-29,60-61:30-31,62-63"
+CPU_AFFINITY="${CPU_AFFINITY}:16-17,48-49:18-19,50-51:20-21,52-53:22-23,54-55"
+CPU_AFFINITY="${CPU_AFFINITY}:8-9,40-41:10-11,42-43:12-13,44-45:14-15,46-47"
+CPU_AFFINITY="${CPU_AFFINITY}:0-1,32-33:2-3,34-35:4-5,36-37:6-7,38-39"
+export OMP_NUM_THREADS=4
+
+
+# mpiexec -n ${NRANKS} -ppn ${NRANKS_PER_NODE} \
+# --cpu-bind=list:${CPU_AFFINITY} \
 python bin/exec.py \
 --config-name yolo \
-mode=train \
-framework.oversubscribe=1 \
+mode=inference \
+framework.oversubscribe=${OVERSUBSCRIBE} \
 run.distributed=True \
 run.id=${run_id} \
 run.minibatch_size=${GLOBAL_BATCH_SIZE} \
-mode.optimizer.loss_balance_scheme=${LOSS_BALANCE} \
-mode.optimizer.lr_schedule.peak_learning_rate=3e-1 \
-mode.optimizer.name=${OPT} \
-output_dir=output-test \
-run.length=1
+output_dir=output \
+run.length=500
+# mode.optimizer.lr_schedule.peak_learning_rate=${LR} \
+# mode.optimizer.name=${OPT} \
 

@@ -129,7 +129,7 @@ class Encoder(torch.nn.Module):
         x = self.pool(x)
 
         # Normalize the output features?
-        # x = torch.sigmoid(x)
+        x = torch.tanh(x)
 
         return x
 

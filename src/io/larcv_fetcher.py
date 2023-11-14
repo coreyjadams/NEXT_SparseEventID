@@ -81,8 +81,8 @@ def prepare_next_config(batch_size, input_file, data_args, name,
             producer = producer_name,
             process  = "Normalize",
             OutputProducer = producer_name,
-            Mean = 10.0,
-            Std = 1.0
+            Mean = 1.0,
+            Std = 0.5
         )
 
 
@@ -144,10 +144,10 @@ def prepare_next_config(batch_size, input_file, data_args, name,
 
 
     if data_args.transform1:
-        out_key = data_args.image_key + "_1"
+        out_key = producer_name + "_1"
         add_augment_chain(cb,
             datatype   = "sparse3d",
-            producer   = data_args.image_key,
+            producer   = producer_name,
             output_key = out_key
         )
         # Get the pmaps:
@@ -165,11 +165,11 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         })
 
     if data_args.transform2:
-        out_key = data_args.image_key + "_2"
+        out_key = producer_name + "_2"
 
         add_augment_chain(cb,
             datatype   ="sparse3d",
-            producer   = data_args.image_key,
+            producer   = producer_name,
             output_key = out_key
         )
         # Get the pmaps:
@@ -205,7 +205,7 @@ def add_augment_chain(config_builder, datatype, producer, output_key):
 
     config_builder.add_preprocess(
             datatype = datatype,
-            producer = output_key,
+            producer = producer,
             process  = "Mirror",
             Axes = [0,1,2],
             OutputProducer = output_key
@@ -216,7 +216,7 @@ def add_augment_chain(config_builder, datatype, producer, output_key):
             datatype = datatype,
             producer = output_key,
             process  = "GaussianBlur",
-            Sigma    = 0.0005,
+            Sigma    = 0.05,
             OutputProducer = output_key
         )
 
@@ -224,7 +224,7 @@ def add_augment_chain(config_builder, datatype, producer, output_key):
             datatype = datatype,
             producer = output_key,
             process  = "Translate",
-            MaxShiftPerAxis = [5, 5, 10],
+            MaxShiftPerAxis = [15, 15, 25],
             OutputProducer = output_key
         )
 

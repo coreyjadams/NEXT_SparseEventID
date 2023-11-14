@@ -22,16 +22,15 @@ class Norm(Enum):
 
 @dataclass
 class Representation:
-    depth:           int = 4
-    n_initial_filters:    int          = 32
-    n_output_filters:     int          = 128
-    weight_decay:         float        = 0.00
+    depth:             int   = 4
+    n_initial_filters: int   = 32
+    n_output_filters:  int   = 128
+    weight_decay:      float = 0.00
 
 
 
-@dataclass
 class ConvRepresentation(Representation):
-    normalization:        Norm         = Norm.group
+    normalization:        Norm         = Norm.batch
     bias:                 bool         = True
     blocks_per_layer:     int          = 4
     residual:             bool         = True
@@ -59,7 +58,7 @@ class YoloHead:
     layers: Tuple[int] = field(default_factory=list)
 
 cs = ConfigStore.instance()
-cs.store(group="encoder", name="convnet",        node=ConvRepresentation)
-cs.store(group="encoder", name="gnn",            node=GraphRepresentation)
+cs.store(group="encoder", name="convnet",     node=ConvRepresentation)
+cs.store(group="encoder", name="gnn",         node=GraphRepresentation)
 cs.store(group="head", name="classification", node=ClassificationHead)
 cs.store(group="head", name="yolo",           node=YoloHead)

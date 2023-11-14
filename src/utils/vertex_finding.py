@@ -38,6 +38,9 @@ class vertex_learning(pl.LightningModule):
 
         self.log_keys = ["loss"]
 
+        if self.args.mode.name == "inference":
+            self.metrics_file = None
+
     def on_train_start(self):
         self.optimizers().param_groups = self.optimizers()._optimizer.param_groups
 
@@ -220,7 +223,10 @@ class vertex_learning(pl.LightningModule):
         vertex_anchor_acc = true_vertex_loc == pred_vertex_loc
         vertex_anchor_acc = torch.mean(vertex_anchor_acc.to(torch.float32))
 
-        abs_vtx_res = torch.sqrt(torch.sum(vertex_resolution**2, dim=1))
+        vertex_displacement = torch.sqrt(torch.sum(vertex_resolution**2, dim=1))
+        vtx_5 = (vertex_displacement < 5.0).to(torch.float32)
+        vtx_10 = (vertex_displacement < 10.0).to(torch.float32)
+        vtx_20 = (vertex_displacement < 20.0).to(torch.float32)
 
         return {
             "acc/accuracy" : event_accuracy,
@@ -230,7 +236,10 @@ class vertex_learning(pl.LightningModule):
             "acc/vertex_x" : torch.mean(vertex_resolution[:,0]),
             "acc/vertex_y" : torch.mean(vertex_resolution[:,1]),
             "acc/vertex_z" : torch.mean(vertex_resolution[:,2]),
-            "acc/vertex"   : torch.mean(abs_vtx_res),
+            "acc/vertex"   : torch.mean(vertex_displacement),
+            "acc/vertex_5" : torch.mean(vtx_5),
+            "acc/vertex_10": torch.mean(vtx_10),
+            "acc/vertex_20": torch.mean(vtx_20),
 
         }
 
