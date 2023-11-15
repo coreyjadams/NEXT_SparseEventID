@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# Script outputs:
+*.sh.o*
+*.sh.e*
+output/
+
 # Distribution / packaging
 .Python
 build/

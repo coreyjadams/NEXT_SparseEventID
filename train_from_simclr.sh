@@ -1,10 +1,10 @@
 #!/bin/bash -l
-#PBS -l select=1:system=polaris
+#PBS -l select=3:system=polaris
 #PBS -l place=scatter
 #PBS -l walltime=1:00:00
-#PBS -q debug
+#PBS -q debug-scaling
 #PBS -A datascience
-#PBS -l filesystems=home:grand
+#PBS -l filesystems=home:eagle
 
 
 # What's the cosmic tagger work directory?
@@ -35,11 +35,11 @@ let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}
 echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
 
 # Set up software deps:
-module load conda/2022-09-08
+module load conda/2023-10-04
 conda activate
 
 # Add-ons from conda:
-source /home/cadams/Polaris/polaris_conda_2022-09-08-venv/bin/activate
+source /home/cadams/Polaris/polaris_conda_2023-10-04-venv/bin/activate
 
 module load cray-hdf5/1.12.1.3
 
@@ -63,7 +63,8 @@ i=1
 n=1
 for OPT in adam lamb novograd;
 do 
-    for LR in 3e-1 3e-2 3e-3 3e-4;
+    for LR in  3e-4;
+    # for LR in 3e-1 3e-2 3e-3 3e-4;
     do
 
         weight_id=repr-128_mb4096-${OPT}-${LR}
@@ -75,14 +76,15 @@ do
 
 
 
-        let "LOCAL_RANKS=${n}*${NRANKS_PER_NODE}"
+        let "LOCAL_RANKS=${NRANKS_PER_NODE}"
+        # let "LOCAL_RANKS=${n}*${NRANKS_PER_NODE}"
         echo $LOCAL_RANKS
         LOCAL_BATCH_SIZE=256
         # let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}"
         let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${LOCAL_RANKS}"
 
 
-        run_id=repr_class_mb${GLOBAL_BATCH_SIZE}-${OPT}-${LR}
+        run_id=repr_class-rmsprop_mb${GLOBAL_BATCH_SIZE}-${OPT}-${LR}
         echo $run_id
 
         echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
@@ -93,9 +95,10 @@ do
         python bin/exec.py \
         --config-name supervised_eventID \
         mode=train \
+        encoder=convnet \
         mode.weights_location=${WEIGHTS//=/\\=} \
         mode.optimizer.loss_balance_scheme=focal \
-        mode.optimizer.kind=rmsprop \
+        mode.optimizer.name=rmsprop \
         mode.optimizer.lr_schedule.peak_learning_rate=0.0003 \
         run.distributed=True \
         run.id=${run_id} \
@@ -105,3 +108,4 @@ do
 
     done    
 done
+# 

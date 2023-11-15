@@ -28,20 +28,22 @@ mpiexec -n ${NNODES} -ppn 1 nvidia-cuda-mps-control -d
 
 
 # NRANKS=1
-LOCAL_BATCH_SIZE=128
+LOCAL_BATCH_SIZE=512
 let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${NRANKS}
 # let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}
 
 echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
 
-# Set up software deps:
-module load conda/2022-09-08
-conda activate
+# # Set up software deps:
+# module load conda/2022-09-08
+# conda activate
 
-# Add-ons from conda:
-source /home/cadams/Polaris/polaris_conda_2022-09-08-venv/bin/activate
+# # Add-ons from conda:
+# source /home/cadams/Polaris/polaris_conda_2022-09-08-venv/bin/activate
 
-module load cray-hdf5/1.12.1.3
+# module load cray-hdf5/1.12.1.3
+
+source ~/SS11-flash-build/setup.sh
 
 # Env variables for better scaling:
 export NCCL_COLLNET_ENABLE=1
@@ -62,17 +64,25 @@ CPU_AFFINITY="${CPU_AFFINITY}:0-1,32-33:2-3,34-35:4-5,36-37:6-7,38-39"
 export OMP_NUM_THREADS=4
 
 
-mpiexec -n ${NRANKS} -ppn ${NRANKS_PER_NODE} \
---cpu-bind=list:${CPU_AFFINITY} \
+weight_dir=/home/cadams/Polaris/NEXT_SparseEventID/output/yolo-supervised_ID_mk_mb4096-adam-batch-3e-3/
+checkpoint=$(ls ${weight_dir}/checkpoints)
+echo "Checkpoint: ${checkpoint}"
+
+WEIGHTS=${weight_dir}/checkpoints/${checkpoint}
+echo "Weights: ${WEIGHTS//=/\\=}"
+
+# mpiexec -n ${NRANKS} -ppn ${NRANKS_PER_NODE} \
+# --cpu-bind=list:${CPU_AFFINITY} \
 python bin/exec.py \
 --config-name yolo \
-mode=train \
+mode=inference \
 framework.oversubscribe=${OVERSUBSCRIBE} \
+mode.weights_location=${WEIGHTS//=/\\=} \
 run.distributed=True \
 run.id=${run_id} \
 run.minibatch_size=${GLOBAL_BATCH_SIZE} \
 output_dir=output \
 run.length=500
-mode.optimizer.lr_schedule.peak_learning_rate=${LR} \
-mode.optimizer.name=${OPT} \
+# mode.optimizer.lr_schedule.peak_learning_rate=${LR} \
+# mode.optimizer.name=${OPT} \
 
