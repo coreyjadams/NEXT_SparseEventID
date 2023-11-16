@@ -21,15 +21,15 @@ class Norm(Enum):
     group = 3
 
 @dataclass
-class _Representation:
+class Representation:
     depth:             int   = 4
     n_initial_filters: int   = 32
     n_output_filters:  int   = 128
     weight_decay:      float = 0.00
 
 
-
-class ConvRepresentation(_Representation):
+@dataclass
+class ConvRepresentation(Representation):
     normalization:        Norm         = Norm.batch
     bias:                 bool         = True
     blocks_per_layer:     int          = 4
@@ -44,7 +44,7 @@ class MLPConfig():
     bias:            bool = True
 
 @dataclass
-class GraphRepresentation(_Representation):
+class GraphRepresentation(Representation):
     mlp_config: MLPConfig = field(default_factory= lambda : MLPConfig(layers=[32,32]))
     graph_layer:      str = "GINConv"
 

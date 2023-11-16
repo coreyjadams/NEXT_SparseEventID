@@ -5,7 +5,7 @@ from hydra.core.config_store import ConfigStore
 from typing import List, Any, Tuple
 from omegaconf import MISSING
 
-from .network   import ConvRepresentation, ClassificationHead, YoloHead
+from .network   import Representation, ClassificationHead, YoloHead
 from .mode      import Mode
 from .framework import Framework
 from .data      import Data
@@ -53,19 +53,19 @@ defaults = [
     {"encoder"   : "convnet"}
 ]
 
-# @dataclass
-# class LearnRepresentation:
-#     defaults: List[Any] = field(default_factory=lambda: defaults)
+@dataclass
+class LearnRepresentation:
+    defaults: List[Any] = field(default_factory=lambda: defaults)
 
 
-#     run:        Run       = MISSING
-#     mode:       Mode      = MISSING
-#     data:       Data      = MISSING
-#     framework:  Framework = MISSING
-#     encoder:    Representation = MISSING
-#     head:       ClassificationHead = field(default_factory= lambda : ClassificationHead())
-#     output_dir: str       = "output/"
-#     name:       str       = "simclr"
+    run:        Run       = MISSING
+    mode:       Mode      = MISSING
+    data:       Data      = MISSING
+    framework:  Framework = MISSING
+    encoder:    Representation = MISSING
+    head:       ClassificationHead = field(default_factory= lambda : ClassificationHead())
+    output_dir: str       = "output/"
+    name:       str       = "simclr"
 
 # cs.store(name="representation", node=LearnRepresentation)
 
@@ -78,41 +78,41 @@ class DetectVertex:
     mode:       Mode      = MISSING
     data:       Data      = MISSING
     framework:  Framework = MISSING
-    encoder:    ConvRepresentation = MISSING
+    encoder:    Representation = MISSING
     head:       YoloHead  = field(default_factory= lambda : YoloHead())
     output_dir: str       = "output/"
     name:       str       = "yolo"
 
 
-# @dataclass
-# class SupervisedClassification:
-#     defaults: List[Any] = field(default_factory=lambda: defaults)
+@dataclass
+class SupervisedClassification:
+    defaults: List[Any] = field(default_factory=lambda: defaults)
 
 
-#     run:        Run       = MISSING
-#     mode:       Mode      = MISSING
-#     data:       Data      = MISSING
-#     framework:  Framework = MISSING
-#     encoder:    Representation = MISSING
-#     head:       ClassificationHead = field(default_factory= lambda : ClassificationHead())
-#     output_dir: str       = "output/"
-#     name:       str       = "supervised_eventID"
+    run:        Run       = MISSING
+    mode:       Mode      = MISSING
+    data:       Data      = MISSING
+    framework:  Framework = MISSING
+    encoder:    Representation = MISSING
+    head:       ClassificationHead = field(default_factory= lambda : ClassificationHead())
+    output_dir: str       = "output/"
+    name:       str       = "supervised_eventID"
 
-# @dataclass
-# class UnsupervisedClassification:
-#     defaults: List[Any] = field(default_factory=lambda: defaults)
-
-
-#     run:        Run       = MISSING
-#     mode:       Mode      = MISSING
-#     data:       Data      = MISSING
-#     framework:  Framework = MISSING
-#     encoder:    Representation = MISSING
-#     head:       ClassificationHead = field(default_factory= lambda : ClassificationHead())
-#     output_dir: str       = "output/"
-#     name:       str       = "unsupervised_eventID"
+@dataclass
+class UnsupervisedClassification:
+    defaults: List[Any] = field(default_factory=lambda: defaults)
 
 
-# cs.store(name="supervised_classification",   node=SupervisedClassification)
-# cs.store(name="unsupervised_classification", node=UnsupervisedClassification)
+    run:        Run       = MISSING
+    mode:       Mode      = MISSING
+    data:       Data      = MISSING
+    framework:  Framework = MISSING
+    encoder:    Representation = MISSING
+    head:       ClassificationHead = field(default_factory= lambda : ClassificationHead())
+    output_dir: str       = "output/"
+    name:       str       = "unsupervised_eventID"
+
+
+cs.store(name="supervised_classification",   node=SupervisedClassification)
+cs.store(name="unsupervised_classification", node=UnsupervisedClassification)
 cs.store(name="detect_vertex",               node=DetectVertex)
