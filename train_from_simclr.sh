@@ -35,13 +35,13 @@ let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}
 echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
 
 # Set up software deps:
-module load conda/2023-10-04
-conda activate
+# module load conda/2023-10-04
+# conda activate
 
 # Add-ons from conda:
-source /home/cadams/Polaris/polaris_conda_2023-10-04-venv/bin/activate
+# source /home/cadams/Polaris/polaris_conda_2023-10-04-venv/bin/activate
 
-module load cray-hdf5/1.12.1.3
+# module load cray-hdf5/1.12.1.3
 
 # Env variables for better scaling:
 export NCCL_COLLNET_ENABLE=1
@@ -63,11 +63,11 @@ i=1
 n=1
 for OPT in adam lamb novograd;
 do 
-    for LR in  3e-4;
+    for LR in  3e-3;
     # for LR in 3e-1 3e-2 3e-3 3e-4;
     do
 
-        weight_id=repr-128_mb4096-${OPT}-${LR}
+        weight_id=repr-mb4096-${OPT}-${LR}
         checkpoint=$(ls ${WEIGHT_PREFIX}/${weight_id}/checkpoints)
         echo "Checkpoint: ${checkpoint}"
 
@@ -80,26 +80,28 @@ do
         # let "LOCAL_RANKS=${n}*${NRANKS_PER_NODE}"
         echo $LOCAL_RANKS
         LOCAL_BATCH_SIZE=256
-        # let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}"
-        let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${LOCAL_RANKS}"
+        let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}"
+        # let "GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}*${LOCAL_RANKS}"
 
 
-        run_id=repr_class-rmsprop_mb${GLOBAL_BATCH_SIZE}-${OPT}-${LR}
+        rep_opt=rmsprop
+
+        run_id=repr_class-${rep_opt}_mb${GLOBAL_BATCH_SIZE}-${OPT}-${LR}
         echo $run_id
 
         echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
 
 
-        mpiexec -n ${NRANKS} -ppn ${NRANKS_PER_NODE} --cpu-bind=numa \
-        --cpu-bind list:${CPU_AFFINITY} \
+        # mpiexec -n ${NRANKS} -ppn ${NRANKS_PER_NODE} --cpu-bind=numa \
+        # --cpu-bind list:${CPU_AFFINITY} \
         python bin/exec.py \
         --config-name supervised_eventID \
         mode=train \
         encoder=convnet \
         mode.weights_location=${WEIGHTS//=/\\=} \
-        mode.optimizer.loss_balance_scheme=focal \
-        mode.optimizer.name=rmsprop \
-        mode.optimizer.lr_schedule.peak_learning_rate=0.0003 \
+        mode.optimizer.loss_balance_scheme=none \
+        mode.optimizer.name=${rep_opt} \
+        mode.optimizer.lr_schedule.peak_learning_rate=0.03 \
         run.distributed=True \
         run.id=${run_id} \
         framework.oversubscribe=4 \

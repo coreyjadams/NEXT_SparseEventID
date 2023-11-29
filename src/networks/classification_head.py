@@ -26,7 +26,7 @@ def build_networks(params, input_shape):
         # First step of the classification head is to pool the spatial size:
         classification_head.append(torch.nn.AvgPool3d(output_shape[1:]))
         classification_head.append(torch.nn.Flatten(start_dim=1, end_dim=-1))
-
+        classification_head.append(torch.nn.InstanceNorm1d(current_number_of_filters))
 
     for i, layer in enumerate(params.head.layers):
 

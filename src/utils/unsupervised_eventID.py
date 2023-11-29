@@ -171,97 +171,97 @@ class unsupervised_eventID(pl.LightningModule):
         self.log_dict(metrics, logger)
         return
 
-    def prefit_distribution(self, all_energies):
-        print(all_energies)
+    # def prefit_distribution(self, all_energies):
+    #     print(all_energies)
 
-        # all_energies = torch.tensor(all_energies, dtype=torch.float)
+    #     # all_energies = torch.tensor(all_energies, dtype=torch.float)
 
-        # Define the bins used in the fit:
-        energy_bins = numpy.arange(1.45, 1.8, 0.005)
-        e_bin_centers = 0.5*(energy_bins[1:] + energy_bins[:-1])
-        bin_widths  = energy_bins[1:] - energy_bins[:-1]
+    #     # Define the bins used in the fit:
+    #     energy_bins = numpy.arange(1.45, 1.8, 0.005)
+    #     e_bin_centers = 0.5*(energy_bins[1:] + energy_bins[:-1])
+    #     bin_widths  = energy_bins[1:] - energy_bins[:-1]
         
-        # Bins used for plotting, if needed:
-        plotting_bins    = numpy.arange(1.4, 1.8, 0.0005)
-        plotting_centers = 0.5*(plotting_bins[1:] + plotting_bins[:-1])
+    #     # Bins used for plotting, if needed:
+    #     plotting_bins    = numpy.arange(1.4, 1.8, 0.0005)
+    #     plotting_centers = 0.5*(plotting_bins[1:] + plotting_bins[:-1])
 
-        from matplotlib import pyplot as plt
-
-
-        # Create a histogram of the data over the fitting bings:
-        data_events, _ = numpy.histogram(all_energies, energy_bins)
-        # a0, tau, amp, mu, sigma
-        seed = (100.0, 1.0, 400.0, 1.65, 0.05)
+    #     from matplotlib import pyplot as plt
 
 
-        fit_fn = lambda fit_params : expgauss(e_bin_centers, fit_params) - data_events
-        residual_fn = lambda fit_params : (fit_fn(fit_params)**2).sum()
+    #     # Create a histogram of the data over the fitting bings:
+    #     data_events, _ = numpy.histogram(all_energies, energy_bins)
+    #     # a0, tau, amp, mu, sigma
+    #     seed = (100.0, 1.0, 400.0, 1.65, 0.05)
 
-        ret = scipy.optimize.curve_fit(expgauss, e_bin_centers, data_events, p0=seed)
+
+    #     fit_fn = lambda fit_params : expgauss(e_bin_centers, fit_params) - data_events
+    #     residual_fn = lambda fit_params : (fit_fn(fit_params)**2).sum()
+
+    #     ret = scipy.optimize.curve_fit(expgauss, e_bin_centers, data_events, p0=seed)
         
-        raw_fitf, raw_values, raw_errors = fit(expgauss, e_bin_centers, data_events, seed)
-        print("Fit values: ", raw_values)
+    #     raw_fitf, raw_values, raw_errors = fit(expgauss, e_bin_centers, data_events, seed)
+    #     print("Fit values: ", raw_values)
         
-        # Lastly, we're going to train the network's distribution against method-of-moments
+    #     # Lastly, we're going to train the network's distribution against method-of-moments
 
-        # So, compute via method of moments:
-        self.min_e = e_bin_centers[0]; self.max_e = e_bin_centers[-1]
+    #     # So, compute via method of moments:
+    #     self.min_e = e_bin_centers[0]; self.max_e = e_bin_centers[-1]
 
-        # Treat these as discrete probability distributions:
-        sig_vals = gauss(e_bin_centers, *raw_values[2:])
-        bkg_vals =   exp(e_bin_centers, *raw_values[0:2])
+    #     # Treat these as discrete probability distributions:
+    #     sig_vals = gauss(e_bin_centers, *raw_values[2:])
+    #     bkg_vals =   exp(e_bin_centers, *raw_values[0:2])
 
-        sig_vals = sig_vals / numpy.sum(sig_vals)
-        bkg_vals = bkg_vals / numpy.sum(bkg_vals)
+    #     sig_vals = sig_vals / numpy.sum(sig_vals)
+    #     bkg_vals = bkg_vals / numpy.sum(bkg_vals)
 
-        # Computing the moments is a computation on the x values, treating the other stuff
-        # as probability distributions.
+    #     # Computing the moments is a computation on the x values, treating the other stuff
+    #     # as probability distributions.
 
-        # The first moment (aka <x> is the probability times x, summed)
+    #     # The first moment (aka <x> is the probability times x, summed)
 
-        sig_mean = numpy.sum(e_bin_centers * sig_vals)
-        # print("sig_sum: ", sig_mean)
+    #     sig_mean = numpy.sum(e_bin_centers * sig_vals)
+    #     # print("sig_sum: ", sig_mean)
 
-        bkg_mean = numpy.sum(e_bin_centers * bkg_vals)
-        # print("bkg_mean: ", bkg_mean)
+    #     bkg_mean = numpy.sum(e_bin_centers * bkg_vals)
+    #     # print("bkg_mean: ", bkg_mean)
 
-        # print("sig_vals: ", sig_vals)
-        # print("bkg_vals: ", bkg_vals)
+    #     # print("sig_vals: ", sig_vals)
+    #     # print("bkg_vals: ", bkg_vals)
 
-        n_moments = 5
-        sig_moments = []
-        bkg_moments = []
-        for i in range(0, n_moments):
-            sig_moments.append( numpy.sum( sig_vals * (e_bin_centers - sig_mean)**i ) )
-            bkg_moments.append( numpy.sum( bkg_vals * (e_bin_centers - bkg_mean)**i ) )
+    #     n_moments = 5
+    #     sig_moments = []
+    #     bkg_moments = []
+    #     for i in range(0, n_moments):
+    #         sig_moments.append( numpy.sum( sig_vals * (e_bin_centers - sig_mean)**i ) )
+    #         bkg_moments.append( numpy.sum( bkg_vals * (e_bin_centers - bkg_mean)**i ) )
 
-        # print("numpy.sum(sig_vals): ", numpy.sum(sig_vals))
-        # print("numpy.sum(bkg_vals): ", numpy.sum(bkg_vals))
-        # print("sig_moments: ", sig_moments)
-        # print("bkg_moments: ", bkg_moments)
+    #     # print("numpy.sum(sig_vals): ", numpy.sum(sig_vals))
+    #     # print("numpy.sum(bkg_vals): ", numpy.sum(bkg_vals))
+    #     # print("sig_moments: ", sig_moments)
+    #     # print("bkg_moments: ", bkg_moments)
 
-        self.sig_moments = sig_moments
-        self.bkg_moments = bkg_moments
-        self.sig_mean    = sig_mean
-        self.bkg_mean    = bkg_mean
+    #     self.sig_moments = sig_moments
+    #     self.bkg_moments = bkg_moments
+    #     self.sig_mean    = sig_mean
+    #     self.bkg_mean    = bkg_mean
 
-        # ret = torchmin.least_squares(fit_fn, seed, gtol=None)
+    #     # ret = torchmin.least_squares(fit_fn, seed, gtol=None)
 
-        # # Plot the data and initial/final fit:
-        # init_fit = expgauss(plotting_centers, *seed)
-        # final_fit = expgauss(plotting_centers, *ret[0])
-        # # print("Final res: ", ret[0])
-        # plt.bar(e_bin_centers, data_events, width=bin_widths, label="Data", zorder=3)
-        # plt.plot(plotting_centers, init_fit, label="Seed", color="r", zorder=4)
-        # plt.plot(plotting_centers, final_fit, label="Fit", color="g", zorder=4)
-        # plt.grid(True)
-        # plt.legend()
-        # plt.savefig("Test_initial_fit.pdf")
-        # plt.close()
+    #     # # Plot the data and initial/final fit:
+    #     # init_fit = expgauss(plotting_centers, *seed)
+    #     # final_fit = expgauss(plotting_centers, *ret[0])
+    #     # # print("Final res: ", ret[0])
+    #     # plt.bar(e_bin_centers, data_events, width=bin_widths, label="Data", zorder=3)
+    #     # plt.plot(plotting_centers, init_fit, label="Seed", color="r", zorder=4)
+    #     # plt.plot(plotting_centers, final_fit, label="Fit", color="g", zorder=4)
+    #     # plt.grid(True)
+    #     # plt.legend()
+    #     # plt.savefig("Test_initial_fit.pdf")
+    #     # plt.close()
 
 
 
-        return
+    #     return
 
 
     def print_log(self, metrics, mode=""):
@@ -302,7 +302,7 @@ class unsupervised_eventID(pl.LightningModule):
         BACKGROUND = 0
 
         accuracy = prediction == labels
-
+        print(labels)
         is_signal     = labels == SIGNAL
         is_background = labels == BACKGROUND
 
@@ -322,37 +322,72 @@ class unsupervised_eventID(pl.LightningModule):
         SIGNAL = 1
         BACKGROUND = 0
 
-        # The loss here is based on method of moments.  We attempt to backprop
-        # the final layer based on the difference between the fitted moments, done
-        # upfront, and the observed moments here.
+        # Use the energy to compute a weak label:
 
-        print(logits.shape)
-        print(logits)
-        # print(batch_energy)
-        # Select the signal and bkg events from the logits
-        # Indexing doesn't make a smooth gradient so using a softmax here: (NOT)
+        weak_label = BACKGROUND*torch.ones( 
+            (len(batch['energy']),),
+            dtype=torch.int64,
+            device=logits.device
+            )
 
-        sigmoid = torch.sigmoid(logits)
+        # Select the weak signal region and set it to 1:
+        sig_region_lower = batch['energy'] > 1.58
+        sig_region_upper = batch['energy'] < 1.62
+        sig_region = torch.logical_and(sig_region_upper, sig_region_lower)
+        weak_label[sig_region] = SIGNAL
 
 
-        sig_weighted_energy = batch['energy'] * sigmoid
-        bkg_weighted_energy = batch['energy'] * (1 - sigmoid)
+        if self.args.mode.optimizer.loss_balance_scheme == LossBalanceScheme.focal:
+            # This section computes the loss via focal loss, since the classes are imbalanced:
+            # Create the full label:
+            y = torch.nn.functional.one_hot(weak_label, logits.size(-1))
+            softmax = torch.nn.functional.softmax(logits) 
+            softmax = softmax.clamp(1e-7, 1. - 1e-7)
+            loss = - y * torch.log(softmax)
 
-        sig_weight = torch.sum(sigmoid)
-        bkg_weight = torch.sum(1-sigmoid)
+            # Apply the focal part:
+            loss = loss * (1 - softmax)**2
+            loss = loss.sum(axis=-1).mean()
+        else:
+            # print(logits.shape)
+            # print(batch['label'].shape)
+            # print(batch['label'])
+            loss = self.criterion(logits, target = weak_label)
 
-        sig_mean_e = torch.sum(sig_weighted_energy) / sig_weight
-        bkg_mean_e = torch.sum(bkg_weighted_energy) / bkg_weight
+        return loss
 
-        # bkg_mean = torch.sum(softmax[:,SIGNAL]*batch['energy'])  / sig_norm
-        # sig_mean = torch.sum(softmax[:,BACKGROUND]*batch['energy']) / bkg_norm
 
-        print(sig_mean_e)
-        print(bkg_mean_e)
+        # # The loss here is based on method of moments.  We attempt to backprop
+        # # the final layer based on the difference between the fitted moments, done
+        # # upfront, and the observed moments here.
 
-        sig_moments = []
-        bkg_moments = []
-        # for i in range(n_moments):
+        # print(logits.shape)
+        # print(logits)
+        # # print(batch_energy)
+        # # Select the signal and bkg events from the logits
+        # # Indexing doesn't make a smooth gradient so using a softmax here: (NOT)
+
+        # sigmoid = torch.sigmoid(logits)
+
+
+        # sig_weighted_energy = batch['energy'] * sigmoid
+        # bkg_weighted_energy = batch['energy'] * (1 - sigmoid)
+
+        # sig_weight = torch.sum(sigmoid)
+        # bkg_weight = torch.sum(1-sigmoid)
+
+        # sig_mean_e = torch.sum(sig_weighted_energy) / sig_weight
+        # bkg_mean_e = torch.sum(bkg_weighted_energy) / bkg_weight
+
+        # # bkg_mean = torch.sum(softmax[:,SIGNAL]*batch['energy'])  / sig_norm
+        # # sig_mean = torch.sum(softmax[:,BACKGROUND]*batch['energy']) / bkg_norm
+
+        # print(sig_mean_e)
+        # print(bkg_mean_e)
+
+        # sig_moments = []
+        # bkg_moments = []
+        # # for i in range(n_moments):
 
         return loss
 

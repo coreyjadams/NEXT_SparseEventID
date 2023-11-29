@@ -17,9 +17,11 @@ class InputNorm(nn.Module):
 
 class Block(nn.Module):
 
-    def __init__(self, *, nIn, nOut, params, kernel=[3,3,3], activation=scn.LeakyReLU):
+    def __init__(self, *, nIn, nOut, params, activation=scn.LeakyReLU):
 
         nn.Module.__init__(self)
+
+        kernel = 3*[params.filter_size,]
 
         self.conv1 = scn.SubmanifoldConvolution(
             dimension   = 3,

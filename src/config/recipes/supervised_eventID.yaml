@@ -12,7 +12,7 @@ data:
   transform2: False
 
 head:
-  layers: [2,]
+  layers: [64,2,]
     # - 128
     # - 128
     # - 64

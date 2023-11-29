@@ -22,9 +22,9 @@ class Norm(Enum):
 
 @dataclass
 class Representation:
-    depth:             int   = 4
-    n_initial_filters: int   = 8
-    n_output_filters:  int   = 32
+    depth:             int   = 3
+    n_initial_filters: int   = 32
+    n_output_filters:  int   = 128
     weight_decay:      float = 0.00
 
 
@@ -34,6 +34,7 @@ class ConvRepresentation(Representation):
     bias:                 bool         = True
     blocks_per_layer:     int          = 4
     residual:             bool         = True
+    filter_size:          int          = 3
     growth_rate:          GrowthRate   = GrowthRate.additive
     downsampling:         DownSampling = DownSampling.convolutional
 

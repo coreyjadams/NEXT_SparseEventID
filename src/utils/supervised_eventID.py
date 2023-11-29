@@ -45,7 +45,7 @@ class supervised_eventID(pl.LightningModule):
             weight = torch.tensor([0.582, 1.417])
         else: weight = None
 
-        self.criterion = torch.nn.CrossEntropyLoss(weight=weight)
+        self.criterion = torch.nn.CrossEntropyLoss(weight=weight, label_smoothing=0.1)
 
     def on_train_start(self):
         self.optimizers().param_groups = self.optimizers()._optimizer.param_groups
@@ -187,9 +187,9 @@ class supervised_eventID(pl.LightningModule):
             loss = loss * (1 - softmax)**2
             loss = loss.sum(axis=-1).mean()
         else:
-            print(logits.shape)
-            print(batch['label'].shape)
-            print(batch['label'])
+            # print(logits.shape)
+            # print(batch['label'].shape)
+            # print(batch['label'])
             loss = self.criterion(logits, target = batch["label"])
 
         return loss

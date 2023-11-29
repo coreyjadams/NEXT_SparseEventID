@@ -25,14 +25,6 @@ let GLOBAL_BATCH_SIZE=${LOCAL_BATCH_SIZE}
 
 echo "Global batch size: ${GLOBAL_BATCH_SIZE}"
 
-# Set up software deps:
-module load conda/2022-09-08
-conda activate
-
-# Add-ons from conda:
-source /home/cadams/Polaris/polaris_conda_2022-09-08-venv/bin/activate
-
-module load cray-hdf5/1.12.1.3
 
 # Env variables for better scaling:
 export NCCL_COLLNET_ENABLE=1

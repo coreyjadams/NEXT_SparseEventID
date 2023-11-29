@@ -67,7 +67,7 @@ class LearnRepresentation:
     output_dir: str       = "output/"
     name:       str       = "simclr"
 
-# cs.store(name="representation", node=LearnRepresentation)
+cs.store(name="representation", node=LearnRepresentation)
 
 @dataclass
 class DetectVertex:

@@ -118,9 +118,9 @@ def create_trainer(args, lightning_model, datasets):
             # print("Loaded model from checkpoint")
 
 
-    # If we're doing unsupervised training, we have to fit the datasets initially based on energy:
-    if args.name == "unsupervised_eventID":
-        lightning_model.prefit_distribution(datasets["train"].dataset.ds.energy)
+    # # If we're doing unsupervised training, we have to fit the datasets initially based on energy:
+    # if args.name == "unsupervised_eventID":
+    #     lightning_model.prefit_distribution(datasets["train"].dataset.ds.energy)
 
     if 'optimizer' in args.mode:
         accum_grad_batches = args.mode.optimizer.gradient_accumulation

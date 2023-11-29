@@ -144,6 +144,7 @@ class exec(object):
             batch_keys.append("label")
         elif self.args.name == "unsupervised_eventID":
             batch_keys.append("energy")
+            batch_keys.append("label")
 
         ds = {}
         for active in self.args.data.active:

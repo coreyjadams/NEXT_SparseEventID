@@ -34,14 +34,7 @@ let NRANKS=${NNODES}*${NRANKS_PER_NODE}
 mpiexec -n ${NNODES} -ppn 1 nvidia-cuda-mps-control -d
 
 
-# Set up software deps:
-module load conda/2022-09-08
-conda activate
-
-# Add-ons from conda:
-source /home/cadams/Polaris/polaris_conda_2022-09-08-venv/bin/activate
-
-module load cray-hdf5/1.12.1.3
+source /home/cadams/SS11-flash-build/setup.sh
 
 # Env variables for better scaling:
 export NCCL_COLLNET_ENABLE=1
