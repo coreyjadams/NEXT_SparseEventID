@@ -187,6 +187,9 @@ class supervised_eventID(pl.LightningModule):
             loss = loss * (1 - softmax)**2
             loss = loss.sum(axis=-1).mean()
         else:
+            print(logits.shape)
+            print(batch['label'].shape)
+            print(batch['label'])
             loss = self.criterion(logits, target = batch["label"])
 
         return loss

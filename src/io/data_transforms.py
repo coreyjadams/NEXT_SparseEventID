@@ -117,7 +117,7 @@ def larcvsparse_to_pytorch_geometric(input_array, image_meta):
 
     # print(x_index)
 
-    voxel_size = image_meta['size'] / image_meta['n_voxels']
+    voxel_size = (image_meta['size'] / image_meta['n_voxels']).astype(numpy.float32)
 
     graph_data = []
 
@@ -132,6 +132,8 @@ def larcvsparse_to_pytorch_geometric(input_array, image_meta):
         
         # Select the data:
         active_data = this_batch_data[active_index, :]
+
+
         xyz = active_data[:,0:3] * voxel_size + image_meta['origin']
 
         # r = numpy.sqrt(numpy.sum(xyz**2, axis=-1))
@@ -143,16 +145,16 @@ def larcvsparse_to_pytorch_geometric(input_array, image_meta):
         row, col = numpy.where(r < 25)
         edge_index = numpy.stack([row,col])
 
-        edge_attr = numpy.concatenate([
-            r[row,col].reshape(-1,1), 
-            edge_displacements[row, col,:]
-        ], axis=-1)
+        # edge_attr = numpy.concatenate([
+        #     r[row,col].reshape(-1,1), 
+        #     edge_displacements[row, col,:]
+        # ], axis=-1)
         graph_data.append(
             torch_geometric.data.Data(
                 x          = torch.tensor(active_data).reshape((-1,4)),
                 # x          = torch.tensor(active_data[:,3]).reshape((-1,1)),
                 edge_index = torch.tensor(edge_index),
-                edge_attr  = torch.tensor(edge_attr),
+                # edge_attr  = torch.tensor(edge_attr),
                 pos        = torch.tensor(xyz),
             )
         )
