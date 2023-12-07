@@ -139,6 +139,7 @@ class exec(object):
         if self.args.name == "yolo":
             batch_keys.append("vertex")
             batch_keys.append("label")
+            batch_keys.append("energy")
 
         elif self.args.name == "supervised_eventID":
             batch_keys.append("label")

@@ -322,20 +322,24 @@ class unsupervised_eventID(pl.LightningModule):
         SIGNAL = 1
         BACKGROUND = 0
 
-        # Use the energy to compute a weak label:
+        # # Use the energy to compute a weak label:
 
-        weak_label = BACKGROUND*torch.ones( 
-            (len(batch['energy']),),
-            dtype=torch.int64,
-            device=logits.device
-            )
+        # weak_label = BACKGROUND*torch.ones( 
+        #     (len(batch['energy']),),
+        #     dtype=torch.int64,
+        #     device=logits.device
+        #     )
 
-        # Select the weak signal region and set it to 1:
-        sig_region_lower = batch['energy'] > 1.58
-        sig_region_upper = batch['energy'] < 1.62
-        sig_region = torch.logical_and(sig_region_upper, sig_region_lower)
-        weak_label[sig_region] = SIGNAL
+        # # Select the weak signal region and set it to 1:
+        # sig_region_lower = batch['energy'] > 1.58
+        # sig_region_upper = batch['energy'] < 1.62
+        # sig_region = torch.logical_and(sig_region_upper, sig_region_lower)
+        # weak_label[sig_region] = SIGNAL
 
+        # print(weak_label)
+        # print(batch['label'])
+        # print(weak_label.device)
+        # print(logits.device)
 
         if self.args.mode.optimizer.loss_balance_scheme == LossBalanceScheme.focal:
             # This section computes the loss via focal loss, since the classes are imbalanced:
@@ -352,8 +356,9 @@ class unsupervised_eventID(pl.LightningModule):
             # print(logits.shape)
             # print(batch['label'].shape)
             # print(batch['label'])
-            loss = self.criterion(logits, target = weak_label)
-
+            # loss = self.criterion(logits, target = weak_label)
+            loss = self.criterion(logits, target = batch['label'])
+        print("Loss: ", loss)
         return loss
 
 

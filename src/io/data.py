@@ -85,19 +85,19 @@ def create_torch_larcv_dataloader(larcv_ds, global_batch_size, data_mode, device
     else:
         target_collate_fn = data.default_convert
 
-    if data_mode == DataMode.graph:
-        import torch_geometric
-        torch_dl = torch_geometric.loader.DataLoader(
-            ids, 
-            # exclude_keys = ["event_ids",]
-        )
-    else:
-        torch_dl = data.DataLoader(ids,
-            num_workers    = 0,
-            batch_size    = None,
-            batch_sampler = None,
-            pin_memory    = False,
-            collate_fn    = target_collate_fn
-        )
+    # if data_mode == DataMode.graph:
+    #     import torch_geometric
+    #     torch_dl = torch_geometric.loader.DataLoader(
+    #         ids, 
+    #         # exclude_keys = ["event_ids",]
+    #     )
+    # else:
+    torch_dl = data.DataLoader(ids,
+        num_workers    = 0,
+        batch_size    = None,
+        batch_sampler = None,
+        pin_memory    = False,
+        collate_fn    = target_collate_fn
+    )
 
     return torch_dl

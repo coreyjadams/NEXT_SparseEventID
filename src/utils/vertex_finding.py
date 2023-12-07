@@ -1,3 +1,5 @@
+import sys, os
+
 import torch
 import pytorch_lightning as pl
 
@@ -11,6 +13,7 @@ import datetime
 from . training_utils import init_optimizer, format_log_message
 
 from src import logging
+from src.config.mode import ModeKind
 
 logger = logging.getLogger("NEXT")
 
@@ -38,8 +41,8 @@ class vertex_learning(pl.LightningModule):
 
         self.log_keys = ["loss"]
 
-        if self.args.mode.name == "inference":
-            self.metrics_file = None
+        if self.args.mode.name == ModeKind.inference: 
+            self.metrics_list = None
 
     def on_train_start(self):
         self.optimizers().param_groups = self.optimizers()._optimizer.param_groups
@@ -103,6 +106,27 @@ class vertex_learning(pl.LightningModule):
 
         prediction_dict = self.predict_event(prediction)
 
+        # In inference mode, intercept the prediction and store it in a dictionary:
+        if self.metrics_list is None:
+            self.metrics_list = {}
+            # for key in vertex_labels.keys():
+                # self.metrics_list[key] = []
+            for key in ["label", 'vertex_true', 'entries', 'energy']:
+                self.metrics_list[key] = []
+            for key in prediction_dict.keys():
+                self.metrics_list[key] = []
+
+
+        # Construct the save vector:
+        for key in ["label", 'vertex_true', 'entries', 'energy']:
+            if key == "vertex_true":
+                self.metrics_list["vertex_true"].append(batch["vertex"])
+            else:
+                self.metrics_list[key].append(batch[key])
+
+        for key in prediction_dict.keys():
+            print(prediction_dict[key].shape)
+            self.metrics_list[key].append(prediction_dict[key])
 
         anchor_loss, regression_loss, event_loss = self.vertex_loss(vertex_labels, prediction)
 
@@ -128,7 +152,29 @@ class vertex_learning(pl.LightningModule):
         self.log_dict(metrics, logger)
         return
 
+    def on_validation_end(self) -> None:
 
+        # for key in self.metrics_list.keys():
+        #     print(key)
+        #     print(len(self.metrics_list[key]))
+        #     print(self.metrics_list[key][0].shape)
+
+        self.metrics_list = {
+            key : torch.concat(self.metrics_list[key], axis=0).cpu().numpy()
+            for key in self.metrics_list.keys()
+        }
+        print(self.metrics_list.keys())
+        for key in self.metrics_list.keys():
+            print(key, self.metrics_list[key].shape)
+
+        fname = self.args.output_dir
+        fname += "/validation_output/"
+        if self.global_rank == 0:
+            os.makedirs(fname, exist_ok=True)
+        fname += f"val_rank_{self.global_rank}"
+        import numpy
+        numpy.savez(fname, **self.metrics_list)
+        return super().on_validation_end()
 
     def print_log(self, metrics, mode=""):
 

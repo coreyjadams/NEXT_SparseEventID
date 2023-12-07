@@ -2,7 +2,7 @@ import torch
 import pytorch_lightning as pl
 
 from lightning_fabric.plugins.environments import MPIEnvironment, LightningEnvironment
-from pytorch_lightning.callbacks           import ModelCheckpoint
+from pytorch_lightning.callbacks           import ModelCheckpoint, ModelSummary
 
 
 class OversubscribeMPI(MPIEnvironment):
@@ -127,7 +127,7 @@ def create_trainer(args, lightning_model, datasets):
         limit_val_batches = 1
     else:
         accum_grad_batches = 1
-        limit_val_batches = 10
+        limit_val_batches = 60
 
     trainer = pl.Trainer(
         accelerator             = args.run.compute_mode.name.lower(),
@@ -144,7 +144,7 @@ def create_trainer(args, lightning_model, datasets):
         val_check_interval      = 10,
         check_val_every_n_epoch = None,
         limit_val_batches       = limit_val_batches,
-        callbacks               = [model_checkpoint],
+        callbacks               = [model_checkpoint, ModelSummary(max_depth=2,)],
     )
 
     return trainer, lightning_model, checkpoint_path

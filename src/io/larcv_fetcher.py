@@ -15,8 +15,8 @@ def lr_meta():
         ([480, 480, 320], [480., 480., 576.],[-240., -240., 0])],
         dtype=[
             ('n_voxels', "int", (3)),
-            ('size', "float", (3)),
-            ('origin', "float", (3)),
+            ('size', "float32", (3)),
+            ('origin', "float32", (3)),
         ]
     )
 
@@ -29,8 +29,8 @@ def pmaps_meta():
         ([64, 64, 64], [640, 640, 640],[-320., -320., -45])],
         dtype=[
             ('n_voxels', "int", (3)),
-            ('size', "float", (3)),
-            ('origin', "float", (3)),
+            ('size', "float32", (3)),
+            ('origin', "float32", (3)),
         ]
     )
 
