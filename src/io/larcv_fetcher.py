@@ -14,7 +14,7 @@ def lr_meta():
     return numpy.array([
         ([480, 480, 320], [480., 480., 576.],[-240., -240., 0])],
         dtype=[
-            ('n_voxels', "int", (3)),
+            ('n_voxels', "int32", (3)),
             ('size', "float32", (3)),
             ('origin', "float32", (3)),
         ]
@@ -28,7 +28,7 @@ def pmaps_meta():
     return numpy.array([
         ([64, 64, 64], [640, 640, 640],[-320., -320., -45])],
         dtype=[
-            ('n_voxels', "int", (3)),
+            ('n_voxels', "int32", (3)),
             ('size', "float32", (3)),
             ('origin', "float32", (3)),
         ]
@@ -414,7 +414,6 @@ class larcv_dataset(object):
         minibatch_data = {
             key : minibatch_data[key] for key in minibatch_data if key in self.batch_keys
         }
-
 
         # Shape the images:
 
