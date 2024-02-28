@@ -44,6 +44,7 @@ class vertex_learning(pl.LightningModule):
         if self.args.mode.name == ModeKind.inference: 
             self.metrics_list = None
 
+
     def on_train_start(self):
         self.optimizers().param_groups = self.optimizers()._optimizer.param_groups
 
@@ -52,7 +53,6 @@ class vertex_learning(pl.LightningModule):
 
 
         representation = self.encoder(batch)
-
         logits = self.head(representation)
 
 
@@ -107,7 +107,7 @@ class vertex_learning(pl.LightningModule):
         prediction_dict = self.predict_event(prediction)
 
         # In inference mode, intercept the prediction and store it in a dictionary:
-        if self.metrics_list is None:
+        if hasattr(self, "metrics_list") and self.metrics_list is None:
             self.metrics_list = {}
             # for key in vertex_labels.keys():
                 # self.metrics_list[key] = []
@@ -117,16 +117,15 @@ class vertex_learning(pl.LightningModule):
                 self.metrics_list[key] = []
 
 
-        # Construct the save vector:
-        for key in ["label", 'vertex_true', 'entries', 'energy']:
-            if key == "vertex_true":
-                self.metrics_list["vertex_true"].append(batch["vertex"])
-            else:
-                self.metrics_list[key].append(batch[key])
+            # Construct the save vector:
+            for key in ["label", 'vertex_true', 'entries', 'energy']:
+                if key == "vertex_true":
+                    self.metrics_list["vertex_true"].append(batch["vertex"])
+                else:
+                    self.metrics_list[key].append(batch[key])
 
-        for key in prediction_dict.keys():
-            print(prediction_dict[key].shape)
-            self.metrics_list[key].append(prediction_dict[key])
+            for key in prediction_dict.keys():
+                self.metrics_list[key].append(prediction_dict[key])
 
         anchor_loss, regression_loss, event_loss = self.vertex_loss(vertex_labels, prediction)
 
@@ -158,22 +157,24 @@ class vertex_learning(pl.LightningModule):
         #     print(key)
         #     print(len(self.metrics_list[key]))
         #     print(self.metrics_list[key][0].shape)
+        if hasattr(self, "metrics_list"):
+            self.metrics_list = {
+                key : torch.concat(self.metrics_list[key], axis=0).cpu().numpy()
+                for key in self.metrics_list.keys()
+            }
+            print(self.metrics_list.keys())
+            for key in self.metrics_list.keys():
+                print(key, self.metrics_list[key].shape)
 
-        self.metrics_list = {
-            key : torch.concat(self.metrics_list[key], axis=0).cpu().numpy()
-            for key in self.metrics_list.keys()
-        }
-        print(self.metrics_list.keys())
-        for key in self.metrics_list.keys():
-            print(key, self.metrics_list[key].shape)
+            fname = self.args.output_dir
+            fname += "/validation_output/"
+            if self.global_rank == 0:
+                os.makedirs(fname, exist_ok=True)
+            fname += f"val_rank_{self.global_rank}"
+            import numpy
+            numpy.savez(fname, **self.metrics_list)
 
-        fname = self.args.output_dir
-        fname += "/validation_output/"
-        if self.global_rank == 0:
-            os.makedirs(fname, exist_ok=True)
-        fname += f"val_rank_{self.global_rank}"
-        import numpy
-        numpy.savez(fname, **self.metrics_list)
+            
         return super().on_validation_end()
 
     def print_log(self, metrics, mode=""):
@@ -210,7 +211,6 @@ class vertex_learning(pl.LightningModule):
         label_prediction     = prediction[:,1]
         regression_prediction = prediction[:,2:]
 
-
         # Pick the anchor with the highest score:
         _, max_index = torch.max(
             torch.reshape(anchor_prediction, (batch_size, -1)), dim=1)
@@ -227,6 +227,7 @@ class vertex_learning(pl.LightningModule):
         # Take the maximum location and use that to infer the vertex prediction and class label.
         # Need to unravel the index since it's flattened ...
         vertex_anchor = self.unravel_index(max_index, image_size)
+
         batch_index = torch.arange(batch_size)
         selected_boxes = regression_prediction[batch_index,:,vertex_anchor[0], vertex_anchor[1],vertex_anchor[2]]
         selected_label = label_prediction[batch_index, vertex_anchor[0], vertex_anchor[1], vertex_anchor[2]]
@@ -329,7 +330,6 @@ class vertex_learning(pl.LightningModule):
  
         # Now create the anchor labels, mostly zero:
         anchor_labels = torch.zeros(size = class_shape, device=target_device, dtype=torch.float32)
-
         anchor_labels[batch_index, anchor_index[:,0], anchor_index[:,1], anchor_index[:,2] ]  = 1
 
 

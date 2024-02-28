@@ -8,31 +8,53 @@ import numpy
 import torch
 
 # Functional programming approach to building up the dataset objects:
+from src.config.data import Detector
 
-def lr_meta():
+def lr_meta(detector):
 
-    return numpy.array([
-        ([480, 480, 320], [480., 480., 576.],[-240., -240., 0])],
-        dtype=[
-            ('n_voxels', "int32", (3)),
-            ('size', "float32", (3)),
-            ('origin', "float32", (3)),
-        ]
-    )
+    if detector == Detector.next_white:
+        return numpy.array([
+            ([480, 480, 320], [480., 480., 576.],[-240., -240., 0])],
+            dtype=[
+                ('n_voxels', "int", (3)),
+                ('size', "float32", (3)),
+                ('origin', "float32", (3)),
+            ]
+        )
+    else:
+        return numpy.array([
+            ([640, 640, 1280], [960., 960., 1280.],[-480., -480., 0])],
+            dtype=[
+                ('n_voxels', "int", (3)),
+                ('size', "float32", (3)),
+                ('origin', "float32", (3)),
+            ]
+        )
 
 
-def pmaps_meta():
+def pmaps_meta(detector):
 
     # The size of the images here are padded and expanded.  This lets me downsample
     # and upsample in the networks more smoothly
-    return numpy.array([
-        ([64, 64, 64], [640, 640, 640],[-320., -320., -45])],
-        dtype=[
-            ('n_voxels', "int32", (3)),
-            ('size', "float32", (3)),
-            ('origin', "float32", (3)),
-        ]
-    )
+    if detector == Detector.next_white:
+        return numpy.array([
+            ([64, 64, 64], [640, 640, 640],[-320., -320., -45])],
+            dtype=[
+                ('n_voxels', "int", (3)),
+                ('size', "float32", (3)),
+                ('origin', "float32", (3)),
+            ]
+        )
+    else:
+        return numpy.array([
+            ([64, 64, 128], [960, 960, 1280],[-480., -480., 0])],
+            dtype=[
+                ('n_voxels', "int", (3)),
+                ('size', "float32", (3)),
+                ('origin', "float32", (3)),
+            ]
+        )
+    
 
 
 def create_larcv_interface(random_access_mode, distributed, seed):
@@ -334,8 +356,8 @@ class larcv_dataset(object):
         # self.data_keys = data_keys
 
         # Get image meta:
-        self.lr_meta = lr_meta()
-        self.pmaps_meta = pmaps_meta()
+        self.lr_meta = lr_meta(data_args.detector)
+        self.pmaps_meta = pmaps_meta(data_args.detector)
 
         self.stop = False
 
@@ -360,8 +382,8 @@ class larcv_dataset(object):
         return meta['n_voxels'][0]
 
     def image_meta(self, key):
-        if "pmaps" in key or "chits" in key or "voxels" in key: return pmaps_meta()
-        else: return lr_meta()
+        if "pmaps" in key or "chits" in key or "voxels" in key: return self.pmaps_meta
+        else: return self.lr_meta
 
     def fetch_next_batch(self, name, force_pop=False):
 

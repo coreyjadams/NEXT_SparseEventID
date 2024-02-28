@@ -22,7 +22,7 @@ class Norm(Enum):
 
 @dataclass
 class Representation:
-    depth:             int   = 6
+    depth:             int   = 3
     n_initial_filters: int   = 32
     n_output_filters:  int   = 128
     weight_decay:      float = 0.00
