@@ -14,6 +14,7 @@ mc_bkg_dir    = dataset_top + "Background/NEXT_v1_05_02_NEXUS_v5_07_10_bkg_v9/la
 mc_tl_208_dir = dataset_top + "polarisProduction/simCLR_train/"
 mc_mk_tl_208_dir = dataset_top + "dnn-dataset/simulation/larcv_2023/"
 old_mk_tl208_dir = dataset_top + "dnn-dataset/simulation/outdated_larcv/"
+ATPC_dir = dataset_top + "/ATPC/"
 # mc_tl_208_dir = dataset_top + "Calibration/NEXT_v1_05_02_NEXUS_v5_07_10_bkg_v9/larcv/merged/"
 next_100_dir = "/lus/eagle/projects/datascience/cadams/NEXT/next100-generation/2nubb/"
 
@@ -25,6 +26,7 @@ class RandomMode(Enum):
 class Detector(Enum):
     next_white = 0
     next_100   = 1
+    atpc       = 2
 
 @dataclass
 class Data:
@@ -115,6 +117,15 @@ class NEXT100Sim(Data):
     vertex:   bool = True
     detector: Detector = Detector.next_100
 
+@dataclass
+class ATPC_0nubb(Data):
+    name:      str = "ATPC_0nubb"
+    mc:       bool = True
+    train:     str = ATPC_dir + "atpc_0nubb_train.h5"
+    val:       str = ATPC_dir + "atpc_0nubb_val.h5"
+    image_key: str = "depositions"
+    vertex:   bool = False
+    detector: Detector = Detector.atpc
 
 cs = ConfigStore.instance()
 cs.store(group="data", name="mc_mk_tl208", node=MCMKTl208)
@@ -122,3 +133,4 @@ cs.store(group="data", name="mc_bkg",   node=MCBackground)
 cs.store(group="data", name="mc_mk_tl208_cls", node = MCMKTl208_CLS)
 cs.store(group="data", name="old_mc_mk_tl208_cls", node = OldMCMKTl208)
 cs.store(group="data", name="next100_sim", node = NEXT100Sim)
+cs.store(group="data", name="atpc_0nubb", node = ATPC_0nubb)

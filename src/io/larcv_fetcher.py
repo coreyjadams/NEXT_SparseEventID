@@ -21,6 +21,15 @@ def lr_meta(detector):
                 ('origin', "float32", (3)),
             ]
         )
+    elif detector == Detector.atpc:
+        return numpy.array([
+            ([600, 600, 600], [6000., 6000., 6000.],[-3000., -3000., 0])],
+            dtype=[
+                ('n_voxels', "int", (3)),
+                ('size', "float32", (3)),
+                ('origin', "float32", (3)),
+            ]
+        )
     else:
         return numpy.array([
             ([640, 640, 1280], [960., 960., 1280.],[-480., -480., 0])],
@@ -39,6 +48,15 @@ def pmaps_meta(detector):
     if detector == Detector.next_white:
         return numpy.array([
             ([64, 64, 64], [640, 640, 640],[-320., -320., -45])],
+            dtype=[
+                ('n_voxels', "int", (3)),
+                ('size', "float32", (3)),
+                ('origin', "float32", (3)),
+            ]
+        )
+    elif detector == Detector.atpc:
+        return numpy.array([
+            ([600, 600, 600], [6000., 6000., 6000.],[-3000., -3000., 0])],
             dtype=[
                 ('n_voxels', "int", (3)),
                 ('size', "float32", (3)),
