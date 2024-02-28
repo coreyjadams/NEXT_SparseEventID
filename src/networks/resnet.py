@@ -18,7 +18,6 @@ class Encoder(torch.nn.Module):
 
         # How many filters did we start with?
         current_number_of_filters = params.encoder.n_initial_filters
-
         if params.framework.mode == DataMode.sparse:
             # image_size = [64,64,128]
             self.input_layer = scn.InputLayer(
@@ -117,7 +116,6 @@ class Encoder(torch.nn.Module):
         
         for i, l in enumerate(self.network_layers):
             x = l(x)
-         
 
         # Last convolutional Layers:
         x = self.final_layer(x)

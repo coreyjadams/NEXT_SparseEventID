@@ -1,7 +1,7 @@
 defaults:
   - detect_vertex
   # - override encoder: convnet
-  - override data: mc_mk_tl208_cls
+  - override data: next100_sim
   - _self_
 
 data:

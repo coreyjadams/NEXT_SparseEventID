@@ -15,12 +15,16 @@ mc_tl_208_dir = dataset_top + "polarisProduction/simCLR_train/"
 mc_mk_tl_208_dir = dataset_top + "dnn-dataset/simulation/larcv_2023/"
 old_mk_tl208_dir = dataset_top + "dnn-dataset/simulation/outdated_larcv/"
 # mc_tl_208_dir = dataset_top + "Calibration/NEXT_v1_05_02_NEXUS_v5_07_10_bkg_v9/larcv/merged/"
-
+next_100_dir = "/lus/eagle/projects/datascience/cadams/NEXT/next100-generation/2nubb/"
 
 class RandomMode(Enum):
     random_blocks = 0
     serial_access = 1
     random_events = 2
+
+class Detector(Enum):
+    next_white = 0
+    next_100   = 1
 
 @dataclass
 class Data:
@@ -37,6 +41,7 @@ class Data:
     normalize:  bool = True 
     transform1: bool = True
     transform2: bool = True
+    detector: Detector = Detector.next_white
 
 @dataclass
 class MCTl208(Data):
@@ -100,6 +105,15 @@ class MCBackground(Data):
     val:   str = mc_bkg_dir + "next_white_background_val.h5"
 
 
+@dataclass
+class NEXT100Sim(Data):
+    name:      str = "next100_sim"
+    mc:       bool = True
+    train:     str = next_100_dir + "next100_train.h5"
+    val:       str = next_100_dir + "next100_val.h5"
+    image_key: str = "lr_hits"
+    vertex:   bool = True
+    detector: Detector = Detector.next_100
 
 
 cs = ConfigStore.instance()
@@ -107,3 +121,4 @@ cs.store(group="data", name="mc_mk_tl208", node=MCMKTl208)
 cs.store(group="data", name="mc_bkg",   node=MCBackground)
 cs.store(group="data", name="mc_mk_tl208_cls", node = MCMKTl208_CLS)
 cs.store(group="data", name="old_mc_mk_tl208_cls", node = OldMCMKTl208)
+cs.store(group="data", name="next100_sim", node = NEXT100Sim)
