@@ -22,8 +22,13 @@ class Norm(Enum):
 
 @dataclass
 class Representation:
+<<<<<<< Updated upstream
     depth:             int   = 3
     n_initial_filters: int   = 32
+=======
+    depth:             int   = 6
+    n_initial_filters: int   = 64
+>>>>>>> Stashed changes
     n_output_filters:  int   = 128
     weight_decay:      float = 0.00
 

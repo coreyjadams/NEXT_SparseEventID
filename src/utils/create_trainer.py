@@ -144,7 +144,7 @@ def create_trainer(args, lightning_model, datasets):
         val_check_interval      = 10,
         check_val_every_n_epoch = None,
         limit_val_batches       = limit_val_batches,
-        callbacks               = [model_checkpoint, ModelSummary(max_depth=2,)],
+        callbacks               = [model_checkpoint, ModelSummary(max_depth=3,)],
     )
 
     return trainer, lightning_model, checkpoint_path

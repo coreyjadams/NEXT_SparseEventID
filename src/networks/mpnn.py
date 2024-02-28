@@ -16,7 +16,7 @@ class MLP(torch.nn.Module):
 
         for n_out in params.layers:
             self.layers.append(torch.nn.Linear(n_in, n_out, bias=params.bias))
-            self.layers.append(torch.nn.Tanh())
+            self.layers.append(torch.nn.GELU())
             n_in = n_out
 
     def forward(self, x):
@@ -25,11 +25,17 @@ class MLP(torch.nn.Module):
         return x
     
 
-# class GraphLayer(torch_geometric.nn.MessagePassing):
+class GraphLayer(torch_geometric.nn.MessagePassing):
 
-#     def __init__(self, in_channels, out_channels, params):
-        
+    def __init__(self, in_channels, out_channels, params):
+        super().__init__(self, aggr="add")
 
+        self.message_mlp = MLP(in_channels, params)
+
+        self.node_mlp = MLP(in_channels, params)
+
+    
+    def message(self, x_j, x_i, edges_ij)
 
 
 class Encoder(torch.nn.Module):
