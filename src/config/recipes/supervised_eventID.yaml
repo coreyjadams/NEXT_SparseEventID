@@ -1,7 +1,7 @@
 defaults:
   - supervised_classification
   - override encoder: convnet
-  - override data: atpc_0nubb
+  - override data: mc_mk_tl208_cls
   - _self_
 
 data:

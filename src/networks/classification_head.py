@@ -3,16 +3,21 @@ import torch
 
 
 from src.config.framework import DataMode
+from src.config.network   import EncoderType
 
 
 def build_networks(params, input_shape):
 
-    if params.framework.mode != DataMode.graph:
-        from . resnet import Encoder
-        encoder = Encoder(params, input_shape)
-    else:
+    if params.framework.mode == DataMode.graph:
         from . mpnn import Encoder
         encoder = Encoder(params, input_shape)
+    else:
+        if params.encoder.type == EncoderType.resnet:
+            from . resnet import Encoder
+            encoder = Encoder(params, input_shape)
+        elif params.encoder.type == EncoderType.vit:
+            from . vit import Encoder
+            encoder = Encoder(params, input_shape)
 
     output_shape = encoder.output_shape
 

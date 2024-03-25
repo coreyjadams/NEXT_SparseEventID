@@ -20,13 +20,18 @@ class Norm(Enum):
     layer = 2
     group = 3
 
+class EncoderType(Enum):
+    resnet = 0
+    mpnn   = 1
+    vit    = 2
+
 @dataclass
 class Representation:
     depth:             int   = 3
     n_initial_filters: int   = 32
     n_output_filters:  int   = 128
     weight_decay:      float = 0.00
-
+    type:        EncoderType = EncoderType.resnet
 
 @dataclass
 class ConvRepresentation(Representation):
@@ -38,6 +43,14 @@ class ConvRepresentation(Representation):
     growth_rate:          GrowthRate   = GrowthRate.additive
     downsampling:         DownSampling = DownSampling.convolutional
 
+@dataclass
+class ViT(Representation):
+    num_heads:    int = 8
+    embed_dim:    int = 64
+    type: EncoderType = EncoderType.vit
+    bias:        bool = True
+    depth:        int = 8
+    dropout:    float = 0.5
 
 @dataclass
 class MLPConfig():
@@ -48,6 +61,7 @@ class MLPConfig():
 class GraphRepresentation(Representation):
     mlp_config: MLPConfig = field(default_factory= lambda : MLPConfig(layers=[32,32]))
     graph_layer:      str = "GINConv"
+    type:     EncoderType = EncoderType.mpnn
 
 
 @dataclass
@@ -61,5 +75,6 @@ class YoloHead:
 cs = ConfigStore.instance()
 cs.store(group="encoder", name="convnet",     node=ConvRepresentation)
 cs.store(group="encoder", name="gnn",         node=GraphRepresentation)
+cs.store(group="encoder", name="vit",         node=ViT)
 cs.store(group="head", name="classification", node=ClassificationHead)
 cs.store(group="head", name="yolo",           node=YoloHead)
