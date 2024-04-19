@@ -8,13 +8,15 @@ def init_optimizer(optimizer_kind, parameters, decay):
     from src.config import OptimizerKind
 
     if optimizer_kind == OptimizerKind.rmsprop:
-        opt = torch.optim.RMSprop(parameters, lr=1.0, eps=1e-6, weight_decay=decay)
+        opt = torch.optim.RMSprop(parameters, lr=1.0, weight_decay=decay)
     elif optimizer_kind == OptimizerKind.adam:
-        opt = torch.optim.Adam(parameters, lr=1.0, eps=1e-6, betas=(0.8,0.9), weight_decay=decay)
+        opt = torch.optim.Adam(parameters, lr=1.0, weight_decay=decay)
+    elif optimizer_kind == OptimizerKind.adamw:
+        opt = torch.optim.AdamW(parameters, lr=1.0, weight_decay=decay)
     elif optimizer_kind == OptimizerKind.adagrad:
         opt = torch.optim.Adagrad(parameters, lr=1.0, weight_decay=decay)
     elif optimizer_kind == OptimizerKind.adadelta:
-        opt = torch.optim.Adadelta(parameters, lr=1.0, eps=1e-6, weight_decay=decay)
+        opt = torch.optim.Adadelta(parameters, lr=1.0, weight_decay=decay)
     elif optimizer_kind == OptimizerKind.lars:
         from . lars import LARS
         opt = LARS(parameters, lr=1.0, weight_decay=decay)

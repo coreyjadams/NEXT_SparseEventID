@@ -20,6 +20,7 @@ class OptimizerKind(Enum):
     lars     = 5
     lamb     = 6
     novograd = 7
+    adamw    = 8
 
 @dataclass
 class LRScheduleConfig:

@@ -33,6 +33,9 @@ def build_networks(params, input_shape):
         classification_head.append(torch.nn.Flatten(start_dim=1, end_dim=-1))
         classification_head.append(torch.nn.InstanceNorm1d(current_number_of_filters))
 
+    if len(params.head.layers) == 0:
+        return encoder, lambda x : x
+
     for i, layer in enumerate(params.head.layers):
 
         classification_head.append(torch.nn.Linear(

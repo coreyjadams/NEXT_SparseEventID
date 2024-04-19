@@ -54,6 +54,7 @@ class supervised_eventID(pl.LightningModule):
 
 
         representation = self.encoder(batch)
+
         # logits = representation
         logits = self.head(representation)
 

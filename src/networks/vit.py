@@ -32,9 +32,9 @@ class ViTEncoderBlock(torch.nn.Module):
         self.mlp = torch.nn.Sequential(
             torch.nn.Linear(params.encoder.embed_dim, hidden_dim),
             torch.nn.GELU(),
-            torch.nn.Dropout(params.encoder.dropout),
+            # torch.nn.Dropout(params.encoder.dropout),
             torch.nn.Linear(hidden_dim, params.encoder.embed_dim),
-            torch.nn.Dropout(params.encoder.dropout)
+            # torch.nn.Dropout(params.encoder.dropout)
         )
     def forward(self, inputs):
 
@@ -89,7 +89,6 @@ class Encoder(torch.nn.Module):
         # )
         # self.output_shape = [128, 8, 8, 8]
         self.output_shape = [params.encoder.embed_dim,]
-        print(image_size)
 
         patches_shape = [p // 8 for p in image_size]
 
@@ -137,26 +136,44 @@ class Encoder(torch.nn.Module):
         x = self.input_layer(x)
        
         x = self.patchify(x)
-        
+        # print("Patches shape: ", x.shape)
         B = x.shape[0]
-        
+        # print("Batch shape: ", B)
         x = x.reshape( (x.shape[0:2]) + (-1,))
+        # print("Reshaped: ", x.shape)
         # move the tokens to the first non-batch dim
         x = torch.transpose(x, 1, 2)
-        
+        # print("Transposed shape: ", x.shape)
+        # print("Class encoding shape: ", self.cls_token.shape)
+        cls_token = self.cls_token.repeat(B,1,1)
+        # print("Cls token.mean(): ", self.cls_token.mean())
+        # print("Cls token.std(): ", self.cls_token.std())
+        # print("pos embed: ", self.pos_embedding)
+        # print("Repeated Class encoding shape: ", cls_token.shape)
+        # print("Position encoding shape: ", self.pos_embedding.shape)
         # Add the classification token:
-        x = torch.cat([x, self.cls_token.repeat(B,1,1)], dim=1)
+
+        x = torch.cat([cls_token, x], dim=1)
+
+        # print("Shape with cls: ", x.shape)
 
         # Add the positional embedding:
         x = x + self.pos_embedding
+
+        # print("Shape with pos embedding: ", x.shape)
+
+
+        # exit()
 
         #
         for i, l in enumerate(self.network_layers):
             x = l(x)
 
         # Pull off the classification token:
-        x = x[:,0,:]
-
+        # x = x[:,0,:]
+        x = x.mean(dim=1)
+        # print("x.mean(): ", x.mean())
+        # print("x.std(): ", x.std())
         return x
 
 
