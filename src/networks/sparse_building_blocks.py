@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import sparseconvnet as scn
 
-from src.config.network import  Norm
+from src.config.network import  Norm, BlockStyle
 
 class InputNorm(nn.Module):
 
@@ -22,6 +22,8 @@ class Block(nn.Module):
         nn.Module.__init__(self)
 
         kernel = 3*[params.filter_size,]
+
+
 
         self.conv1 = scn.SubmanifoldConvolution(
             dimension   = 3,
@@ -94,6 +96,83 @@ class ResidualBlock(nn.Module):
 
         return out
 
+from sparseconvnet import SparseConvNetTensor
+
+class SparseGELU(nn.Module):
+    def forward(self, input):
+        output = SparseConvNetTensor()
+        output.features = nn.functional.gelu(input.features)
+        output.metadata = input.metadata
+        output.spatial_size = input.spatial_size
+        return output
+    def input_spatial_size(self, out_size):
+        return out_size
+
+class ConvNextBlock(nn.Module):
+
+    def __init__(self, *, nIn, nOut, params):
+        nn.Module.__init__(self)
+
+        self.convolution_1 = scn.SubmanifoldConvolution(
+            dimension   = 3,
+            nIn         = nIn,
+            nOut        = nIn,
+            filter_size = [7,7,7],
+            groups      = nIn,
+            bias        = params.bias)
+        
+        self.convolution_2 = scn.SubmanifoldConvolution(
+            dimension   = 3,
+            nIn         = nIn,
+            nOut        = 4*nIn,
+            filter_size = [1,1,1],
+            groups      = 1,
+            bias        = params.bias)
+
+        self.convolution_3 = scn.SubmanifoldConvolution(
+            dimension   = 3,
+            nIn         = 4*nIn,
+            nOut        = nIn,
+            filter_size = [1,1,1],
+            groups      = 1,
+            bias        = params.bias)
+
+        self.residual = scn.Identity()
+        self.gelu = SparseGELU()
+
+        self._do_normalization = False
+        if params.normalization == Norm.batch:
+            self._do_normalization = True
+            self.norm = scn.BatchNormalization(nOut)
+        elif params.normalization == Norm.group:
+            self._do_normalization = True
+            self.norm = scn.SparseGroupNorm(num_groups=1, num_channels=nOut)
+        elif params.normalization == Norm.layer:
+            raise Exception("Layer norm not supported in SCN")
+
+        self.add = scn.AddTable()
+
+    def forward(self, x):
+
+        residual = self.residual(x)
+
+        x = self.convolution_1(x)
+
+        x = self.norm(x)
+
+        x = self.convolution_2(x)
+
+        x = self.gelu(x)
+
+        x = self.convolution_3(x)
+
+        # The addition of sparse tensors is not straightforward, since
+
+
+
+        out = self.add([x, residual])
+
+        return out
 
 class ConvolutionDownsample(nn.Module):
 
@@ -235,9 +314,16 @@ class BlockSeries(torch.nn.Module):
     def __init__(self, *, nIn, n_blocks, params):
         torch.nn.Module.__init__(self)
 
-        if params.residual:
+        if params.block_style == BlockStyle.residual:
             self.blocks = [ 
                 ResidualBlock(nIn    = nIn,
+                              nOut   = nIn,
+                              params = params)
+                for i in range(n_blocks)
+            ]
+        elif params.block_style == BlockStyle.convnext:
+            self.blocks = [
+                ConvNextBlock(nIn    = nIn,
                               nOut   = nIn,
                               params = params)
                 for i in range(n_blocks)

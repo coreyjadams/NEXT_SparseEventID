@@ -362,7 +362,7 @@ class exec(object):
     
     def configure_logger(self, rank):
 
-        logger = logging.getLogger("SpEvID")
+        logger = logging.getLogger("NEXT")
         if rank == 0:
             logger.setFile(self.args.output_dir + "/process.log")
             logger.setLevel(logging.INFO)

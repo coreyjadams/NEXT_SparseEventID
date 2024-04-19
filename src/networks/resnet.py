@@ -72,7 +72,7 @@ class Encoder(torch.nn.Module):
 
         self.final_layer = BlockSeries(
                     nIn      = current_number_of_filters,
-                    n_blocks = params.encoder.blocks_per_layer,
+                    n_blocks = 1,
                     params   = params.encoder
                 )
 
@@ -85,6 +85,7 @@ class Encoder(torch.nn.Module):
 
 
         final_shape = [i // 2**params.encoder.depth for i in image_size]
+        # self.output_shape = [params.encoder.n_output_filters,]
         self.output_shape = [params.encoder.n_output_filters,] +  final_shape
 
         # We apply a global pooling layer to the image, to produce the encoding:
@@ -92,7 +93,7 @@ class Encoder(torch.nn.Module):
             self.pool = torch.nn.Sequential(
                 scn.SparseToDense(
                     dimension=3, nPlanes=self.output_shape[0]),
-                # torch.nn.AvgPool3d(self.output_shape[1:]),
+                torch.nn.AvgPool3d(self.output_shape[1:]),
                 # torch.nn.AvgPool3d(self.output_shape[1:], divisor_override=1),
             )
 
@@ -124,10 +125,11 @@ class Encoder(torch.nn.Module):
         x = self.bottleneck(x)
         
         # # Pool correctly: 
-        x = self.pool(x)
+        x = self.pool(x).squeeze()
+        
 
         # Normalize the output features?
-        x = torch.tanh(x)
+        # x = torch.tanh(x)
 
         return x
 

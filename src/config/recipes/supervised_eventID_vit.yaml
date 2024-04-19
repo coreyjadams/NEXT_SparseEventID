@@ -1,6 +1,6 @@
 defaults:
   - supervised_classification
-  - override encoder: convnet
+  - override encoder: vit
   - override data: mc_mk_tl208_cls
   - _self_
 
@@ -8,14 +8,15 @@ data:
   active:
     - train
     - val
-  transform1: True
+  transform1: False
   transform2: False
 
 encoder:
-  n_output_filters: 2
+  embed_dim: 256
+  depth: 20
 
 head:
-  layers: []
+  layers: [2,]
     # - 128
     # - 128
     # - 64

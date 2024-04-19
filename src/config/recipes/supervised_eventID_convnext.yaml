@@ -13,7 +13,8 @@ data:
 
 encoder:
   n_output_filters: 2
-
+  block_style: convnext
+  
 head:
   layers: []
     # - 128

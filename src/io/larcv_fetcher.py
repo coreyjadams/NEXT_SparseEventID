@@ -132,7 +132,7 @@ def prepare_next_config(batch_size, input_file, data_args, name,
         producer  = producer_name,
         name      = name+producer_name,
         MaxVoxels = 6500,
-        Augment   = False,
+        Augment   = True,
         Channels  = [0]
     )
 
@@ -459,7 +459,7 @@ class larcv_dataset(object):
 
         for key in self.batch_keys:
             if key == "event_ids": continue
-            if "lr_hits" in key:
+            if "lr_hits" in key or "depositions" in key:
                 if self.data_mode == DataMode.dense:
                     minibatch_data[key]  = data_transforms.larcvsparse_to_dense_3d(
                         minibatch_data[key],

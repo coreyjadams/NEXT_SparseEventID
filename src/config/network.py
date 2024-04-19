@@ -26,20 +26,24 @@ class EncoderType(Enum):
     vit    = 2
     cvt    = 3
     
+class BlockStyle(Enum):
+    none     = 0
+    residual = 1
+    convnext = 2
+
 @dataclass
 class Representation:
-    depth:             int = 3
-    n_initial_filters: int = 32
-    n_output_filters:  int = 128
-    weight_decay:    float = 0.00
-    type:      EncoderType = EncoderType.resnet
+    depth:             int   = 3
+    n_initial_filters: int   = 32
+    n_output_filters:  int   = 128
+    type:        EncoderType = EncoderType.resnet
+    bias:               bool = True
 
 @dataclass
 class ConvRepresentation(Representation):
-    normalization:        Norm         = Norm.batch
-    bias:                 bool         = True
+    normalization:        Norm         = Norm.group
     blocks_per_layer:     int          = 4
-    residual:             bool         = True
+    block_style:          BlockStyle   = BlockStyle.residual
     filter_size:          int          = 3
     growth_rate:          GrowthRate   = GrowthRate.additive
     downsampling:         DownSampling = DownSampling.convolutional
@@ -49,15 +53,15 @@ class ViT(Representation):
     num_heads:    int = 8
     embed_dim:    int = 64
     type: EncoderType = EncoderType.vit
-    bias:        bool = True
     depth:        int = 8
     dropout:    float = 0.5
 
 @dataclass
 class CvT(Representation):
-    depth:            int = 3
+    num_heads:        int = 8
+    depth:            int = 2
     type:     EncoderType = EncoderType.cvt
-    blocks_per_layer: int = 3
+    blocks_per_layer: int = 2
 
 @dataclass
 class MLPConfig():
