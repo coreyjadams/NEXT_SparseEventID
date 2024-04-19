@@ -96,12 +96,12 @@ class Encoder(torch.nn.Module):
         if params.framework.mode == DataMode.sparse:
             self.patchify = torch.nn.Sequential(
                 scn.Convolution(
-                    dimension   = 3,
-                    nIn         = 1,
-                    nOut        = params.encoder.embed_dim,
-                    filter_size = 8,
-                    filter_stride = 8,
-                    bias        = params.encoder.bias
+                    dimension     = 3,
+                    nIn           = 1,
+                    nOut          = params.encoder.embed_dim,
+                    filter_size   = 7,
+                    filter_stride = 1,
+                    bias          = params.encoder.bias
                 ),
                 scn.SparseToDense(
                     dimension=3, nPlanes=params.encoder.embed_dim),
