@@ -1,6 +1,6 @@
 defaults:
   - supervised_classification
-  - override encoder: vit
+  - override encoder: cvt
   - override data: mc_mk_tl208_cls
   - _self_
 
@@ -10,10 +10,6 @@ data:
     - val
   transform1: False
   transform2: False
-
-encoder:
-  depth: 8
-  embed_dim: 64
 
 head:
   layers: [2,]

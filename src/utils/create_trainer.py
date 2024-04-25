@@ -16,7 +16,7 @@ class OversubscribeMPI(MPIEnvironment):
 
 def create_trainer(args, lightning_model, datasets):
 
-    from src.config import Precision
+    from src.config import Precision, ComputeMode
 
     # Map the precision to lightning args:
     if args.run.precision == Precision.mixed:
@@ -49,7 +49,12 @@ def create_trainer(args, lightning_model, datasets):
             strategy = "horovod"
         elif args.framework.distributed_mode == DistributedMode.DDP:
             from pytorch_lightning.strategies import DDPStrategy
-            backend = "nccl"
+            if args.run.compute_mode == ComputeMode.CUDA: backend = "nccl"
+            elif args.run.compute_mode == ComputeMode.XPU: 
+                import oneccl_bindings_for_pytorch
+                backend = "ccl"
+            else:
+                backend = "gloo"
             if oversubscribe > 1:
                 backend = "gloo"
             strategy = DDPStrategy(

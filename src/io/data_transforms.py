@@ -1,5 +1,4 @@
 import numpy
-import torch_geometric
 '''
 This is a torch-free file that exists to massage data
 From sparse to dense or dense to sparse, etc.
@@ -85,6 +84,7 @@ def larcvsparse_to_dense_3d(input_array, dense_shape):
 import torch
 
 def larcvsparse_to_pytorch_geometric(input_array, image_meta):
+    import torch_geometric
 
     # Need to create node features and an adjacency matrix.
     # Define points as connected if they fall within some radius R

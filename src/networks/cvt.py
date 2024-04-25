@@ -1,236 +1,131 @@
 import torch
-import sparseconvnet as scn
+import torch.nn as nn
+try:
+    import sparseconvnet as scn
+except:
+    pass
 
 import numpy
 
 from src.config.network import GrowthRate, DownSampling
 from src.config.framework import DataMode
 
-class ConvolutionalTransformerBlock(torch.nn.Module):
 
-    def __init__(self, nIn, params):
+
+# Most of the blocks here are adapted to 3D use case from here:
+# https://github.com/changzy00/pytorch-attention/blob/master/vision_transformers/cvt.py
+
+class ConvTransBlock(nn.Module):
+    def __init__(self, dim, num_heads, mlp_ratio=4, kernel_size=3):
         super().__init__()
-
-        # Create the attention generator:
-        self.attn = ConvolutionalAttention(nIn, params)
-
-        # if params.framework.mode == DataMode.sparse:
-        #     self.norm = scn.SparseGroupNorm(num_groups=1, num_channels=nIn)
-        # else:
-        #     self.norm = torch.nn.InstanceNorm3d(nIn)
-
+        hidden_features = int(dim * mlp_ratio)
+        self.attn = Attention(dim, num_heads, kernel_size)
+        self.mlp = ConvMlp(dim, hidden_features)
+        self.norm = LayerNorm(dim, eps=1e-6, data_format="channels_first")
 
     def forward(self, x):
-        
-        attn = self.attn(x)
-
-
-        return attn
+        x = x + self.attn(x)
+        x = x + self.mlp(self.norm(x))
+        return x
     
-class ConvolutionalAttention(torch.nn.Module):
     
-    def __init__(self, nIn, params):
+class Attention(nn.Module):
+    def __init__(self, dim, num_heads=8, ks=3, attn_drop=0, proj_drop=0):
         super().__init__()
-
-        self.num_heads = params.encoder.num_heads
-
-        if params.framework.mode == DataMode.sparse:
-
-            self.norm = scn.SparseGroupNorm(num_groups=1, num_channels=nIn)
-
-            self.k, self.q, self.v = [
-                torch.nn.Sequential(
-                    scn.SubmanifoldConvolution(dimension=3,
-                        nIn         = nIn,
-                        nOut        = nIn,
-                        filter_size = 3,
-                        groups      = nIn,
-                        bias        = False
-                    ),
-                    
-                ) for _ in range(3) ]
-        else:
-            self.norm = torch.nn.LayerNorm(nIn)
-            self.q, self.k, self.v = [
-                torch.nn.Sequential(
-                    torch.nn.Conv3d(
-                        in_channels  = nIn,
-                        out_channels = nIn,
-                        kernel_size  = 3,
-                        stride       = 1,
-                        padding      = "same"
-                    ),
-                ) for _ in range(3) ]
-
-            self.attn = torch.nn.MultiheadAttention(nIn, self.num_heads, batch_first = True)
-
-            self.mlp = torch.nn.Linear(nIn, nIn)
-
+        assert dim % num_heads == 0
+        self.num_heads = num_heads
+        head_dim = dim  // num_heads
+        self.scale = head_dim ** -0.5
+        self.conv_proj_qkv = nn.Sequential(
+            nn.Conv3d(dim, dim, kernel_size=ks, stride=1, padding=(ks - 1) // 2, groups=dim),
+            nn.InstanceNorm3d(dim),
+            nn.Conv3d(dim, 3 * dim, 1)
+        )
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Conv3d(dim, dim, 1)
+        self.proj_drop = nn.Dropout(proj_drop)
 
     def forward(self, x):
-        
+        B, C, H, W, D = x.shape
+        qkv = self.conv_proj_qkv(x).reshape(B, 3, self.num_heads, C // self.num_heads, H, W, D)
+        qkv = qkv.flatten(4).permute(1, 0, 2, 4, 3)
+        q, k, v = qkv.unbind(0)
+        attn = (q @ k.transpose(-1, -2)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+        x = (attn @ v).transpose(-1, -2).reshape(B, C, H * W * D)
+        x = x.reshape(B, C, H, W, D)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+    
 
-        q, k, v = self.q(x), self.k(x), self.v(x)
-
-
-        input_shape = q.shape
-
-        B = input_shape[0]
-        c = input_shape[1]
-        # h, w, d = input_shape[2], input_shape[3], input_shape[4]
-
-        # This is the target shape before permuting:
-        q_shape = (B, c, -1)
-
-        q = torch.permute(torch.reshape(q, q_shape), (0,2,1))
-        k = torch.permute(torch.reshape(k, q_shape), (0,2,1))
-        v = torch.permute(torch.reshape(v, q_shape), (0,2,1))
-
-        # Reshape for the number of heads:
-
-        attn = self.attn(q, k, v, need_weights=False)[0]
-
-
-        # Take the input, and shape it into flat tokens for the attention:
-        token_x = torch.permute(torch.reshape(x, (B, c, -1)), (0,2,1))
-
-
-        # Intermediate addition:
-        inter_x = token_x + attn
-
-
-        # Pass through the MLP
-        output = inter_x + self.mlp(self.norm(inter_x))
-
-
-        # Reshape the attention to match the input shape:
-        output = torch.permute(output, (0,2,1))
-
-        return torch.reshape(output, x.shape)
+class LayerNorm(nn.Module):
+    r""" LayerNorm that supports two data formats: channels_last (default) or channels_first. 
+    The ordering of the dimensions in the inputs. channels_last corresponds to inputs with 
+    shape (batch_size, height, width, channels) while channels_first corresponds to inputs 
+    with shape (batch_size, channels, height, width).
+    """
+    def __init__(self, normalized_shape, eps=1e-6, data_format="channels_last"):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(normalized_shape))
+        self.bias = nn.Parameter(torch.zeros(normalized_shape))
+        self.eps = eps
+        self.data_format = data_format
+        if self.data_format not in ["channels_last", "channels_first"]:
+            raise NotImplementedError 
+        self.normalized_shape = (normalized_shape, )
+    
+    def forward(self, x):
+        if self.data_format == "channels_last":
+            return F.layer_norm(x, self.normalized_shape, self.weight, self.bias, self.eps)
+        elif self.data_format == "channels_first":
+            u = x.mean(1, keepdim=True)
+            s = (x - u).pow(2).mean(1, keepdim=True)
+            x = (x - u) / torch.sqrt(s + self.eps)
+            x = self.weight[:, None, None, None] * x + self.bias[:, None, None, None]
+            return x
 
 
 class ConvolutionalTokenEmbedding(torch.nn.Module):
 
-    def __init__(self, nIn, nOut, params):
+    def __init__(self, nIn, nOut, kernel, stride, padding):
         super().__init__()
 
-        if params.framework.mode == DataMode.sparse:
-
-            # Padding isn't available for sparse convolutions.
-            # So, the shape can't come out right in one conv.
-            # Using a depthwise conv to increase the filters,
-            # and a stride=2, filter=2 conv to downsample that.
-            # Putting in a normalization in between
-            self.conv = torch.nn.Sequential(
-                scn.SubmanifoldConvolution(dimension=3,
-                    nIn             = nIn,
-                    nOut            = nOut,
-                    filter_size     = 7,
-                    groups          = nIn,
-                    bias            = False
-                ),
-                scn.SparseGroupNorm(num_groups=1, num_channels=nOut),
-                scn.Convolution(dimension=3,
-                    nIn             = nOut,
-                    nOut            = nOut,
-                    filter_size     = 2,
-                    filter_stride   = 2,
-                    bias            = False
-                )
-            )
-        else:
-            self.conv = torch.nn.Conv3d(
-                in_channels= nIn,
-                out_channels= nOut,
-                kernel_size = 7,
-                stride = 2,
-                padding = 3
-            )
-
+        self.conv = torch.nn.Conv3d(
+            in_channels= nIn,
+            out_channels= nOut,
+            kernel_size = kernel,
+            stride = stride,
+            padding = padding
+        )
+        self.norm = LayerNorm(nOut, data_format="channels_first")
 
     def forward(self, x):
 
         x = self.conv(x)
+        return self.norm(x)
 
-        return x
-
-
-# class ViTEncoderBlock(torch.nn.Module):
-
-#     def __init__(self, params):
-#         super().__init__()
-
-#         # self.norm1 = torch.nn.LayerNorm()
-#         # self.norm2 = torch.nn.LayerNorm()
-
-#         # Create the key, query and value all at once:
-#         self.qkv = torch.nn.Linear(params.encoder.embed_dim, 3*params.encoder.embed_dim)
-
-
-#         self.norm1 = torch.nn.InstanceNorm1d(params.encoder.embed_dim)
-#         self.norm2 = torch.nn.InstanceNorm1d(params.encoder.embed_dim)
-
-#         self.attention = torch.nn.MultiheadAttention(
-#             embed_dim = params.encoder.embed_dim, 
-#             num_heads = params.encoder.num_heads,
-#             batch_first = True,
-#         )
-#         hidden_dim = 4*params.encoder.embed_dim
-
-#         self.mlp = torch.nn.Sequential(
-#             torch.nn.Linear(params.encoder.embed_dim, hidden_dim),
-#             torch.nn.GELU(),
-#             torch.nn.Dropout(params.encoder.dropout),
-#             torch.nn.Linear(hidden_dim, params.encoder.embed_dim),
-#             torch.nn.Dropout(params.encoder.dropout)
-#         )
-#     def forward(self, inputs):
-
-#         x = inputs
-#         # First, apply a normalization:
-#         x = self.norm1(x)
-
-#         # Generate the query, key and values:
-#         qkv = self.qkv(x)
-#         # print("qkv.shape: ", qkv.shape)
-#         query, key, value = torch.chunk(qkv, chunks=3, dim = -1)
-#         # print("query.shape: ", query.shape)
-#         # print("key.shape: ", key.shape)
-#         # print("value.shape: ", value.shape)
-
-#         # Now, apply multihead attention:
-#         attention = self.attention(query, key, value)[0]
-#         # print(attention)
-#         # Residual connection:
-#         mid_x = inputs + attention    
-
-#         x = self.norm2(mid_x)
-
-#         x = self.mlp(x)
-
-#         return x + mid_x
-
-class Block(torch.nn.Module):
-
-    def __init__(self, nIn, nOut, params):
+class ConvMlp(nn.Module):
+    def __init__(self, in_features, hidden_features=None, out_features=None, drop=0):
         super().__init__()
-
-        self.cte = ConvolutionalTokenEmbedding(nIn, nOut, params)
-
-        self.encoder_layers = torch.nn.Sequential()
-        for _ in range(params.encoder.blocks_per_layer):
-            self.encoder_layers.append(
-                ConvolutionalTransformerBlock(nOut, params)
-            )
-            pass
+        hidden_features = hidden_features or in_features
+        out_features = out_features or in_features
+        self.conv1 = nn.Conv3d(in_features, hidden_features, 1)
+        self.act = nn.GELU()
+        self.drop1 = nn.Dropout(drop)
+        self.conv2 = nn.Conv3d(hidden_features, out_features, 1)
+        self.drop2 = nn.Dropout(drop)
 
     def forward(self, x):
-
-        x = self.cte(x)
-
-        x = self.encoder_layers(x)
-
+        x = self.conv1(x)
+        x = self.act(x)
+        x = self.drop1(x)
+        x = self.conv2(x)
+        x = self.drop2(x)
         return x
+    
+
 
 class Encoder(torch.nn.Module):
 
@@ -238,97 +133,56 @@ class Encoder(torch.nn.Module):
 
         super().__init__()
 
-        # How many filters did we start with?
-        if params.framework.mode == DataMode.sparse:
-            # image_size = [64,64,128]
-            self.input_layer = scn.InputLayer(
-                dimension    = 3,
-                # spatial_size = 512,
-                spatial_size = torch.tensor(image_size)
-            )
-        else:
-            self.input_layer = torch.nn.Identity()
 
-        if params.framework.mode == DataMode.sparse:
-            self.patchify = torch.nn.Sequential(
-                scn.SubmanifoldConvolution(
-                    dimension     = 3,
-                    nIn           = 1,
-                    nOut          = params.encoder.n_initial_filters,
-                    filter_size   = 7,
-                    bias          = params.encoder.bias
-                ),
-                # scn.SparseToDense(
-                    # dimension=3, nPlanes=params.encoder.embed_dim),
-            )
-        
-        else:
-            self.patchify = torch.nn.Conv3d(
-                in_channels  = 1,
-                out_channels = params.encoder.n_initial_filters,
-                kernel_size  = 7,
-                stride       = 2,
-                padding      = 3
-            )
-
-        nIn = params.encoder.n_initial_filters
-
-        self.network_layers = torch.nn.ModuleList()
+        # Only Dense mode supported for ViT
+        assert params.framework.mode == DataMode.dense
 
 
-        for i_layer in range(params.encoder.depth):
-            nOut = 2*nIn
-            self.network_layers.append(Block(nIn, nOut, params))
+        nIn  = 1
+
+        dims   = [64, 192, 384]
+        layers = [1, 2, 3]
+        num_heads = [1, 3, 6]
+
+        self.network_layers = nn.ModuleList()
+
+        for i in range(len(dims)):
+            nOut = dims[i] 
+            if i == 0:
+                self.network_layers.append(
+                    ConvolutionalTokenEmbedding(nIn, nOut, kernel=7, stride=4, padding=2)
+                )
+            else:
+                self.network_layers.append(
+                    ConvolutionalTokenEmbedding(nIn, nOut, kernel=3, stride=2, padding=1)
+                )
+            for j in range(layers[i]):
+
+                self.network_layers.append(
+                    ConvTransBlock(
+                        nOut, num_heads[i]
+                    )
+                )
+
             nIn = nOut
 
-        if params.framework.mode == DataMode.sparse:
-            self.bottleneck =  torch.nn.Sequential(
-                scn.SubmanifoldConvolution(
-                    dimension     = 3,
-                    nIn           = nOut,
-                    nOut          = params.encoder.n_output_filters,
-                    filter_size   = 1,
-                    # filter_stride = 1,
-                    bias          = params.encoder.bias
-                ),
-                scn.SparseToDense(
-                    dimension=3, nPlanes=params.encoder.n_output_filters),
-            )
-        else:
-            self.bottleneck = torch.nn.Conv3d(
-                in_channels  = nOut,
-                out_channels = params.encoder.n_output_filters,
-                kernel_size  = 1,
-                stride       = 1
-            )
+        self.output_shape = [params.encoder.n_output_filters, 4, 4, 4]
+        # # self.output_shape = [params.encoder.embed_dim,]
+        # # print(image_size)
 
-        nOut = params.encoder.n_output_filters
-
-        self.output_shape = [nOut, 8, 8, 8]
-        # self.output_shape = [params.encoder.embed_dim,]
-        print(image_size)
-
+        self.bottleneck = nn.Conv3d(nOut, params.encoder.n_output_filters, 1)
 
 
     def forward(self, x):
 
-        # print("Initial Size: ", x.spatial_size)
-        x = self.input_layer(x)
-        print("Size after input_layer: ", x.shape)
-
-        x = self.patchify(x)
-        print("Size after patchify: ", x.shape)
 
 
         for i, l in enumerate(self.network_layers):
             x = l(x)
-            print(f"Size after layer {i}: ", x.shape)
 
         x = self.bottleneck(x)
-        print(x.shape)
-        # Pull off the classification token:
-        # x = torch.mean(x, axis=(2,3,4))
-        # print(x.shape)
+
+
 
         return x
 

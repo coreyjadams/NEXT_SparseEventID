@@ -1,5 +1,9 @@
 import torch
-import sparseconvnet as scn
+import torch.nn as nn
+try:
+    import sparseconvnet as scn
+except:
+    pass
 
 import numpy
 
@@ -25,9 +29,24 @@ class Encoder(torch.nn.Module):
                 # spatial_size = 512,
                 spatial_size = torch.tensor(image_size)
             )
+            self.initial_convolution = scn.SubmanifoldConvolution(
+                dimension   = 3,
+                nIn         = 1,
+                nOut        = params.encoder.n_initial_filters,
+                filter_size = 5,
+                bias        = params.encoder.bias
+            )
+
         else:
             self.input_layer = torch.nn.Identity()
-
+            self.initial_convolution = nn.Conv3d(
+                    in_channels  = 1,
+                    out_channels = params.encoder.n_initial_filters,
+                    kernel_size  = 5,
+                    stride       = 1,
+                    padding      = "same",
+                    bias         = params.encoder.bias
+                )
         # self.first_block = Block(
         #     nIn    = 1,
         #     nOut   = params.encoder.n_initial_filters,
@@ -36,13 +55,7 @@ class Encoder(torch.nn.Module):
 
 
 
-        self.initial_convolution = scn.SubmanifoldConvolution(
-                dimension   = 3,
-                nIn         = 1,
-                nOut        = params.encoder.n_initial_filters,
-                filter_size = 5,
-                bias        = params.encoder.bias
-            )
+
 
         if params.encoder.downsampling == DownSampling.convolutional:
             downsampler = ConvDonsample
@@ -76,12 +89,22 @@ class Encoder(torch.nn.Module):
                     params   = params.encoder
                 )
 
-        self.bottleneck  = scn.SubmanifoldConvolution(dimension=3,
-                    nIn  = current_number_of_filters,
-                    nOut = params.encoder.n_output_filters,
-                    filter_size=3,
-                    bias=params.encoder.bias)
 
+        if params.framework.mode == DataMode.sparse:
+            self.bottleneck  = scn.SubmanifoldConvolution(dimension=3,
+                        nIn  = current_number_of_filters,
+                        nOut = params.encoder.n_output_filters,
+                        filter_size=3,
+                        bias=params.encoder.bias)
+        else:
+            self.bottleneck  = nn.Conv3d(
+                    in_channels  = current_number_of_filters,
+                    out_channels = params.encoder.n_output_filters,
+                    kernel_size  = 1,
+                    stride       = 1,
+                    padding      = 0,
+                    bias         = params.encoder.bias
+                )
 
 
         final_shape = [i // 2**params.encoder.depth for i in image_size]
@@ -100,6 +123,7 @@ class Encoder(torch.nn.Module):
         else:
             self.pool = torch.nn.AvgPool3d(self.output_shape[1:])
 
+        self.output_shape = [params.encoder.n_output_filters,]
 
         # if params.framework.mode == DataMode.sparse:
         #     self.final_activation = scn.Tanh()
@@ -113,6 +137,7 @@ class Encoder(torch.nn.Module):
 
         x = self.input_layer(x)
        
+
         x = self.initial_convolution(x)
         
         for i, l in enumerate(self.network_layers):
@@ -124,6 +149,7 @@ class Encoder(torch.nn.Module):
         # Bottleneck for the right number of outputs:
         x = self.bottleneck(x)
         
+
         # # Pool correctly: 
         x = self.pool(x).squeeze()
         
@@ -150,6 +176,6 @@ class Encoder(torch.nn.Module):
         else:
             from . building_blocks import Block, BlockSeries
             from . building_blocks import ConvolutionDownsample
-            from . building_blocks import MaxPooling
+            from . building_blocks import MaxPooling as Pooling
             from . building_blocks import InputNorm
         return Block, BlockSeries, ConvolutionDownsample, Pooling, InputNorm

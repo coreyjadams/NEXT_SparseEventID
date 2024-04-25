@@ -2,8 +2,7 @@ import torch
 from torch import nn
 
 
-from src.config.network import  Norm
-
+from src.config.network import  Norm, BlockStyle
 
 class InputNorm(nn.Module):
 
@@ -176,12 +175,35 @@ class BlockSeries(torch.nn.Module):
     def __init__(self, *, nIn, n_blocks, params, kernel=[3,3,3], padding="same"):
         torch.nn.Module.__init__(self)
 
-        if not params.residual:
-            self.blocks = [ Block(nIn = nIn, nOut = nIn,
-                kernel=kernel, padding=padding, params = params) for i in range(n_blocks) ]
+
+        if params.block_style == BlockStyle.residual:
+            self.blocks = [ 
+                ResidualBlock(nIn    = nIn,
+                              nOut   = nIn,
+                              params = params)
+                for i in range(n_blocks)
+            ]
+        elif params.block_style == BlockStyle.convnext:
+            self.blocks = [
+                ConvNextBlock(nIn    = nIn,
+                              nOut   = nIn,
+                              params = params)
+                for i in range(n_blocks)
+            ]
         else:
-            self.blocks = [ ResidualBlock(nIn = nIn, nOut = nIn,
-                kernel=kernel, padding=padding, params = params) for i in range(n_blocks)]
+            self.blocks = [ 
+                Block(nIn    = nIn,
+                      nOut   = nIn,
+                      params = params)
+                for i in range(n_blocks)
+            ]
+
+        # if not params.residual:
+        #     self.blocks = [ Block(nIn = nIn, nOut = nIn,
+        #         kernel=kernel, padding=padding, params = params) for i in range(n_blocks) ]
+        # else:
+        #     self.blocks = [ ResidualBlock(nIn = nIn, nOut = nIn,
+        #         kernel=kernel, padding=padding, params = params) for i in range(n_blocks)]
 
         for i, block in enumerate(self.blocks):
             self.add_module('block_{}'.format(i), block)

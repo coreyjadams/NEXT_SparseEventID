@@ -19,6 +19,7 @@ class Norm(Enum):
     batch = 1
     layer = 2
     group = 3
+    instance = 4
 
 class EncoderType(Enum):
     resnet = 0
@@ -33,25 +34,37 @@ class BlockStyle(Enum):
 
 @dataclass
 class Representation:
-    depth:             int   = 3
-    n_initial_filters: int   = 32
-    n_output_filters:  int   = 128
-    type:        EncoderType = EncoderType.resnet
-    bias:               bool = True
+    depth:            int = 3
+    type:     EncoderType = EncoderType.resnet
+    bias:            bool = False
 
 @dataclass
-class ConvRepresentation(Representation):
-    normalization:        Norm         = Norm.group
+class ResNet(Representation):
+    normalization:        Norm         = Norm.batch
     blocks_per_layer:     int          = 4
     block_style:          BlockStyle   = BlockStyle.residual
     filter_size:          int          = 3
     growth_rate:          GrowthRate   = GrowthRate.additive
     downsampling:         DownSampling = DownSampling.convolutional
+    n_initial_filters:    int          = 32
+    n_output_filters:     int          = 128
+
+@dataclass
+class ConvNext(Representation):
+    normalization:        Norm         = Norm.instance
+    blocks_per_layer:     int          = 4
+    block_style:          BlockStyle   = BlockStyle.convnext
+    filter_size:          int          = 3
+    growth_rate:          GrowthRate   = GrowthRate.additive
+    downsampling:         DownSampling = DownSampling.convolutional
+    n_initial_filters:    int          = 32
+    n_output_filters:     int          = 128
 
 @dataclass
 class ViT(Representation):
     num_heads:    int = 8
     embed_dim:    int = 64
+    patch_size:   int = 8
     type: EncoderType = EncoderType.vit
     depth:        int = 8
     dropout:    float = 0.5
@@ -60,8 +73,10 @@ class ViT(Representation):
 class CvT(Representation):
     num_heads:        int = 8
     depth:            int = 2
+    embed_dim:        int = 64
     type:     EncoderType = EncoderType.cvt
     blocks_per_layer: int = 2
+    n_output_filters: int= 128
 
 @dataclass
 class MLPConfig():
@@ -84,7 +99,7 @@ class YoloHead:
     layers: Tuple[int] = field(default_factory=list)
 
 cs = ConfigStore.instance()
-cs.store(group="encoder", name="convnet",     node=ConvRepresentation)
+cs.store(group="encoder", name="resnet",      node=ResNet)
 cs.store(group="encoder", name="gnn",         node=GraphRepresentation)
 cs.store(group="encoder", name="vit",         node=ViT)
 cs.store(group="encoder", name="cvt",         node=CvT)

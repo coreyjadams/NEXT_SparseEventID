@@ -1,4 +1,10 @@
 import torch
+try:
+    import intel_extension_for_pytorch as ipex
+    import oneccl_bindings_for_pytorcy
+except:
+    pass
+
 import pytorch_lightning as pl
 
 # torch.set_float32_matmul_precision('high')
@@ -55,10 +61,8 @@ class supervised_eventID(pl.LightningModule):
 
         representation = self.encoder(batch)
 
-        print(representation.shape)
-        # logits = representation
         logits = self.head(representation)
-        print(logits.shape)
+
         return logits
 
 
