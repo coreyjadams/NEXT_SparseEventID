@@ -1,4 +1,10 @@
 import torch
+try:
+    import intel_extension_for_pytorch
+    import oneccl_bindings_for_pytorch
+except:
+    pass
+
 import pytorch_lightning as pl
 
 import warnings

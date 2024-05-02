@@ -1,0 +1,21 @@
+defaults:
+  - representation
+  - override data: mc_mk_tl208
+  - override encoder: vit
+  - _self_
+
+data:
+  active:
+    - train
+    - val
+
+encoder:
+  depth: 8
+  embed_dim: 64
+
+
+head:
+  layers:
+    - 256
+mode:
+  restore_encoder_only: False
