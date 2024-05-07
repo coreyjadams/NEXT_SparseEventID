@@ -47,7 +47,7 @@ def pmaps_meta(detector):
     # and upsample in the networks more smoothly
     if detector == Detector.next_white:
         return numpy.array([
-            ([64, 64, 64], [640, 640, 640],[-320., -320., -45])],
+            ([64, 64, 128], [640, 640, 1280],[-320., -320., -45])],
             dtype=[
                 ('n_voxels', "int", (3)),
                 ('size', "float32", (3)),
