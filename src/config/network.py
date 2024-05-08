@@ -51,7 +51,7 @@ class ResNet(Representation):
 
 @dataclass
 class ConvNext(Representation):
-    normalization:        Norm         = Norm.instance
+    normalization:        Norm         = Norm.group
     blocks_per_layer:     int          = 4
     block_style:          BlockStyle   = BlockStyle.convnext
     filter_size:          int          = 3
@@ -100,6 +100,7 @@ class YoloHead:
 
 cs = ConfigStore.instance()
 cs.store(group="encoder", name="resnet",      node=ResNet)
+cs.store(group="encoder", name="convnext",    node=ConvNext)
 cs.store(group="encoder", name="gnn",         node=GraphRepresentation)
 cs.store(group="encoder", name="vit",         node=ViT)
 cs.store(group="encoder", name="cvt",         node=CvT)

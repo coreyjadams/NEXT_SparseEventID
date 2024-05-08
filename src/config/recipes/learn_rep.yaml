@@ -11,5 +11,6 @@ data:
 head:
   layers:
     - 256
+    
 mode:
   restore_encoder_only: False

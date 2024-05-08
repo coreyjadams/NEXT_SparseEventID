@@ -149,6 +149,7 @@ class ConvNextBlock(nn.Module):
             self.norm = scn.SparseGroupNorm(num_groups=1, num_channels=nOut)
         elif params.normalization == Norm.layer:
             raise Exception("Layer norm not supported in SCN")
+            self.norm = lambda x : x
 
         self.add = scn.AddTable()
 

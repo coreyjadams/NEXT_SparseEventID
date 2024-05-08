@@ -1,6 +1,6 @@
 defaults:
   - supervised_classification
-  - override encoder: convnet
+  - override encoder: convnext
   - override data: mc_mk_tl208_cls
   - _self_
 
@@ -13,7 +13,6 @@ data:
 
 encoder:
   n_output_filters: 2
-  block_style: convnext
   
 head:
   layers: []

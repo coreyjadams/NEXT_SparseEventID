@@ -166,7 +166,7 @@ class Encoder(torch.nn.Module):
 
             nIn = nOut
 
-        self.output_shape = [params.encoder.n_output_filters, 4, 4, 4]
+        self.output_shape = [params.encoder.n_output_filters, 4, 4, 8]
         # # self.output_shape = [params.encoder.embed_dim,]
         # # print(image_size)
 
@@ -181,7 +181,6 @@ class Encoder(torch.nn.Module):
             x = l(x)
 
         x = self.bottleneck(x)
-
 
 
         return x
