@@ -1,0 +1,19 @@
+defaults:
+  - supervised_classification
+  - override encoder: swin
+  - override data: mc_mk_tl208_cls
+  - _self_
+
+data:
+  active:
+    - train
+    - val
+  transform1: False
+  transform2: False
+
+head:
+  layers: [2,]
+    # - 128
+    # - 128
+    # - 64
+    # - 2

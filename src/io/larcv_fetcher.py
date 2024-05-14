@@ -313,7 +313,7 @@ def create_larcv_dataset(data_args, batch_size, batch_keys,
         data_args  = data_args,
         input_file = input_file,
         name       = name,
-        is_mc      = data_args.mc,
+        is_mc      = True if "sim" in name else False,
         get_vertex = data_args.vertex
     )
 
@@ -341,7 +341,7 @@ def create_larcv_dataset(data_args, batch_size, batch_keys,
         batch_keys      = batch_keys,
         name            = name,
         data_args       = data_args,
-        is_mc           = data_args.mc,
+        is_mc           = True if "sim" in name else False,
         energy          = energy_array,
         data_mode       = data_mode)
 
@@ -431,8 +431,11 @@ class larcv_dataset(object):
             minibatch_data[key] = numpy.reshape(minibatch_data[key], minibatch_dims[key])
 
         if 'energy' in self.batch_keys:
-            label_particle = minibatch_data['label'][:,0]
-            minibatch_data['energy'] = label_particle['_energy_deposit']
+            # Use the event IDs to pull the energy out:
+            entries = minibatch_data["entries"]
+            energies = self.energy[entries]
+            
+            minibatch_data['energy'] = energies
 
 
         # We need the event id for vertex classification, even if it's not used.
@@ -456,7 +459,6 @@ class larcv_dataset(object):
         }
 
         # Shape the images:
-
         for key in self.batch_keys:
             if key == "event_ids": continue
             if "lr_hits" in key or "depositions" in key:

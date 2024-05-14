@@ -1,13 +1,10 @@
 defaults:
   - supervised_classification
   - override encoder: resnet
-  - override data: mc_mk_tl208_cls
+  - override data: next-white-supervised
   - _self_
 
 data:
-  active:
-    - train
-    - val
   transform1: True
   transform2: False
 

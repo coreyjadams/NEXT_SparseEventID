@@ -21,6 +21,9 @@ def build_networks(params, input_shape):
         elif params.encoder.type == EncoderType.cvt:
             from . cvt import Encoder
             encoder = Encoder(params, input_shape)
+        elif params.encoder.type == EncoderType.swin:
+            from . swin import Encoder
+            encoder = Encoder(params, input_shape)
         else:
             raise Exception(f"Encoder {params.encoder.type} not found")
 

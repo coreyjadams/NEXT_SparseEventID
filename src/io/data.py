@@ -85,13 +85,6 @@ def create_torch_larcv_dataloader(larcv_ds, global_batch_size, data_mode, device
     else:
         target_collate_fn = data.default_convert
 
-    # if data_mode == DataMode.graph:
-    #     import torch_geometric
-    #     torch_dl = torch_geometric.loader.DataLoader(
-    #         ids, 
-    #         # exclude_keys = ["event_ids",]
-    #     )
-    # else:
     torch_dl = data.DataLoader(ids,
         num_workers    = 0,
         batch_size    = None,
@@ -101,3 +94,53 @@ def create_torch_larcv_dataloader(larcv_ds, global_batch_size, data_mode, device
     )
 
     return torch_dl
+
+
+class JointLarcvDataset(data.IterableDataset):
+
+    def __init__(self, sim_larcv_dataset, data_larcv_dataset, global_batch_size):
+        super(TorchLarcvDataset).__init__()
+
+        self.length = min(len(sim_larcv_dataset), len(data_larcv_dataset)) 
+
+        self.sim_ds = iter(sim_larcv_dataset)
+        self.data_ds = iter(data_larcv_dataset)
+        self.global_batch_size = global_batch_size
+
+    def __iter__(self):
+        i = 0
+        while i < self.length:
+            sim_batch = next(self.sim_ds)
+            data_batch = next(self.data_ds)
+            yield {"sim" : sim_batch, "data": data_batch}
+            i += 1
+
+    def image_size(self, key):
+        return self.data_ds.image_size(key)
+
+    def image_meta(self, key):
+        return self.data_ds.image_meta(key)
+
+    def __len__(self):
+        return int(self.length / self.global_batch_size)
+
+
+def create_sim_data_dataloader(sim_larcv_ds, data_larcv_ds, global_batch_size, data_mode, device=None):
+
+    ids = JointLarcvDataset(sim_larcv_ds, data_larcv_ds, global_batch_size)
+    
+    if device is not None:
+        target_collate_fn = lambda x : custom_convert(x, device)
+    else:
+        target_collate_fn = data.default_convert
+
+    torch_dl = data.DataLoader(ids,
+        num_workers    = 0,
+        batch_size    = None,
+        batch_sampler = None,
+        pin_memory    = False,
+        collate_fn    = target_collate_fn
+    )
+
+    return torch_dl
+

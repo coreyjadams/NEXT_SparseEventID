@@ -94,33 +94,40 @@ class supervised_eventID(pl.LightningModule):
         self.log_dict(metrics)
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx):
 
 
-        image = batch[self.image_key]
+        if dataloader_idx == 0:
+            image = batch[self.image_key]
 
-        logits = self(image)
-
-
-        prediction = self.predict_event(logits)
-        loss = self.calculate_loss(batch, logits, prediction)
-
-        accuracy_dict = self.calculate_accuracy(prediction, batch['label'])
+            logits = self(image)
 
 
+            prediction = self.predict_event(logits)
+            loss = self.calculate_loss(batch, logits, prediction)
 
-        metrics = {
-            'loss/loss' : loss,
-            'opt/lr' : self.optimizers().state_dict()['param_groups'][0]['lr']
-        }
+            accuracy_dict = self.calculate_accuracy(prediction, batch['label'])
 
 
-        metrics.update(accuracy_dict)
 
-        # self.log()
-        self.print_log(metrics, mode="val")
-        metrics = { "/val/" + key : metrics[key] for key in metrics}
-        self.log_dict(metrics, logger)
+            metrics = {
+                'loss/loss' : loss,
+                'opt/lr' : self.optimizers().state_dict()['param_groups'][0]['lr']
+            }
+
+
+            metrics.update(accuracy_dict)
+
+            # self.log()
+            self.print_log(metrics, mode="val")
+            metrics = { "/val/" + key : metrics[key] for key in metrics}
+            self.log_dict(metrics, logger)
+        elif dataloader_idx == 1:
+
+            # Compute energy distance between simulation and data:
+            data_batch = batch["data"][self.image_key]
+            sim_batch  = batch["sim"][self.image_key]
+
         return
 
 

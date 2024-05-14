@@ -24,7 +24,7 @@ sys.path.insert(0,network_dir)
 # from src.config import Config
 from src.config.mode import ModeKind
 
-from src.io import create_larcv_dataset
+from src.io import create_larcv_dataset, create_sim_data_dataloader
 
 from src import logging
 
@@ -136,12 +136,23 @@ class exec(object):
 
         elif self.args.name == "supervised_eventID":
             batch_keys.append("label")
+            batch_keys.append("energy")
         elif self.args.name == "unsupervised_eventID":
             batch_keys.append("energy")
             batch_keys.append("label")
 
+        # for data, make sure there is no label:
+        import copy
+        data_keys = copy.copy(batch_keys)
+        if "label" in data_keys: data_keys.remove("label")
+
+
         ds = {}
         for active in self.args.data.active:
+
+            # We put the comparison data into one dataset
+            # So skip it here:
+            if "comp" in active: continue
 
             f_name = getattr(self.args.data, active)
             larcv_ds = create_larcv_dataset(self.args.data,
@@ -149,7 +160,7 @@ class exec(object):
                 input_file   = f_name,
                 name         = active,
                 distributed  = self.args.run.distributed,
-                batch_keys   = batch_keys,
+                batch_keys   = batch_keys if "sim" in active else data_keys,
                 data_mode    = self.args.framework.mode,
             )
             # # We pull out the energy and labels for this dataset:
@@ -172,6 +183,40 @@ class exec(object):
             })
             # Get the image size:
             spatial_size = larcv_ds.image_size(self.args.data.image_key)
+
+        # Now for the comparison datasets:
+        if all([c in self.args.data.active for c in ["sim_comp", "data_comp"] ]):
+            
+
+
+            f_name = getattr(self.args.data, "sim_comp")
+            sim_ds = create_larcv_dataset(self.args.data,
+                batch_size   = self.args.run.minibatch_size,
+                input_file   = f_name,
+                name         = "sim_comp",
+                distributed  = self.args.run.distributed,
+                batch_keys   = batch_keys,
+                data_mode    = self.args.framework.mode,
+            )
+
+
+            f_name = getattr(self.args.data, "data_comp")
+            data_ds = create_larcv_dataset(self.args.data,
+                batch_size   = self.args.run.minibatch_size,
+                input_file   = f_name,
+                name         = "data_comp",
+                distributed  = self.args.run.distributed,
+                batch_keys   = data_keys,
+                data_mode    = self.args.framework.mode,
+            )
+
+            joint_ds = create_sim_data_dataloader(
+                sim_ds, data_ds,
+                self.args.run.minibatch_size,
+                self.args.framework.mode,
+            )
+
+            ds.update({"comp" : joint_ds})
 
         return ds
         #
@@ -197,12 +242,23 @@ class exec(object):
 
         trainer, model, checkpoint_path = create_trainer(self.args, self.trainer, self.datasets)
 
-        trainer.fit(
-            model,
-            train_dataloaders= self.datasets["train"],
-            val_dataloaders  = self.datasets["val"],
-            ckpt_path        = checkpoint_path
-        )
+        if self.args.name == "simclr":
+            pass
+
+        elif self.args.name == "yolo":
+            pass
+        elif self.args.name == "supervised_eventID":
+            trainer.fit(
+                model,
+                train_dataloaders= self.datasets["sim_train"],
+                val_dataloaders  = [self.datasets["sim_val"], self.datasets["comp"]],
+                ckpt_path        = checkpoint_path,
+            )
+
+        elif self.args.name == "unsupervised_eventID":
+            from src.utils.unsupervised_eventID import create_lightning_module
+
+
 
 
     def inference(self):

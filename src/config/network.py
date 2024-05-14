@@ -26,7 +26,8 @@ class EncoderType(Enum):
     mpnn   = 1
     vit    = 2
     cvt    = 3
-    
+    swin   = 4
+
 class BlockStyle(Enum):
     none     = 0
     residual = 1
@@ -79,6 +80,18 @@ class CvT(Representation):
     n_output_filters: int= 128
 
 @dataclass
+class Swin(Representation):
+    type: EncoderType = EncoderType.swin
+    hidden_dim:   int = 96
+    layers: List[int] = field(default_factory=lambda : [2, 2, 6, 8 ])
+    heads:  List[int] = field(default_factory=lambda : [3, 6, 12, 24 ])
+    embed_dim:    int = 64
+    head_dim:     int = 32
+    window_size:  int = 7
+    downscaling_factors: List[int] = field(default_factory=lambda : [4, 2, 2, 2] ) 
+    relative_pos_embedding: bool = True
+
+@dataclass
 class MLPConfig():
     layers:     List[int] = field(default_factory=lambda: [16,])
     bias:            bool = True
@@ -104,5 +117,6 @@ cs.store(group="encoder", name="convnext",    node=ConvNext)
 cs.store(group="encoder", name="gnn",         node=GraphRepresentation)
 cs.store(group="encoder", name="vit",         node=ViT)
 cs.store(group="encoder", name="cvt",         node=CvT)
+cs.store(group="encoder", name="swin",        node=Swin)
 cs.store(group="head", name="classification", node=ClassificationHead)
 cs.store(group="head", name="yolo",           node=YoloHead)
