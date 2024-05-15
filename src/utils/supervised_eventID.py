@@ -122,14 +122,53 @@ class supervised_eventID(pl.LightningModule):
             self.print_log(metrics, mode="val")
             metrics = { "/val/" + key : metrics[key] for key in metrics}
             self.log_dict(metrics, logger)
+
         elif dataloader_idx == 1:
 
             # Compute energy distance between simulation and data:
             data_batch = batch["data"][self.image_key]
             sim_batch  = batch["sim"][self.image_key]
 
+            e_dist_metrics = self.energy_distance(
+                self.encoder(data_batch),
+                self.encoder(sim_batch),
+            )
+
+            self.print_log(e_dist_metrics, mode = "comp")
+
+            metrics = { "/comp/" + key : e_dist_metrics[key] for key in e_dist_metrics}
+
+            self.log_dict(metrics, logger)
+
         return
 
+
+    def energy_distance(self, dist1, dist2):
+        """
+        Compute the energy distance between two batches of vectors
+        See https://pages.stat.wisc.edu/~wahba/stat860public/pdf4/Energy/EnergyDistance10.1002-wics.1375.pdf
+        for more information about Energy Distance.
+        """
+        
+        # Compute the individual distributions A B and C
+        
+        N, features = dist1.shape
+
+        A = dist1.reshape((N, 1, features)) - dist1.reshape((1, N, features))
+        A = (A**2).sum(axis=-1).mean()
+
+        B = dist2.reshape((N, 1, features)) - dist2.reshape((1, N, features))
+        B = (B**2).sum(axis=-1).mean()
+
+        C = dist1.reshape((N, 1, features)) - dist2.reshape((1, N, features))
+        C = (C**2).sum(axis=-1).mean()
+
+        return {
+            "A" : A,
+            "B" : B,
+            "C" : C,
+            "Ed" : 2*C - A - B,
+        }
 
 
     def print_log(self, metrics, mode=""):
