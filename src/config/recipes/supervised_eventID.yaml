@@ -9,10 +9,10 @@ data:
   transform2: False
 
 encoder:
-  n_output_filters: 2
+  n_output_filters: 64
 
 head:
-  layers: []
+  layers: [2,]
     # - 128
     # - 128
     # - 64
