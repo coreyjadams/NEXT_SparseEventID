@@ -50,7 +50,7 @@ defaults = [
     {"mode"      : "train"},
     {"data"      : "mc_tl208"},
     {"framework" : "lightning"},
-    {"encoder"   : "convnet"}
+    {"encoder"   : "convnext"}
 ]
 
 @dataclass

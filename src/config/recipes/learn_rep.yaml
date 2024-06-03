@@ -1,12 +1,11 @@
 defaults:
   - representation
-  - override data: mc_mk_tl208
+  - override data: next-white-representation
   - _self_
 
 data:
   active:
-    - train
-    - val
+    - data_runs
 
 head:
   layers:

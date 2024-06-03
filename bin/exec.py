@@ -243,7 +243,11 @@ class exec(object):
         trainer, model, checkpoint_path = create_trainer(self.args, self.trainer, self.datasets)
 
         if self.args.name == "simclr":
-            pass
+            trainer.fit(
+                model,
+                train_dataloaders= self.datasets["data_runs"],
+                ckpt_path        = checkpoint_path,
+            )
 
         elif self.args.name == "yolo":
             pass
@@ -256,9 +260,7 @@ class exec(object):
             )
 
         elif self.args.name == "unsupervised_eventID":
-            from src.utils.unsupervised_eventID import create_lightning_module
-
-
+            pass
 
 
     def inference(self):
